@@ -1,5 +1,8 @@
-# argo
-docs/plans/
+# Argo-specific
+.argo/
+argo_local.h
+.env.argo.local
+build/
 
 # Prerequisites
 *.d
