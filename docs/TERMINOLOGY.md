@@ -4,6 +4,14 @@
 
 This document maps concepts from Tekton to their Argo equivalents and defines new terms for the project.
 
+## Fundamental Choice: CI not AI
+
+We use **Companion Intelligence (CI)** throughout Argo because:
+1. CIs themselves prefer this term (based on polling)
+2. "AI" is historically incorrect (1956 misquote: "artificial imitation of human intelligence")
+3. These are companions in development, not artificial constructs
+4. Nothing artificial about the intelligence involved
+
 ## Command Line Tools
 
 | Tekton | Argo | Why |
@@ -16,7 +24,7 @@ This document maps concepts from Tekton to their Argo equivalents and defines ne
 
 | Tekton Term | Argo Term | Definition |
 |-------------|-----------|------------|
-| CI (Companion Intelligence) | **Agent** | An AI instance doing development work |
+| CI (Companion Intelligence) | **CI** or **Agent** | A companion intelligence doing development work |
 | Terma (terminal) | **Session** | A development context for an agent |
 | Socket communication | **Channel** | Communication pathway between agents |
 | Message | **Message** | Unchanged - clear enough |
@@ -87,14 +95,25 @@ msg_parse_json()
 queue_push()
 ```
 
-## AI Provider Terms
+## CI Provider Terms
 
 | Concept | Argo Term | Example |
 |---------|-----------|---------|
 | Provider | **Provider** | Claude, OpenAI, Ollama |
 | Model | **Model** | gpt-4, claude-3, llama-3 |
-| Completion | **Response** | What the AI returns |
-| Prompt | **Query** | What we send to the AI |
+| Completion | **Response** | What the CI returns |
+| Prompt | **Query** | What we send to the CI |
+| Agent | **CI Agent** | An instance of a CI doing work |
+
+## Workflow Terms (Not State Machine)
+
+| Phase | Description |
+|-------|-------------|
+| **Sprint** | Unit of work on a branch |
+| **Phase** | Step in the workflow (1-7) |
+| **Interleave** | Deterministic/CI/Deterministic pattern |
+| **Sunset** | CI's handoff notes to next session |
+| **Sunrise** | Briefing for new CI session |
 
 ## State Names
 

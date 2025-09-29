@@ -4,6 +4,54 @@
 
 This document defines the exact process for developing Argo. Follow it religiously.
 
+## Sprint = Branch Philosophy
+
+Every sprint is a Git branch. This provides:
+- **Isolation**: Each sprint can't break others
+- **Atomicity**: Entire sprint merges or doesn't
+- **Traceability**: Git history shows sprint boundaries
+- **User Control**: Only user decides merge/abandon
+
+## The Development Workflow (Not State Machine)
+
+### The Seven Phases
+
+1. **Proposal** - Gather and understand requirements
+2. **Define Sprint** - Scope the work, create branch
+3. **Review Sprint** - What will we build?
+4. **Agree on Approach** - Define acceptance criteria and tests
+5. **Execute Sprint** - Build, test, iterate:
+   - a) Write test specifications
+   - b) Write code to pass tests
+   - c) Run unit tests
+   - d) Run functional tests
+   - e) Run integration tests
+   - f) Evaluate: Done or revise?
+6. **Complete Phase** - Document progress, update onboarding
+7. **Next Phase** - Return to step 3 or finish
+
+### The Interleaved Pattern
+
+Every CI interaction follows this pattern:
+```
+DETERMINISTIC → CI → DETERMINISTIC → CI → DETERMINISTIC
+```
+
+Example:
+```
+DETERMINISTIC: Create sprint branch, load context
+    ↓
+CI: Review requirements, propose approach
+    ↓
+DETERMINISTIC: Setup test framework
+    ↓
+CI: Write test cases
+    ↓
+DETERMINISTIC: Run tests, report results
+```
+
+CIs never control infrastructure - they provide creative input TO the deterministic system.
+
 ## The Four Phases (In Order, No Skipping)
 
 ### Phase 1: PLAN (Before Any Code)
@@ -246,24 +294,54 @@ But document what you did:
 "Added bounds check per defensive programming"
 ```
 
+## Sprint Management
+
+### Branch Lifecycle
+```bash
+# Sprint starts
+git checkout -b sprint-1-foundation
+
+# Work happens on sprint branch
+# Multiple CIs can work here
+# All changes isolated from main
+
+# Sprint complete (Casey decides)
+git checkout main
+git merge sprint-1-foundation  # Only if Casey approves
+
+# Clean up
+git branch -d sprint-1-foundation  # Or archive if needed
+```
+
+### No Intermediate Merges
+- Sprint branch never merges to main until complete
+- No "partial delivery" that might break main
+- Sprint is atomic unit - all or nothing
+
 ## Daily Flow
 
 ### Start of Session:
 ```
-You: "Resuming work on [FEATURE]. Currently at [STATUS]."
+CI: "Resuming work on [FEATURE]. Currently at [STATUS]."
 Casey: "Good. Continue with [SPECIFIC TASK]."
 ```
 
 ### During Development:
 ```
-You: "Tests 1-3 passing. Issue with test 4: [PROBLEM]"
+CI: "Tests 1-3 passing. Issue with test 4: [PROBLEM]"
 Casey: "Try [SOLUTION]" or "Show me the failing test"
 ```
 
 ### End of Session:
 ```
-You: "Completed: [WHAT]. Next: [WHAT]. Blockers: [ANY]"
+CI: "Completed: [WHAT]. Next: [WHAT]. Blockers: [ANY]"
 Casey: "Good progress" or "Let's revisit [ISSUE] tomorrow"
+```
+
+### Sprint Completion:
+```
+CI: "All tests passing, documentation updated. Sprint ready for review."
+Casey: [Reviews] "Merge it" / "Fix X first" / "Abandon this approach"
 ```
 
 ## Quality Gates
