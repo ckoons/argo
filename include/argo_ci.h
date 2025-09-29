@@ -6,11 +6,13 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
 
 /* CI name and role limits */
 #define CI_NAME_MAX 32
 #define CI_ROLE_MAX 32
 #define CI_MODEL_MAX 64
+#define CI_MAX_MESSAGE 8192
 
 /* CI roles (configurations) */
 #define CI_ROLE_BUILDER "builder"
@@ -25,12 +27,18 @@ typedef struct ci_response ci_response_t;
 typedef struct ci_context ci_context_t;
 typedef struct ci_memory_digest ci_memory_digest_t;
 
+/* Callback types */
+typedef void (*ci_response_callback)(const ci_response_t* response, void* userdata);
+typedef void (*ci_stream_callback)(const char* chunk, size_t len, void* userdata);
+
 /* CI response structure */
 struct ci_response {
+    bool success;
+    int error_code;
     char* content;
     size_t content_len;
-    int status_code;
-    char* error_message;
+    char* model_used;
+    time_t timestamp;
     void* provider_data;
 };
 
@@ -56,13 +64,13 @@ struct ci_context {
 };
 
 /* Function pointers for provider operations */
-typedef int (*ci_init_fn)(void* config);
-typedef int (*ci_connect_fn)(ci_context_t* ctx);
-typedef ci_response_t* (*ci_query_fn)(ci_context_t* ctx, const char* prompt);
-typedef int (*ci_stream_fn)(ci_context_t* ctx, const char* prompt,
-                           void (*callback)(const char* chunk, void* data),
-                           void* user_data);
-typedef void (*ci_cleanup_fn)(ci_context_t* ctx);
+typedef int (*ci_init_fn)(ci_provider_t* provider);
+typedef int (*ci_connect_fn)(ci_provider_t* provider);
+typedef int (*ci_query_fn)(ci_provider_t* provider, const char* prompt,
+                          ci_response_callback callback, void* userdata);
+typedef int (*ci_stream_fn)(ci_provider_t* provider, const char* prompt,
+                           ci_stream_callback callback, void* userdata);
+typedef void (*ci_cleanup_fn)(ci_provider_t* provider);
 
 /* CI provider structure */
 struct ci_provider {
@@ -85,6 +93,7 @@ struct ci_provider {
 
     /* Provider-specific data */
     void* provider_data;
+    void* context;  /* Provider's internal context */
 };
 
 /* Configuration structures for different roles */
