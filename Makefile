@@ -158,9 +158,62 @@ $(REGISTRY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_registry.o $(STUB_OBJECTS)
 $(MEMORY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_memory.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-# Run tests
-test: $(TEST_TARGET)
-	./$(TEST_TARGET)
+# Quick tests - fast, no external dependencies
+test-quick: test-registry test-memory
+	@echo ""
+	@echo "=========================================="
+	@echo "Quick Tests Complete"
+	@echo "=========================================="
+
+# All safe tests - includes API availability checks but no costs
+test-all: test-providers test-registry test-memory test-api
+	@echo ""
+	@echo "=========================================="
+	@echo "All Tests Complete"
+	@echo "=========================================="
+
+# Individual test targets
+test-providers: $(TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "CI Provider Tests"
+	@echo "=========================================="
+	-@./$(TEST_TARGET)
+
+test-registry: $(REGISTRY_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Registry Tests"
+	@echo "=========================================="
+	@./$(REGISTRY_TEST_TARGET)
+
+test-memory: $(MEMORY_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Memory Manager Tests"
+	@echo "=========================================="
+	@./$(MEMORY_TEST_TARGET)
+
+test-api: $(API_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "API Provider Tests"
+	@echo "NOTE: Requires valid API keys"
+	@echo "=========================================="
+	@./$(API_TEST_TARGET)
+
+# Explicit only - costs real money
+test-api-calls: $(API_CALL_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "WARNING: This will make actual API calls"
+	@echo "         and incur costs!"
+	@echo "=========================================="
+	@./$(API_CALL_TARGET)
+
+# Line counting
+count-core:
+	@./scripts/count_core.sh
 
 # Clean build artifacts
 clean:
@@ -193,4 +246,6 @@ update-models:
 	@echo "Updating model defaults from API providers..."
 	@./scripts/update_models.sh
 
-.PHONY: all directories test clean distclean check debug update-models
+.PHONY: all directories test-quick test-all test-providers test-registry \
+        test-memory test-api test-api-calls count-core clean distclean \
+        check debug update-models
