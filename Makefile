@@ -17,7 +17,8 @@ SESSION_DIR = .argo/sessions
 # Source files
 SOURCES = $(SRC_DIR)/argo_socket.c \
           $(SRC_DIR)/argo_ollama.c \
-          $(SRC_DIR)/argo_claude.c
+          $(SRC_DIR)/argo_claude.c \
+          $(SRC_DIR)/argo_claude_code.c
 
 # Object files
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
@@ -104,6 +105,8 @@ $(BUILD_DIR)/stubs.c:
 	@echo "    /* Check if claude CLI exists */" >> $@
 	@echo "    return false;  /* For now, assume not available */" >> $@
 	@echo "}" >> $@
+	@echo "/* claude_code functions are now in argo_claude_code.c */" >> $@
+	@echo "ci_provider_t* claude_code_create_provider(const char* ci_name);" >> $@
 	@echo "size_t claude_get_memory_usage(ci_provider_t* provider) {" >> $@
 	@echo "    (void)provider;" >> $@
 	@echo "    return 0;" >> $@

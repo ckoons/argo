@@ -236,6 +236,67 @@ int test_ollama_streaming(void) {
     return 0;
 }
 
+/* Test Claude Code prompt mode */
+int test_claude_code_provider(void) {
+    printf("\n=== Testing Claude Code Prompt Mode ===\n");
+    g_tests_run++;
+
+    /* Create provider */
+    ci_provider_t* provider = claude_code_create_provider("test_claude_code");
+    if (!provider) {
+        printf("FAIL: Could not create Claude Code provider\n");
+        return -1;
+    }
+
+    /* Initialize */
+    int result = provider->init(provider);
+    if (result != ARGO_SUCCESS) {
+        printf("FAIL: Could not initialize Claude Code: %s\n",
+               argo_error_string(result));
+        provider->cleanup(provider);
+        return -1;
+    }
+
+    /* Test query */
+    printf("Testing Claude Code prompt mode...\n");
+
+    bool response_received = false;
+
+    result = provider->query(provider,
+                           "What is 2 + 2? Please respond with just the number.",
+                           capture_callback,
+                           &response_received);
+
+    if (result != ARGO_SUCCESS) {
+        printf("FAIL: Query failed: %s\n", argo_error_string(result));
+        provider->cleanup(provider);
+        return -1;
+    }
+
+    /* Check response immediately (simulated) */
+    if (!response_received) {
+        printf("FAIL: No response received from Claude Code\n");
+        provider->cleanup(provider);
+        return -1;
+    }
+
+    if (!g_last_response.success) {
+        printf("FAIL: Claude Code returned error: %s\n",
+               argo_error_string(g_last_response.error_code));
+        provider->cleanup(provider);
+        return -1;
+    }
+
+    printf("Claude Code response: %s\n", g_last_response.content);
+
+    /* Cleanup */
+    provider->cleanup(provider);
+
+    printf("PASS: Claude Code prompt mode test\n");
+    g_tests_passed++;
+    return 0;
+}
+
 /* Test Claude provider */
 int test_claude_provider(void) {
     printf("\n=== Testing Claude Provider ===\n");
@@ -374,6 +435,10 @@ int main(int argc, char* argv[]) {
 
     if (g_running) {
         test_ollama_streaming();
+    }
+
+    if (g_running) {
+        test_claude_code_provider();
     }
 
     if (g_running) {

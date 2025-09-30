@@ -14,8 +14,12 @@
 /* Claude provider creation */
 ci_provider_t* claude_create_provider(const char* ci_name);
 
+/* Claude Code prompt mode provider */
+ci_provider_t* claude_code_create_provider(const char* ci_name);
+
 /* Claude-specific functions */
 bool claude_is_available(void);
+bool claude_code_is_available(void);
 int claude_get_session_info(const char* ci_name, char** info);
 int claude_clear_session(const char* ci_name);
 
