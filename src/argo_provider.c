@@ -385,10 +385,10 @@ char* provider_message_to_json(const provider_message_t* message) {
     if (!message) return NULL;
 
     /* Allocate buffer */
-    char* json = malloc(8192);
+    char* json = malloc(PROVIDER_MESSAGE_BUFFER_SIZE);
     if (!json) return NULL;
 
-    int len = snprintf(json, 8192,
+    int len = snprintf(json, PROVIDER_MESSAGE_BUFFER_SIZE,
         "{"
         "\"type\":\"%s\","
         "\"ci_name\":\"%s\","
@@ -403,11 +403,11 @@ char* provider_message_to_json(const provider_message_t* message) {
 
     /* Add context if present */
     if (message->context) {
-        len += snprintf(json + len, 8192 - len,
+        len += snprintf(json + len, PROVIDER_MESSAGE_BUFFER_SIZE - len,
             ",\"context\":\"%s\"", message->context);
     }
 
-    snprintf(json + len, 8192 - len, "}");
+    snprintf(json + len, PROVIDER_MESSAGE_BUFFER_SIZE - len, "}");
 
     return json;
 }
@@ -420,12 +420,12 @@ provider_message_t* provider_message_from_json(const char* json) {
     if (!msg) return NULL;
 
     /* Simple extraction - find fields */
-    char buffer[1024];
+    char buffer[PROVIDER_MESSAGE_FIELD_SIZE];
 
     /* Type */
     char* type_start = strstr(json, "\"type\":\"");
     if (type_start) {
-        type_start += 8;
+        type_start += PROVIDER_JSON_FIELD_OFFSET_TYPE;
         char* type_end = strchr(type_start, '"');
         if (type_end) {
             size_t len = type_end - type_start;
@@ -440,7 +440,7 @@ provider_message_t* provider_message_from_json(const char* json) {
     /* CI name */
     char* ci_start = strstr(json, "\"ci_name\":\"");
     if (ci_start) {
-        ci_start += 11;
+        ci_start += PROVIDER_JSON_FIELD_OFFSET_CI_NAME;
         char* ci_end = strchr(ci_start, '"');
         if (ci_end) {
             size_t len = ci_end - ci_start;
@@ -455,7 +455,7 @@ provider_message_t* provider_message_from_json(const char* json) {
     /* Content */
     char* content_start = strstr(json, "\"content\":\"");
     if (content_start) {
-        content_start += 11;
+        content_start += PROVIDER_JSON_FIELD_OFFSET_CONTENT;
         char* content_end = strchr(content_start, '"');
         if (content_end) {
             size_t len = content_end - content_start;
@@ -470,13 +470,13 @@ provider_message_t* provider_message_from_json(const char* json) {
     /* Timestamp */
     char* ts_start = strstr(json, "\"timestamp\":");
     if (ts_start) {
-        msg->timestamp = atol(ts_start + 12);
+        msg->timestamp = atol(ts_start + PROVIDER_JSON_FIELD_OFFSET_TIMESTAMP);
     }
 
     /* Sequence */
     char* seq_start = strstr(json, "\"sequence\":");
     if (seq_start) {
-        msg->sequence = atoi(seq_start + 11);
+        msg->sequence = atoi(seq_start + PROVIDER_JSON_FIELD_OFFSET_SEQUENCE);
     }
 
     return msg;

@@ -11,6 +11,16 @@
 #define CLAUDE_SESSION_DIR ".argo/sessions"
 #define CLAUDE_SESSION_PATH ".argo/sessions/%s.mmap"
 
+/* Claude Code configuration */
+#define CLAUDE_CODE_SESSION_ID_SIZE 64
+#define CLAUDE_CODE_PATH_SIZE 256
+#define CLAUDE_CODE_MAX_CONTEXT 200000
+#define CLAUDE_CODE_RESPONSE_CAPACITY 65536
+#define CLAUDE_CODE_TIMEOUT_SECONDS 300
+#define CLAUDE_CODE_CHUNK_BUFFER_SIZE 1024
+#define CLAUDE_CODE_MIN_FILE_SIZE 100
+#define CLAUDE_CODE_COMPLETION_CHECK_DELAY 2
+
 /* Claude provider creation */
 ci_provider_t* claude_create_provider(const char* ci_name);
 

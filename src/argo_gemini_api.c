@@ -17,7 +17,7 @@
 
 /* Gemini API context */
 typedef struct {
-    char model[64];
+    char model[API_MODEL_NAME_SIZE];
     char* response_content;
     size_t response_capacity;
     uint64_t total_queries;
@@ -54,7 +54,7 @@ ci_provider_t* gemini_api_create_provider(const char* model) {
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = true;
     ctx->provider.supports_memory = false;
-    ctx->provider.max_context = 2097152;  /* Gemini 1.5 has 2M context */
+    ctx->provider.max_context = GEMINI_MAX_CONTEXT;
 
     LOG_INFO("Created Gemini API provider for model %s", ctx->model);
     return &ctx->provider;
@@ -65,7 +65,7 @@ static int gemini_api_init(ci_provider_t* provider) {
     ARGO_GET_CONTEXT(provider, gemini_api_context_t, ctx);
 
     /* Allocate response buffer */
-    ctx->response_capacity = 65536;
+    ctx->response_capacity = API_RESPONSE_CAPACITY;
     ctx->response_content = malloc(ctx->response_capacity);
     if (!ctx->response_content) {
         return E_SYSTEM_MEMORY;
@@ -88,7 +88,7 @@ static int gemini_api_query(ci_provider_t* provider, const char* prompt,
     ARGO_GET_CONTEXT(provider, gemini_api_context_t, ctx);
 
     /* Build Gemini-specific JSON format */
-    char json_body[8192];
+    char json_body[API_REQUEST_BUFFER_SIZE];
     snprintf(json_body, sizeof(json_body),
             "{"
             "\"contents\":[{"
@@ -97,14 +97,14 @@ static int gemini_api_query(ci_provider_t* provider, const char* prompt,
             "}]"
             "}],"
             "\"generationConfig\":{"
-            "\"maxOutputTokens\":4096,"
+            "\"maxOutputTokens\":%d,"
             "\"temperature\":0.7"
             "}"
             "}",
-            prompt);
+            prompt, API_MAX_TOKENS);
 
     /* Build URL with model and API key */
-    char url[512];
+    char url[API_URL_SIZE];
     snprintf(url, sizeof(url), "%s/%s:generateContent?key=%s",
             GEMINI_API_URL, ctx->model, GEMINI_API_KEY);
 
@@ -123,7 +123,7 @@ static int gemini_api_query(ci_provider_t* provider, const char* prompt,
         return result;
     }
 
-    if (resp->status_code != 200) {
+    if (resp->status_code != API_HTTP_OK) {
         LOG_ERROR("Gemini API returned status %d: %s", resp->status_code, resp->body);
         http_response_free(resp);
         return E_PROTOCOL_HTTP;
@@ -224,5 +224,5 @@ static void gemini_api_cleanup(ci_provider_t* provider) {
 
 /* Check availability */
 bool gemini_api_is_available(void) {
-    return strlen(GEMINI_API_KEY) > 10;
+    return strlen(GEMINI_API_KEY) > API_KEY_MIN_LENGTH;
 }

@@ -209,23 +209,23 @@ int memory_set_sunrise_brief(ci_memory_digest_t* digest,
 char* memory_digest_to_json(ci_memory_digest_t* digest) {
     if (!digest) return NULL;
 
-    char* json = malloc(8192);
+    char* json = malloc(MEMORY_JSON_BUFFER_SIZE);
     if (!json) return NULL;
 
     int offset = 0;
-    offset += snprintf(json + offset, 8192 - offset,
+    offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset,
                       "{\"session_id\":\"%s\",\"ci_name\":\"%s\","
                       "\"created\":%ld,\"item_count\":%d,\"breadcrumbs\":[",
                       digest->session_id, digest->ci_name,
                       (long)digest->created, digest->selected_count);
 
     for (int i = 0; i < digest->breadcrumb_count; i++) {
-        offset += snprintf(json + offset, 8192 - offset,
+        offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset,
                           "%s\"%s\"", i > 0 ? "," : "",
                           digest->breadcrumbs[i]);
     }
 
-    offset += snprintf(json + offset, 8192 - offset, "]}");
+    offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset, "]}");
 
     return json;
 }

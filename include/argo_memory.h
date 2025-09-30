@@ -14,6 +14,9 @@
 #define MEMORY_BREADCRUMB_MAX 20
 #define MEMORY_SUGGESTION_MAX 10
 
+/* Memory JSON buffer size */
+#define MEMORY_JSON_BUFFER_SIZE 8192
+
 /* Memory item types */
 typedef enum memory_type {
     MEMORY_TYPE_FACT,           /* Facts about the project */

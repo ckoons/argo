@@ -24,8 +24,8 @@
 /* Ollama context structure */
 typedef struct ollama_context {
     /* Configuration */
-    char endpoint[256];
-    char model[64];
+    char endpoint[OLLAMA_ENDPOINT_SIZE];
+    char model[OLLAMA_MODEL_SIZE];
     int port;
     bool use_streaming;  /* Default true */
 
@@ -110,7 +110,7 @@ static int ollama_init(ci_provider_t* provider) {
     ARGO_GET_CONTEXT(provider, ollama_context_t, ctx);
 
     /* Allocate response buffer */
-    ctx->response_capacity = 16384;  /* Start with 16KB */
+    ctx->response_capacity = OLLAMA_RESPONSE_CAPACITY;
     ctx->response_content = malloc(ctx->response_capacity);
     if (!ctx->response_content) {
         return E_SYSTEM_MEMORY;
@@ -151,7 +151,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
     ARGO_ENSURE_CONNECTED(provider, ctx);
 
     /* Build HTTP request - use non-streaming for regular query */
-    char request[8192];
+    char request[OLLAMA_REQUEST_BUFFER_SIZE];
     int req_len = build_http_request(request, sizeof(request), ctx->model, prompt, false);
     if (req_len < 0) {
         return E_PROTOCOL_SIZE;
@@ -215,7 +215,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
             return E_SYSTEM_SOCKET;
         }
 
-        usleep(10000);  /* 10ms sleep */
+        usleep(OLLAMA_POLL_DELAY_US);
     }
 
     if (!json_start) {
@@ -232,7 +232,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
         return E_PROTOCOL_FORMAT;
     }
 
-    response_start += 12;  /* Skip past "response":" */
+    response_start += OLLAMA_RESPONSE_FIELD_OFFSET;
 
     /* Find the closing quote, handling escapes */
     char* p = response_start;
@@ -291,7 +291,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
     ARGO_ENSURE_CONNECTED(provider, ctx);
 
     /* Build HTTP request with streaming enabled */
-    char request[8192];
+    char request[OLLAMA_REQUEST_BUFFER_SIZE];
     int req_len = build_http_request(request, sizeof(request), ctx->model, prompt, true);
     if (req_len < 0) {
         return E_PROTOCOL_SIZE;
@@ -312,7 +312,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
     /* Read streaming response */
     time_t start = time(NULL);
     bool headers_complete = false;
-    char line_buffer[8192];
+    char line_buffer[OLLAMA_LINE_BUFFER_SIZE];
 
     while (time(NULL) - start < OLLAMA_TIMEOUT_SECONDS) {
         ssize_t bytes = recv(ctx->socket_fd,
@@ -359,7 +359,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
 
                                 /* Extract the chunk */
                                 size_t chunk_len = end - response_field;
-                                char chunk[1024];
+                                char chunk[OLLAMA_CHUNK_SIZE];
                                 if (chunk_len < sizeof(chunk)) {
                                     strncpy(chunk, response_field, chunk_len);
                                     chunk[chunk_len] = '\0';
@@ -401,7 +401,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
             return E_SYSTEM_SOCKET;
         }
 
-        usleep(10000);  /* 10ms */
+        usleep(OLLAMA_POLL_DELAY_US);
     }
 
     ollama_disconnect(ctx);
@@ -445,7 +445,7 @@ static int ollama_disconnect(ollama_context_t* ctx) {
 static int build_http_request(char* buffer, size_t size,
                              const char* model, const char* prompt, bool streaming) {
     /* Build JSON body */
-    char json_body[4096];
+    char json_body[OLLAMA_JSON_BODY_SIZE];
     int json_len = snprintf(json_body, sizeof(json_body),
                            OLLAMA_REQUEST_FORMAT,
                            model, prompt, streaming ? "true" : "false");

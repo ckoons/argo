@@ -5,6 +5,24 @@
 
 #include "argo_ci.h"
 
+/* Common API provider constants */
+#define API_MODEL_NAME_SIZE 64
+#define API_RESPONSE_CAPACITY 65536
+#define API_REQUEST_BUFFER_SIZE 8192
+#define API_MAX_TOKENS 4096
+#define API_AUTH_HEADER_SIZE 256
+#define API_URL_SIZE 512
+#define API_HTTP_OK 200
+#define API_KEY_MIN_LENGTH 10
+
+/* API Version strings */
+#define ANTHROPIC_API_VERSION "2023-06-01"
+
+/* Context sizes */
+#define CLAUDE_MAX_CONTEXT 200000
+#define OPENAI_MAX_CONTEXT 128000
+#define GEMINI_MAX_CONTEXT 2097152
+
 /* Provider creation functions */
 ci_provider_t* claude_api_create_provider(const char* model);
 ci_provider_t* openai_api_create_provider(const char* model);

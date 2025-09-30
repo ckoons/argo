@@ -26,9 +26,9 @@
 /* Claude Code context structure */
 typedef struct claude_code_context {
     /* Session info */
-    char session_id[64];
-    char prompt_file[256];
-    char response_file[256];
+    char session_id[CLAUDE_CODE_SESSION_ID_SIZE];
+    char prompt_file[CLAUDE_CODE_PATH_SIZE];
+    char response_file[CLAUDE_CODE_PATH_SIZE];
 
     /* Communication state */
     bool connected;
@@ -76,7 +76,7 @@ ci_provider_t* claude_code_create_provider(const char* ci_name) {
     ctx->provider.supports_streaming = true;
     ctx->provider.supports_memory = true;
     ctx->provider.supports_sunset_sunrise = true;
-    ctx->provider.max_context = 200000;  /* Claude's context window */
+    ctx->provider.max_context = CLAUDE_CODE_MAX_CONTEXT;
 
     /* Set session info */
     if (ci_name) {
@@ -104,7 +104,7 @@ static int claude_code_init(ci_provider_t* provider) {
     mkdir(".argo/prompts", 0755);
 
     /* Allocate response buffer */
-    ctx->response_capacity = 65536;  /* Start with 64KB */
+    ctx->response_capacity = CLAUDE_CODE_RESPONSE_CAPACITY;
     ctx->response_content = malloc(ctx->response_capacity);
     if (!ctx->response_content) {
         return E_SYSTEM_MEMORY;
@@ -204,7 +204,7 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
     printf("========================================\n\n");
 
     /* Wait for response file (with timeout) */
-    int timeout = 300;  /* 5 minutes */
+    int timeout = CLAUDE_CODE_TIMEOUT_SECONDS;
     int waited = 0;
 
     while (waited < timeout) {
@@ -274,10 +274,10 @@ static int claude_code_stream(ci_provider_t* provider, const char* prompt,
     printf("========================================\n\n");
 
     /* Stream response as file is written */
-    int timeout = 300;  /* 5 minutes total */
+    int timeout = CLAUDE_CODE_TIMEOUT_SECONDS;
     int waited = 0;
     long last_size = 0;
-    char chunk_buffer[1024];
+    char chunk_buffer[CLAUDE_CODE_CHUNK_BUFFER_SIZE];
 
     while (waited < timeout) {
         FILE* fp = fopen(ctx->response_file, "r");
@@ -316,11 +316,11 @@ static int claude_code_stream(ci_provider_t* provider, const char* prompt,
                 if (fp) {
                     fseek(fp, 0, SEEK_END);
                     long size = ftell(fp);
-                    if (size > 100) {  /* Only check if file has content */
+                    if (size > CLAUDE_CODE_MIN_FILE_SIZE) {
                         fclose(fp);
-                        /* Assume complete after no changes for 2 seconds */
+                        /* Assume complete after no changes for specified delay */
                         if (last_size == current_size) {
-                            sleep(2);
+                            sleep(CLAUDE_CODE_COMPLETION_CHECK_DELAY);
                             /* Recheck */
                             fp = fopen(ctx->response_file, "r");
                             if (fp) {

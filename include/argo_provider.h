@@ -8,6 +8,15 @@
 #include "argo_ci.h"
 #include "argo_registry.h"
 
+/* Provider message buffer sizes */
+#define PROVIDER_MESSAGE_BUFFER_SIZE 8192
+#define PROVIDER_MESSAGE_FIELD_SIZE 1024
+#define PROVIDER_JSON_FIELD_OFFSET_TYPE 8
+#define PROVIDER_JSON_FIELD_OFFSET_CI_NAME 11
+#define PROVIDER_JSON_FIELD_OFFSET_CONTENT 11
+#define PROVIDER_JSON_FIELD_OFFSET_TIMESTAMP 12
+#define PROVIDER_JSON_FIELD_OFFSET_SEQUENCE 11
+
 /* Provider types */
 typedef enum {
     PROVIDER_TYPE_LOCAL,      /* Local service (Ollama) */

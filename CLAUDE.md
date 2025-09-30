@@ -16,6 +16,7 @@ This is a ground-up implementation following strict coding standards.
 - NEVER use gets() or other unsafe string functions
 - NEVER hardcode filenames or file paths in .c files
 - NEVER hardcode format strings or messages in .c files
+- NEVER use numeric constants in .c files (they must be defined values in header files)
 - NEVER exceed 600 lines in a .c file
 - NEVER create or use environment variables (Explicit exceptions: none)
 

@@ -17,7 +17,7 @@
 
 /* OpenAI API context */
 typedef struct {
-    char model[64];
+    char model[API_MODEL_NAME_SIZE];
     char* response_content;
     size_t response_capacity;
     uint64_t total_queries;
@@ -54,7 +54,7 @@ ci_provider_t* openai_api_create_provider(const char* model) {
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = true;
     ctx->provider.supports_memory = false;
-    ctx->provider.max_context = 128000;  /* GPT-4o context */
+    ctx->provider.max_context = OPENAI_MAX_CONTEXT;
 
     LOG_INFO("Created OpenAI API provider for model %s", ctx->model);
     return &ctx->provider;
@@ -65,7 +65,7 @@ static int openai_api_init(ci_provider_t* provider) {
     ARGO_GET_CONTEXT(provider, openai_api_context_t, ctx);
 
     /* Allocate response buffer */
-    ctx->response_capacity = 65536;
+    ctx->response_capacity = API_RESPONSE_CAPACITY;
     ctx->response_content = malloc(ctx->response_capacity);
     if (!ctx->response_content) {
         return E_SYSTEM_MEMORY;
@@ -88,21 +88,21 @@ static int openai_api_query(ci_provider_t* provider, const char* prompt,
     ARGO_GET_CONTEXT(provider, openai_api_context_t, ctx);
 
     /* Build request JSON */
-    char json_body[8192];
+    char json_body[API_REQUEST_BUFFER_SIZE];
     snprintf(json_body, sizeof(json_body),
             "{"
             "\"model\":\"%s\","
             "\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}],"
-            "\"max_tokens\":4096,"
+            "\"max_tokens\":%d,"
             "\"temperature\":0.7"
             "}",
-            ctx->model, prompt);
+            ctx->model, prompt, API_MAX_TOKENS);
 
     /* Create HTTP request */
     http_request_t* req = http_request_new(HTTP_POST, OPENAI_API_URL);
     http_request_add_header(req, "Content-Type", "application/json");
 
-    char auth_header[256];
+    char auth_header[API_AUTH_HEADER_SIZE];
     snprintf(auth_header, sizeof(auth_header), "Bearer %s", OPENAI_API_KEY);
     http_request_add_header(req, "Authorization", auth_header);
 
@@ -118,7 +118,7 @@ static int openai_api_query(ci_provider_t* provider, const char* prompt,
         return result;
     }
 
-    if (resp->status_code != 200) {
+    if (resp->status_code != API_HTTP_OK) {
         LOG_ERROR("OpenAI API returned status %d: %s", resp->status_code, resp->body);
         http_response_free(resp);
         return E_PROTOCOL_HTTP;
@@ -219,5 +219,5 @@ static void openai_api_cleanup(ci_provider_t* provider) {
 
 /* Check availability */
 bool openai_api_is_available(void) {
-    return strlen(OPENAI_API_KEY) > 10;
+    return strlen(OPENAI_API_KEY) > API_KEY_MIN_LENGTH;
 }
