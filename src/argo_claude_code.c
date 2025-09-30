@@ -72,9 +72,10 @@ ci_provider_t* claude_code_create_provider(const char* ci_name) {
 
     /* Set provider info */
     strncpy(ctx->provider.name, "claude_code", sizeof(ctx->provider.name) - 1);
-    strncpy(ctx->provider.model, "claude-opus-4.1", sizeof(ctx->provider.model) - 1);
-    ctx->provider.supports_streaming = false;  /* Start with non-streaming */
+    strncpy(ctx->provider.model, "claude-sonnet-4-5", sizeof(ctx->provider.model) - 1);
+    ctx->provider.supports_streaming = true;
     ctx->provider.supports_memory = true;
+    ctx->provider.supports_sunset_sunrise = true;
     ctx->provider.max_context = 200000;  /* Claude's context window */
 
     /* Set session info */
@@ -126,6 +127,52 @@ static int claude_code_connect(ci_provider_t* provider) {
     return ARGO_SUCCESS;
 }
 
+/* Write prompt to file */
+static int write_prompt_file(claude_code_context_t* ctx, const char* prompt) {
+    FILE* fp = fopen(ctx->prompt_file, "w");
+    if (!fp) {
+        LOG_ERROR("Failed to create prompt file: %s", ctx->prompt_file);
+        return E_SYSTEM_FILE;
+    }
+
+    fprintf(fp, "%s\n", prompt);
+    fclose(fp);
+    return ARGO_SUCCESS;
+}
+
+/* Read response file */
+static int read_response_file(claude_code_context_t* ctx) {
+    FILE* fp = fopen(ctx->response_file, "r");
+    if (!fp) {
+        return E_SYSTEM_FILE;
+    }
+
+    /* Read file into buffer */
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    if (file_size <= 0) {
+        fclose(fp);
+        return E_PROTOCOL_FORMAT;
+    }
+
+    /* Ensure buffer capacity */
+    int result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
+                                       file_size + 1);
+    if (result != ARGO_SUCCESS) {
+        fclose(fp);
+        return result;
+    }
+
+    size_t read = fread(ctx->response_content, 1, file_size, fp);
+    ctx->response_content[read] = '\0';
+    ctx->response_size = read;
+
+    fclose(fp);
+    return ARGO_SUCCESS;
+}
+
 /* Query Claude Code via prompt file */
 static int claude_code_query(ci_provider_t* provider, const char* prompt,
                             ci_response_callback callback, void* userdata) {
@@ -136,35 +183,46 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
     /* Increment counter for unique prompt */
     ctx->prompt_counter++;
 
+    /* Write prompt to file */
+    int result = write_prompt_file(ctx, prompt);
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
     /* Display the prompt to Claude Code (me) */
     printf("\n");
     printf("========================================\n");
     printf("CLAUDE CODE PROMPT MODE - Request #%d\n", ctx->prompt_counter);
     printf("========================================\n");
     printf("Session: %s\n", ctx->session_id);
+    printf("Prompt file: %s\n", ctx->prompt_file);
+    printf("Response file: %s\n", ctx->response_file);
     printf("----------------------------------------\n");
     printf("PROMPT:\n%s\n", prompt);
     printf("----------------------------------------\n");
-    printf("Please respond with your analysis/answer.\n");
-    printf("When complete, type: END_RESPONSE\n");
+    printf("Please write your response to: %s\n", ctx->response_file);
     printf("========================================\n\n");
 
-    /* For now, simulate a response for testing */
-    /* In production, this would wait for actual Claude Code input */
-    const char* simulated_response =
-        "I understand your request. As Claude Code in prompt mode, "
-        "I would analyze this and provide a thoughtful response. "
-        "This is a test implementation showing the communication pathway works.";
+    /* Wait for response file (with timeout) */
+    int timeout = 300;  /* 5 minutes */
+    int waited = 0;
 
-    /* Copy response to context buffer */
-    size_t resp_len = strlen(simulated_response);
-    int result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
-                                       resp_len + 1);
-    if (result != ARGO_SUCCESS) {
-        return result;
+    while (waited < timeout) {
+        if (access(ctx->response_file, F_OK) == 0) {
+            /* Response file exists, read it */
+            result = read_response_file(ctx);
+            if (result == ARGO_SUCCESS) {
+                break;
+            }
+        }
+        sleep(1);
+        waited++;
     }
-    strcpy(ctx->response_content, simulated_response);
-    ctx->response_size = resp_len;
+
+    if (waited >= timeout) {
+        LOG_ERROR("Timeout waiting for Claude Code response");
+        return E_CI_TIMEOUT;
+    }
 
     /* Build response */
     ci_response_t response;
@@ -177,20 +235,124 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
     /* Invoke callback */
     callback(&response, userdata);
 
+    /* Clean up files for next request */
+    unlink(ctx->prompt_file);
+    unlink(ctx->response_file);
+
     LOG_DEBUG("Claude Code prompt #%d completed", ctx->prompt_counter);
     return ARGO_SUCCESS;
 }
 
-/* Stream from Claude Code (not implemented yet) */
+/* Stream from Claude Code - reads response file as it's written */
 static int claude_code_stream(ci_provider_t* provider, const char* prompt,
                              ci_stream_callback callback, void* userdata) {
-    (void)provider;
-    (void)prompt;
-    (void)callback;
-    (void)userdata;
+    ARGO_CHECK_NULL(prompt);
+    ARGO_CHECK_NULL(callback);
+    ARGO_GET_CONTEXT(provider, claude_code_context_t, ctx);
 
-    /* Claude Code prompt mode doesn't support streaming yet */
-    return E_INTERNAL_NOTIMPL;
+    /* Increment counter */
+    ctx->prompt_counter++;
+
+    /* Write prompt to file */
+    int result = write_prompt_file(ctx, prompt);
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Display prompt */
+    printf("\n");
+    printf("========================================\n");
+    printf("CLAUDE CODE STREAMING MODE - Request #%d\n", ctx->prompt_counter);
+    printf("========================================\n");
+    printf("Session: %s\n", ctx->session_id);
+    printf("Response file: %s\n", ctx->response_file);
+    printf("----------------------------------------\n");
+    printf("PROMPT:\n%s\n", prompt);
+    printf("----------------------------------------\n");
+    printf("Please write your response to: %s\n", ctx->response_file);
+    printf("Response will be streamed as you write.\n");
+    printf("========================================\n\n");
+
+    /* Stream response as file is written */
+    int timeout = 300;  /* 5 minutes total */
+    int waited = 0;
+    long last_size = 0;
+    char chunk_buffer[1024];
+
+    while (waited < timeout) {
+        FILE* fp = fopen(ctx->response_file, "r");
+        if (fp) {
+            /* Get file size */
+            fseek(fp, 0, SEEK_END);
+            long current_size = ftell(fp);
+
+            if (current_size > last_size) {
+                /* New content available */
+                fseek(fp, last_size, SEEK_SET);
+                size_t to_read = current_size - last_size;
+
+                while (to_read > 0) {
+                    size_t chunk_size = to_read < sizeof(chunk_buffer) ?
+                                       to_read : sizeof(chunk_buffer);
+                    size_t read_bytes = fread(chunk_buffer, 1, chunk_size, fp);
+
+                    if (read_bytes > 0) {
+                        /* Call streaming callback with chunk */
+                        callback(chunk_buffer, read_bytes, userdata);
+                        to_read -= read_bytes;
+                    } else {
+                        break;
+                    }
+                }
+
+                last_size = current_size;
+            }
+
+            fclose(fp);
+
+            /* Check for completion marker in file */
+            if (current_size > 0) {
+                fp = fopen(ctx->response_file, "r");
+                if (fp) {
+                    fseek(fp, 0, SEEK_END);
+                    long size = ftell(fp);
+                    if (size > 100) {  /* Only check if file has content */
+                        fclose(fp);
+                        /* Assume complete after no changes for 2 seconds */
+                        if (last_size == current_size) {
+                            sleep(2);
+                            /* Recheck */
+                            fp = fopen(ctx->response_file, "r");
+                            if (fp) {
+                                fseek(fp, 0, SEEK_END);
+                                long recheck_size = ftell(fp);
+                                fclose(fp);
+                                if (recheck_size == last_size) {
+                                    /* No new content, assume complete */
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        fclose(fp);
+                    }
+                }
+            }
+        }
+
+        sleep(1);
+        waited++;
+    }
+
+    /* Update statistics */
+    ARGO_UPDATE_STATS(ctx);
+
+    /* Clean up files */
+    unlink(ctx->prompt_file);
+    unlink(ctx->response_file);
+
+    LOG_DEBUG("Claude Code streaming #%d completed", ctx->prompt_counter);
+    return waited >= timeout ? E_CI_TIMEOUT : ARGO_SUCCESS;
 }
 
 /* Cleanup Claude Code provider */

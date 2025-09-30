@@ -21,7 +21,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_error.c \
                $(SRC_DIR)/argo_registry.c \
                $(SRC_DIR)/argo_memory.c \
-               $(SRC_DIR)/argo_lifecycle.c
+               $(SRC_DIR)/argo_lifecycle.c \
+               $(SRC_DIR)/argo_provider.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -46,7 +47,8 @@ CORE_LIB = $(BUILD_DIR)/libargo_core.a
 # Script sources
 SCRIPT_SOURCES = $(SCRIPT_DIR)/argo_monitor.c \
                  $(SCRIPT_DIR)/argo_memory_inspect.c \
-                 $(SCRIPT_DIR)/argo_update_models.c
+                 $(SCRIPT_DIR)/argo_update_models.c \
+                 $(SCRIPT_DIR)/argo_ci_assign.c
 
 # Script executables
 SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
@@ -66,9 +68,10 @@ API_CALL_TARGET = $(BUILD_DIR)/test_api_calls
 REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_registry
 MEMORY_TEST_TARGET = $(BUILD_DIR)/test_memory
 LIFECYCLE_TEST_TARGET = $(BUILD_DIR)/test_lifecycle
+PROVIDER_TEST_TARGET = $(BUILD_DIR)/test_providers
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -194,8 +197,12 @@ $(MEMORY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_memory.o $(STUB_OBJECTS)
 $(LIFECYCLE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_lifecycle.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build provider test executable
+$(PROVIDER_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_providers.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle
+test-quick: test-registry test-memory test-lifecycle test-providers
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -209,10 +216,10 @@ test-all: test-providers test-registry test-memory test-lifecycle test-api
 	@echo "=========================================="
 
 # Individual test targets
-test-providers: $(TEST_TARGET)
+test-ci-providers: $(TEST_TARGET)
 	@echo ""
 	@echo "=========================================="
-	@echo "CI Provider Tests"
+	@echo "Old CI Provider Tests (deprecated)"
 	@echo "=========================================="
 	-@./$(TEST_TARGET)
 
@@ -236,6 +243,13 @@ test-lifecycle: $(LIFECYCLE_TEST_TARGET)
 	@echo "Lifecycle Manager Tests"
 	@echo "=========================================="
 	@./$(LIFECYCLE_TEST_TARGET)
+
+test-providers: $(PROVIDER_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Provider System Tests"
+	@echo "=========================================="
+	@./$(PROVIDER_TEST_TARGET)
 
 test-api: $(API_TEST_TARGET)
 	@echo ""
@@ -293,8 +307,8 @@ update-models:
 	@./scripts/update_models.sh
 
 .PHONY: all directories scripts test-quick test-all test-providers test-registry \
-        test-memory test-api test-api-calls count-core clean distclean \
-        check debug update-models
+        test-memory test-lifecycle test-providers test-api test-api-calls \
+        count-core clean distclean check debug update-models
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
