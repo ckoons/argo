@@ -21,13 +21,26 @@ bool grok_api_is_available(void);
 bool deepseek_api_is_available(void);
 bool openrouter_is_available(void);
 
-/* Default models for each provider */
-#define CLAUDE_DEFAULT_MODEL "claude-3-5-sonnet-20241022"
-#define OPENAI_DEFAULT_MODEL "gpt-4o"
-#define GEMINI_DEFAULT_MODEL "gemini-1.5-flash"
-#define GROK_DEFAULT_MODEL "grok-beta"
-#define DEEPSEEK_DEFAULT_MODEL "deepseek-chat"
-#define OPENROUTER_DEFAULT_MODEL "anthropic/claude-3.5-sonnet"
+/*
+ * Default models for each provider
+ *
+ * These can be overridden by creating include/argo_local_models.h
+ * See include/argo_local_models.h.example for template
+ * Or run: scripts/update_models.sh
+ */
+
+/* Check for local model overrides first */
+#if __has_include("argo_local_models.h")
+#include "argo_local_models.h"
+#else
+/* Built-in defaults - Last verified: 2025-09-30 */
+#define CLAUDE_DEFAULT_MODEL "claude-sonnet-4-5-20250929"     /* Claude Sonnet 4.5 (latest) */
+#define OPENAI_DEFAULT_MODEL "gpt-4o"                          /* GPT-4o (current) */
+#define GEMINI_DEFAULT_MODEL "gemini-2.5-flash"                /* Gemini 2.5 Flash */
+#define GROK_DEFAULT_MODEL "grok-3"                            /* Grok 3 (current) */
+#define DEEPSEEK_DEFAULT_MODEL "deepseek-chat"                 /* DeepSeek Chat (current) */
+#define OPENROUTER_DEFAULT_MODEL "anthropic/claude-sonnet-4.5" /* Claude Sonnet 4.5 via OpenRouter */
+#endif
 
 /* Cost tracking structure */
 typedef struct {

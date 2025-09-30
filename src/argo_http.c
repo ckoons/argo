@@ -90,9 +90,9 @@ void http_request_free(http_request_t* req) {
 int http_execute(const http_request_t* req, http_response_t** resp) {
     if (!req || !resp) return E_INPUT_NULL;
 
-    /* Build curl command */
+    /* Build curl command with status code output */
     char cmd[8192];
-    int cmd_len = snprintf(cmd, sizeof(cmd), "curl -s -X %s",
+    int cmd_len = snprintf(cmd, sizeof(cmd), "curl -s -w '\\n%%{http_code}' -X %s",
                           req->method == HTTP_POST ? "POST" : "GET");
 
     /* Add headers */
@@ -148,6 +148,17 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
         pclose(fp);
         unlink(temp_file);
 
+        /* Extract HTTP status code from last line */
+        int status_code = 200;  /* Default */
+        char* last_newline = strrchr(response_buf, '\n');
+        if (last_newline && last_newline > response_buf) {
+            /* Parse status code from last line */
+            status_code = atoi(last_newline + 1);
+            /* Remove status code line from body */
+            *last_newline = '\0';
+            response_size = last_newline - response_buf;
+        }
+
         /* Create response */
         *resp = calloc(1, sizeof(http_response_t));
         if (!*resp) {
@@ -155,7 +166,7 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
             return E_SYSTEM_MEMORY;
         }
 
-        (*resp)->status_code = 200;  /* Assume success if we got data */
+        (*resp)->status_code = status_code;
         (*resp)->body = response_buf;
         (*resp)->body_len = response_size;
 
@@ -188,6 +199,17 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
 
         pclose(fp);
 
+        /* Extract HTTP status code from last line */
+        int status_code = 200;  /* Default */
+        char* last_newline = strrchr(response_buf, '\n');
+        if (last_newline && last_newline > response_buf) {
+            /* Parse status code from last line */
+            status_code = atoi(last_newline + 1);
+            /* Remove status code line from body */
+            *last_newline = '\0';
+            response_size = last_newline - response_buf;
+        }
+
         /* Create response */
         *resp = calloc(1, sizeof(http_response_t));
         if (!*resp) {
@@ -195,7 +217,7 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
             return E_SYSTEM_MEMORY;
         }
 
-        (*resp)->status_code = 200;
+        (*resp)->status_code = status_code;
         (*resp)->body = response_buf;
         (*resp)->body_len = response_size;
     }

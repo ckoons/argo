@@ -23,7 +23,8 @@ SOURCES = $(SRC_DIR)/argo_socket.c \
           $(SRC_DIR)/argo_claude_api.c \
           $(SRC_DIR)/argo_openai_api.c \
           $(SRC_DIR)/argo_gemini_api.c \
-          $(SRC_DIR)/argo_api_common.c
+          $(SRC_DIR)/argo_api_common.c \
+          $(SRC_DIR)/argo_error.c
 
 # Object files
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
@@ -119,12 +120,7 @@ $(BUILD_DIR)/stubs.c:
 	@echo "    return 0;" >> $@
 	@echo "}" >> $@
 	@echo "" >> $@
-	@echo "/* Error string stubs */" >> $@
-	@echo "const char* argo_error_string(int code) {" >> $@
-	@echo "    static char buf[32];" >> $@
-	@echo "    snprintf(buf, sizeof(buf), \"Error %d\", code);" >> $@
-	@echo "    return buf;" >> $@
-	@echo "}" >> $@
+	@echo "/* Error strings now in argo_error.c - no stub needed */" >> $@
 
 # Compile source files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
@@ -180,4 +176,9 @@ debug:
 	@echo "OBJECTS: $(OBJECTS)"
 	@echo "TEST_TARGET: $(TEST_TARGET)"
 
-.PHONY: all directories test clean distclean check debug
+# Update model defaults from API providers
+update-models:
+	@echo "Updating model defaults from API providers..."
+	@./scripts/update_models.sh
+
+.PHONY: all directories test clean distclean check debug update-models

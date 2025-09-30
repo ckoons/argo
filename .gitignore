@@ -1,6 +1,8 @@
 # Argo-specific
 .argo/
 argo_local.h
+argo_local_models.h
+include/argo_local_models.h
 .env.argo.local
 build/
 

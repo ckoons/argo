@@ -1,0 +1,35 @@
+/* © 2025 Casey Koons All rights reserved */
+/* Copy to argo_local_models.h and customize for your preferred models */
+
+#ifndef ARGO_LOCAL_MODELS_H
+#define ARGO_LOCAL_MODELS_H
+
+/*
+ * Custom model preferences - overrides defaults in argo_api_providers.h
+ * This file is git-ignored, so your preferences stay local
+ *
+ * To use: cp include/argo_local_models.h.example include/argo_local_models.h
+ * Then edit include/argo_local_models.h with your preferred models
+ *
+ * Or run: scripts/update_models.sh to auto-generate from current API offerings
+ */
+
+/* Anthropic Claude Models - Last verified: 2025-09-30 */
+#define CLAUDE_DEFAULT_MODEL "claude-sonnet-4-5-20250929"
+
+/* OpenAI Models - Last verified: 2025-09-30 */
+#define OPENAI_DEFAULT_MODEL "gpt-4o"
+
+/* Google Gemini Models - Last verified: 2025-09-30 */
+#define GEMINI_DEFAULT_MODEL "gemini-2.5-flash"
+
+/* xAI Grok Models - Last verified: 2025-09-30 */
+#define GROK_DEFAULT_MODEL "grok-3"
+
+/* DeepSeek Models - Last verified: 2025-09-30 */
+#define DEEPSEEK_DEFAULT_MODEL "deepseek-chat"
+
+/* OpenRouter Models - Last verified: 2025-09-30 */
+#define OPENROUTER_DEFAULT_MODEL "anthropic/claude-sonnet-4.5"
+
+#endif /* ARGO_LOCAL_MODELS_H */
