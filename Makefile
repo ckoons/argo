@@ -20,7 +20,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_http.c \
                $(SRC_DIR)/argo_error.c \
                $(SRC_DIR)/argo_registry.c \
-               $(SRC_DIR)/argo_memory.c
+               $(SRC_DIR)/argo_memory.c \
+               $(SRC_DIR)/argo_lifecycle.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -64,9 +65,10 @@ API_TEST_TARGET = $(BUILD_DIR)/test_api_providers
 API_CALL_TARGET = $(BUILD_DIR)/test_api_calls
 REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_registry
 MEMORY_TEST_TARGET = $(BUILD_DIR)/test_memory
+LIFECYCLE_TEST_TARGET = $(BUILD_DIR)/test_lifecycle
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -188,15 +190,19 @@ $(REGISTRY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_registry.o $(STUB_OBJECTS)
 $(MEMORY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_memory.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build lifecycle test executable
+$(LIFECYCLE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_lifecycle.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory
+test-quick: test-registry test-memory test-lifecycle
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
 	@echo "=========================================="
 
 # All safe tests - includes API availability checks but no costs
-test-all: test-providers test-registry test-memory test-api
+test-all: test-providers test-registry test-memory test-lifecycle test-api
 	@echo ""
 	@echo "=========================================="
 	@echo "All Tests Complete"
@@ -223,6 +229,13 @@ test-memory: $(MEMORY_TEST_TARGET)
 	@echo "Memory Manager Tests"
 	@echo "=========================================="
 	@./$(MEMORY_TEST_TARGET)
+
+test-lifecycle: $(LIFECYCLE_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Lifecycle Manager Tests"
+	@echo "=========================================="
+	@./$(LIFECYCLE_TEST_TARGET)
 
 test-api: $(API_TEST_TARGET)
 	@echo ""
