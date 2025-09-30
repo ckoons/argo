@@ -70,9 +70,10 @@ REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_registry
 MEMORY_TEST_TARGET = $(BUILD_DIR)/test_memory
 LIFECYCLE_TEST_TARGET = $(BUILD_DIR)/test_lifecycle
 PROVIDER_TEST_TARGET = $(BUILD_DIR)/test_providers
+MESSAGING_TEST_TARGET = $(BUILD_DIR)/test_messaging
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -202,8 +203,12 @@ $(LIFECYCLE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_lifecycle.o $(STUB_OBJECT
 $(PROVIDER_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_providers.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build messaging test executable
+$(MESSAGING_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_messaging.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -251,6 +256,13 @@ test-providers: $(PROVIDER_TEST_TARGET)
 	@echo "Provider System Tests"
 	@echo "=========================================="
 	@./$(PROVIDER_TEST_TARGET)
+
+test-messaging: $(MESSAGING_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Messaging System Tests"
+	@echo "=========================================="
+	@./$(MESSAGING_TEST_TARGET)
 
 test-api: $(API_TEST_TARGET)
 	@echo ""
