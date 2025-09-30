@@ -11,6 +11,8 @@
 #include "argo_ci_common.h"
 #include "argo_api_providers.h"
 #include "argo_api_keys.h"
+#include "argo_api_common.h"
+#include "argo_json.h"
 #include "argo_http.h"
 #include "argo_error.h"
 #include "argo_log.h"
@@ -64,11 +66,12 @@ ci_provider_t* openai_api_create_provider(const char* model) {
 static int openai_api_init(ci_provider_t* provider) {
     ARGO_GET_CONTEXT(provider, openai_api_context_t, ctx);
 
-    /* Allocate response buffer */
-    ctx->response_capacity = API_RESPONSE_CAPACITY;
-    ctx->response_content = malloc(ctx->response_capacity);
-    if (!ctx->response_content) {
-        return E_SYSTEM_MEMORY;
+    /* Allocate response buffer using common utility */
+    int result = api_allocate_response_buffer(&ctx->response_content,
+                                              &ctx->response_capacity,
+                                              API_RESPONSE_CAPACITY);
+    if (result != ARGO_SUCCESS) {
+        return result;
     }
 
     return http_init();
@@ -98,74 +101,47 @@ static int openai_api_query(ci_provider_t* provider, const char* prompt,
             "}",
             ctx->model, prompt, API_MAX_TOKENS);
 
-    /* Create HTTP request */
-    http_request_t* req = http_request_new(HTTP_POST, OPENAI_API_URL);
-    http_request_add_header(req, "Content-Type", "application/json");
+    /* Setup authentication */
+    api_auth_config_t auth = {
+        .type = API_AUTH_BEARER,
+        .value = OPENAI_API_KEY
+    };
 
-    char auth_header[API_AUTH_HEADER_SIZE];
-    snprintf(auth_header, sizeof(auth_header), "Bearer %s", OPENAI_API_KEY);
-    http_request_add_header(req, "Authorization", auth_header);
-
-    http_request_set_body(req, json_body, strlen(json_body));
-
-    /* Execute request */
+    /* Execute HTTP request using common utility */
     http_response_t* resp = NULL;
-    int result = http_execute(req, &resp);
-    http_request_free(req);
-
+    int result = api_http_post_json(OPENAI_API_URL, json_body, &auth,
+                                    NULL, &resp);
     if (result != ARGO_SUCCESS) {
         LOG_ERROR("Failed to execute OpenAI API request");
         return result;
     }
 
-    if (resp->status_code != API_HTTP_OK) {
-        LOG_ERROR("OpenAI API returned status %d: %s", resp->status_code, resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_HTTP;
-    }
+    /* Extract content using JSON utility - navigate message.content */
+    const char* field_path[] = { "message", "content" };
+    char* extracted_content = NULL;
+    size_t content_len = 0;
+    result = json_extract_nested_string(resp->body, field_path, 2,
+                                       &extracted_content, &content_len);
 
-    /* Extract content from response JSON - find "content" in message */
-    char* message_start = strstr(resp->body, "\"message\"");
-    if (!message_start) {
-        LOG_ERROR("No message in OpenAI API response: %s", resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    char* content_key = strstr(message_start, "\"content\"");
-    if (!content_key) {
-        LOG_ERROR("No content in OpenAI message: %s", resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    /* Find the opening quote after "content": (skip colon and possible space) */
-    char* content_start = strchr(content_key + 9, '"');
-    if (!content_start) {
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-    content_start++;  /* Move past the opening quote */
-
-    /* Find closing quote */
-    char* content_end = strchr(content_start, '"');
-    if (!content_end) {
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    /* Copy content */
-    size_t content_len = content_end - content_start;
-    result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
-                                   content_len + 1);
     if (result != ARGO_SUCCESS) {
+        LOG_ERROR("Failed to extract content from OpenAI API response");
         http_response_free(resp);
         return result;
     }
 
-    strncpy(ctx->response_content, content_start, content_len);
-    ctx->response_content[content_len] = '\0';
+    /* Ensure our buffer is large enough */
+    result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
+                                   content_len + 1);
+    if (result != ARGO_SUCCESS) {
+        free(extracted_content);
+        http_response_free(resp);
+        return result;
+    }
 
+    /* Copy to context buffer */
+    memcpy(ctx->response_content, extracted_content, content_len);
+    ctx->response_content[content_len] = '\0';
+    free(extracted_content);
     http_response_free(resp);
 
     /* Build response */
@@ -182,27 +158,15 @@ static int openai_api_query(ci_provider_t* provider, const char* prompt,
     return ARGO_SUCCESS;
 }
 
-/* Helper for streaming wrapper */
-static void stream_wrapper_callback(const ci_response_t* resp, void* ud) {
-    struct { ci_stream_callback cb; void* ud; } *sctx = ud;
-    if (resp->success && resp->content) {
-        sctx->cb(resp->content, strlen(resp->content), sctx->ud);
-    }
-}
-
 /* Stream from OpenAI API */
 static int openai_api_stream(ci_provider_t* provider, const char* prompt,
                             ci_stream_callback callback, void* userdata) {
-    /* For now, use non-streaming */
+    /* Use common stream adapter */
     ARGO_CHECK_NULL(prompt);
     ARGO_CHECK_NULL(callback);
 
-    struct {
-        ci_stream_callback callback;
-        void* userdata;
-    } stream_ctx = { callback, userdata };
-
-    return openai_api_query(provider, prompt, stream_wrapper_callback, &stream_ctx);
+    return ci_query_to_stream(provider, prompt, openai_api_query,
+                             callback, userdata);
 }
 
 /* Cleanup */

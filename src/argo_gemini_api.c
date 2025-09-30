@@ -11,6 +11,8 @@
 #include "argo_ci_common.h"
 #include "argo_api_providers.h"
 #include "argo_api_keys.h"
+#include "argo_api_common.h"
+#include "argo_json.h"
 #include "argo_http.h"
 #include "argo_error.h"
 #include "argo_log.h"
@@ -64,11 +66,12 @@ ci_provider_t* gemini_api_create_provider(const char* model) {
 static int gemini_api_init(ci_provider_t* provider) {
     ARGO_GET_CONTEXT(provider, gemini_api_context_t, ctx);
 
-    /* Allocate response buffer */
-    ctx->response_capacity = API_RESPONSE_CAPACITY;
-    ctx->response_content = malloc(ctx->response_capacity);
-    if (!ctx->response_content) {
-        return E_SYSTEM_MEMORY;
+    /* Allocate response buffer using common utility */
+    int result = api_allocate_response_buffer(&ctx->response_content,
+                                              &ctx->response_capacity,
+                                              API_RESPONSE_CAPACITY);
+    if (result != ARGO_SUCCESS) {
+        return result;
     }
 
     return http_init();
@@ -103,74 +106,53 @@ static int gemini_api_query(ci_provider_t* provider, const char* prompt,
             "}",
             prompt, API_MAX_TOKENS);
 
-    /* Build URL with model and API key */
-    char url[API_URL_SIZE];
-    snprintf(url, sizeof(url), "%s/%s:generateContent?key=%s",
-            GEMINI_API_URL, ctx->model, GEMINI_API_KEY);
+    /* Build URL with model for Gemini */
+    char base_url[API_URL_SIZE];
+    snprintf(base_url, sizeof(base_url), "%s/%s:generateContent",
+            GEMINI_API_URL, ctx->model);
 
-    /* Create HTTP request */
-    http_request_t* req = http_request_new(HTTP_POST, url);
-    http_request_add_header(req, "Content-Type", "application/json");
-    http_request_set_body(req, json_body, strlen(json_body));
+    /* Setup authentication - Gemini uses URL param */
+    api_auth_config_t auth = {
+        .type = API_AUTH_URL_PARAM,
+        .param_name = "key",
+        .value = GEMINI_API_KEY
+    };
 
-    /* Execute request */
+    /* Execute HTTP request using common utility */
     http_response_t* resp = NULL;
-    int result = http_execute(req, &resp);
-    http_request_free(req);
-
+    int result = api_http_post_json(base_url, json_body, &auth,
+                                    NULL, &resp);
     if (result != ARGO_SUCCESS) {
         LOG_ERROR("Failed to execute Gemini API request");
         return result;
     }
 
-    if (resp->status_code != API_HTTP_OK) {
-        LOG_ERROR("Gemini API returned status %d: %s", resp->status_code, resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_HTTP;
-    }
+    /* Extract content using JSON utility - navigate candidates.text */
+    const char* field_path[] = { "candidates", "text" };
+    char* extracted_content = NULL;
+    size_t content_len = 0;
+    result = json_extract_nested_string(resp->body, field_path, 2,
+                                       &extracted_content, &content_len);
 
-    /* Extract content from Gemini response format: candidates[0].content.parts[0].text */
-    char* candidates_start = strstr(resp->body, "\"candidates\"");
-    if (!candidates_start) {
-        LOG_ERROR("No candidates in Gemini API response: %s", resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    char* text_start = strstr(candidates_start, "\"text\"");
-    if (!text_start) {
-        LOG_ERROR("No text in Gemini API candidates: %s", resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    /* Find the opening quote after "text": */
-    char* content_start = strchr(text_start + 6, '"');
-    if (!content_start) {
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-    content_start++;  /* Move past the quote */
-
-    /* Find closing quote */
-    char* content_end = strchr(content_start, '"');
-    if (!content_end) {
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    /* Copy content */
-    size_t content_len = content_end - content_start;
-    result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
-                                   content_len + 1);
     if (result != ARGO_SUCCESS) {
+        LOG_ERROR("Failed to extract content from Gemini API response");
         http_response_free(resp);
         return result;
     }
 
-    strncpy(ctx->response_content, content_start, content_len);
-    ctx->response_content[content_len] = '\0';
+    /* Ensure our buffer is large enough */
+    result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
+                                   content_len + 1);
+    if (result != ARGO_SUCCESS) {
+        free(extracted_content);
+        http_response_free(resp);
+        return result;
+    }
 
+    /* Copy to context buffer */
+    memcpy(ctx->response_content, extracted_content, content_len);
+    ctx->response_content[content_len] = '\0';
+    free(extracted_content);
     http_response_free(resp);
 
     /* Build response */
@@ -187,27 +169,15 @@ static int gemini_api_query(ci_provider_t* provider, const char* prompt,
     return ARGO_SUCCESS;
 }
 
-/* Helper for streaming wrapper */
-static void stream_wrapper_callback(const ci_response_t* resp, void* ud) {
-    struct { ci_stream_callback cb; void* ud; } *sctx = ud;
-    if (resp->success && resp->content) {
-        sctx->cb(resp->content, strlen(resp->content), sctx->ud);
-    }
-}
-
 /* Stream from Gemini API */
 static int gemini_api_stream(ci_provider_t* provider, const char* prompt,
                             ci_stream_callback callback, void* userdata) {
-    /* For now, use non-streaming */
+    /* Use common stream adapter */
     ARGO_CHECK_NULL(prompt);
     ARGO_CHECK_NULL(callback);
 
-    struct {
-        ci_stream_callback callback;
-        void* userdata;
-    } stream_ctx = { callback, userdata };
-
-    return gemini_api_query(provider, prompt, stream_wrapper_callback, &stream_ctx);
+    return ci_query_to_stream(provider, prompt, gemini_api_query,
+                             callback, userdata);
 }
 
 /* Cleanup */

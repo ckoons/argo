@@ -107,4 +107,28 @@ static inline void build_ci_response(ci_response_t* response, bool success,
     response->timestamp = time(NULL);
 }
 
+/* Stream wrapper callback context */
+typedef struct {
+    ci_stream_callback callback;
+    void* userdata;
+} stream_wrapper_context_t;
+
+/* Stream wrapper callback - converts query response to stream */
+static inline void ci_stream_wrapper_callback(const ci_response_t* resp, void* ud) {
+    stream_wrapper_context_t* sctx = (stream_wrapper_context_t*)ud;
+    if (resp->success && resp->content) {
+        sctx->callback(resp->content, strlen(resp->content), sctx->userdata);
+    }
+}
+
+/* Adapt query function to stream interface */
+typedef int (*ci_query_func)(ci_provider_t*, const char*, ci_response_callback, void*);
+
+static inline int ci_query_to_stream(ci_provider_t* provider, const char* prompt,
+                                     ci_query_func query_fn,
+                                     ci_stream_callback callback, void* userdata) {
+    stream_wrapper_context_t stream_ctx = { callback, userdata };
+    return query_fn(provider, prompt, ci_stream_wrapper_callback, &stream_ctx);
+}
+
 #endif /* ARGO_CI_COMMON_H */

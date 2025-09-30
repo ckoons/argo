@@ -11,6 +11,8 @@
 #include "argo_ci_common.h"
 #include "argo_api_providers.h"
 #include "argo_api_keys.h"
+#include "argo_api_common.h"
+#include "argo_json.h"
 #include "argo_http.h"
 #include "argo_error.h"
 #include "argo_log.h"
@@ -64,11 +66,12 @@ ci_provider_t* claude_api_create_provider(const char* model) {
 static int claude_api_init(ci_provider_t* provider) {
     ARGO_GET_CONTEXT(provider, claude_api_context_t, ctx);
 
-    /* Allocate response buffer */
-    ctx->response_capacity = API_RESPONSE_CAPACITY;
-    ctx->response_content = malloc(ctx->response_capacity);
-    if (!ctx->response_content) {
-        return E_SYSTEM_MEMORY;
+    /* Allocate response buffer using common utility */
+    int result = api_allocate_response_buffer(&ctx->response_content,
+                                              &ctx->response_capacity,
+                                              API_RESPONSE_CAPACITY);
+    if (result != ARGO_SUCCESS) {
+        return result;
     }
 
     /* Initialize HTTP client */
@@ -98,71 +101,54 @@ static int claude_api_query(ci_provider_t* provider, const char* prompt,
             "}",
             ctx->model, prompt, API_MAX_TOKENS);
 
-    /* Create HTTP request */
-    http_request_t* req = http_request_new(HTTP_POST, ANTHROPIC_API_URL);
-    http_request_add_header(req, "Content-Type", "application/json");
-    http_request_add_header(req, "x-api-key", ANTHROPIC_API_KEY);
-    http_request_add_header(req, "anthropic-version", ANTHROPIC_API_VERSION);
-    http_request_set_body(req, json_body, strlen(json_body));
+    /* Setup authentication */
+    api_auth_config_t auth = {
+        .type = API_AUTH_HEADER,
+        .header_name = "x-api-key",
+        .value = ANTHROPIC_API_KEY
+    };
 
-    /* Execute request */
+    /* Extra headers for Claude */
+    const char* extra_headers[] = {
+        "anthropic-version", ANTHROPIC_API_VERSION,
+        NULL
+    };
+
+    /* Execute HTTP request using common utility */
     http_response_t* resp = NULL;
-    int result = http_execute(req, &resp);
-    http_request_free(req);
-
+    int result = api_http_post_json(ANTHROPIC_API_URL, json_body, &auth,
+                                    extra_headers, &resp);
     if (result != ARGO_SUCCESS) {
         LOG_ERROR("Failed to execute Claude API request");
         return result;
     }
 
-    if (resp->status_code != API_HTTP_OK) {
-        LOG_ERROR("Claude API returned status %d: %s", resp->status_code, resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_HTTP;
-    }
+    /* Extract content using JSON utility - navigate content[0].text */
+    const char* field_path[] = { "content", "text" };
+    char* extracted_content = NULL;
+    size_t content_len = 0;
+    result = json_extract_nested_string(resp->body, field_path, 2,
+                                       &extracted_content, &content_len);
 
-    /* Extract content from response JSON - find "text" in content array */
-    char* content_array = strstr(resp->body, "\"content\"");
-    if (!content_array) {
-        LOG_ERROR("No content array in Claude API response: %s", resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    char* text_key = strstr(content_array, "\"text\"");
-    if (!text_key) {
-        LOG_ERROR("No text in Claude API content: %s", resp->body);
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    /* Find the opening quote after "text": (skip colon and possible space) */
-    char* content_start = strchr(text_key + 6, '"');
-    if (!content_start) {
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-    content_start++;  /* Move past the opening quote */
-
-    /* Find closing quote */
-    char* content_end = strchr(content_start, '"');
-    if (!content_end) {
-        http_response_free(resp);
-        return E_PROTOCOL_FORMAT;
-    }
-
-    /* Copy content */
-    size_t content_len = content_end - content_start;
-    result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
-                                   content_len + 1);
     if (result != ARGO_SUCCESS) {
+        LOG_ERROR("Failed to extract content from Claude API response");
         http_response_free(resp);
         return result;
     }
 
-    strncpy(ctx->response_content, content_start, content_len);
-    ctx->response_content[content_len] = '\0';
+    /* Ensure our buffer is large enough */
+    result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
+                                   content_len + 1);
+    if (result != ARGO_SUCCESS) {
+        free(extracted_content);
+        http_response_free(resp);
+        return result;
+    }
 
+    /* Copy to context buffer */
+    memcpy(ctx->response_content, extracted_content, content_len);
+    ctx->response_content[content_len] = '\0';
+    free(extracted_content);
     http_response_free(resp);
 
     /* Build response */
@@ -179,29 +165,15 @@ static int claude_api_query(ci_provider_t* provider, const char* prompt,
     return ARGO_SUCCESS;
 }
 
-/* Helper for streaming wrapper */
-static void stream_wrapper_callback(const ci_response_t* resp, void* ud) {
-    struct { ci_stream_callback cb; void* ud; } *sctx = ud;
-    if (resp->success && resp->content) {
-        sctx->cb(resp->content, strlen(resp->content), sctx->ud);
-    }
-}
-
 /* Stream from Claude API */
 static int claude_api_stream(ci_provider_t* provider, const char* prompt,
                             ci_stream_callback callback, void* userdata) {
-    /* For now, just use non-streaming and send as one chunk */
+    /* Use common stream adapter */
     ARGO_CHECK_NULL(prompt);
     ARGO_CHECK_NULL(callback);
-    ARGO_GET_CONTEXT(provider, claude_api_context_t, ctx);
 
-    /* Use query and wrap in streaming callback */
-    struct {
-        ci_stream_callback callback;
-        void* userdata;
-    } stream_ctx = { callback, userdata };
-
-    return claude_api_query(provider, prompt, stream_wrapper_callback, &stream_ctx);
+    return ci_query_to_stream(provider, prompt, claude_api_query,
+                             callback, userdata);
 }
 
 /* Cleanup */

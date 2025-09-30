@@ -17,6 +17,7 @@
 #include "argo_ci.h"
 #include "argo_ci_defaults.h"
 #include "argo_ci_common.h"
+#include "argo_api_common.h"
 #include "argo_error.h"
 #include "argo_log.h"
 #include "argo_ollama.h"
@@ -109,11 +110,12 @@ ci_provider_t* ollama_create_provider(const char* model_name) {
 static int ollama_init(ci_provider_t* provider) {
     ARGO_GET_CONTEXT(provider, ollama_context_t, ctx);
 
-    /* Allocate response buffer */
-    ctx->response_capacity = OLLAMA_RESPONSE_CAPACITY;
-    ctx->response_content = malloc(ctx->response_capacity);
-    if (!ctx->response_content) {
-        return E_SYSTEM_MEMORY;
+    /* Allocate response buffer using common utility */
+    int result = api_allocate_response_buffer(&ctx->response_content,
+                                              &ctx->response_capacity,
+                                              OLLAMA_RESPONSE_CAPACITY);
+    if (result != ARGO_SUCCESS) {
+        return result;
     }
 
     LOG_DEBUG("Ollama provider initialized");
