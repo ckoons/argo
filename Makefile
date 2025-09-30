@@ -18,7 +18,12 @@ SESSION_DIR = .argo/sessions
 SOURCES = $(SRC_DIR)/argo_socket.c \
           $(SRC_DIR)/argo_ollama.c \
           $(SRC_DIR)/argo_claude.c \
-          $(SRC_DIR)/argo_claude_code.c
+          $(SRC_DIR)/argo_claude_code.c \
+          $(SRC_DIR)/argo_http.c \
+          $(SRC_DIR)/argo_claude_api.c \
+          $(SRC_DIR)/argo_openai_api.c \
+          $(SRC_DIR)/argo_gemini_api.c \
+          $(SRC_DIR)/argo_api_common.c
 
 # Object files
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
@@ -33,9 +38,11 @@ STUB_OBJECTS = $(BUILD_DIR)/stubs.o
 
 # Targets
 TEST_TARGET = $(BUILD_DIR)/test_ci_providers
+API_TEST_TARGET = $(BUILD_DIR)/test_api_providers
+API_CALL_TARGET = $(BUILD_DIR)/test_api_calls
 
 # Default target
-all: directories $(TEST_TARGET)
+all: directories $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET)
 
 # Create necessary directories
 directories:
@@ -133,6 +140,14 @@ $(BUILD_DIR)/stubs.o: $(BUILD_DIR)/stubs.c
 
 # Build test executable
 $(TEST_TARGET): $(OBJECTS) $(TEST_OBJECTS) $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build API test executable
+$(API_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_api_providers.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build API call test executable
+$(API_CALL_TARGET): $(OBJECTS) $(BUILD_DIR)/test_api_calls.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Run tests
