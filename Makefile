@@ -24,7 +24,9 @@ SOURCES = $(SRC_DIR)/argo_socket.c \
           $(SRC_DIR)/argo_openai_api.c \
           $(SRC_DIR)/argo_gemini_api.c \
           $(SRC_DIR)/argo_api_common.c \
-          $(SRC_DIR)/argo_error.c
+          $(SRC_DIR)/argo_error.c \
+          $(SRC_DIR)/argo_registry.c \
+          $(SRC_DIR)/argo_memory.c
 
 # Object files
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
@@ -41,9 +43,11 @@ STUB_OBJECTS = $(BUILD_DIR)/stubs.o
 TEST_TARGET = $(BUILD_DIR)/test_ci_providers
 API_TEST_TARGET = $(BUILD_DIR)/test_api_providers
 API_CALL_TARGET = $(BUILD_DIR)/test_api_calls
+REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_registry
+MEMORY_TEST_TARGET = $(BUILD_DIR)/test_memory
 
 # Default target
-all: directories $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET)
+all: directories $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET)
 
 # Create necessary directories
 directories:
@@ -144,6 +148,14 @@ $(API_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_api_providers.o $(STUB_OBJECTS)
 
 # Build API call test executable
 $(API_CALL_TARGET): $(OBJECTS) $(BUILD_DIR)/test_api_calls.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build registry test executable
+$(REGISTRY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_registry.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build memory test executable
+$(MEMORY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_memory.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Run tests
