@@ -129,15 +129,30 @@ static int gemini_api_query(ci_provider_t* provider, const char* prompt,
         return E_PROTOCOL_HTTP;
     }
 
-    /* Extract content from Gemini response format */
-    char* content_start = strstr(resp->body, "\"text\":\"");
-    if (!content_start) {
-        LOG_ERROR("No text in Gemini API response");
+    /* Extract content from Gemini response format: candidates[0].content.parts[0].text */
+    char* candidates_start = strstr(resp->body, "\"candidates\"");
+    if (!candidates_start) {
+        LOG_ERROR("No candidates in Gemini API response: %s", resp->body);
         http_response_free(resp);
         return E_PROTOCOL_FORMAT;
     }
 
-    content_start += 8;  /* Skip past "text":" */
+    char* text_start = strstr(candidates_start, "\"text\"");
+    if (!text_start) {
+        LOG_ERROR("No text in Gemini API candidates: %s", resp->body);
+        http_response_free(resp);
+        return E_PROTOCOL_FORMAT;
+    }
+
+    /* Find the opening quote after "text": */
+    char* content_start = strchr(text_start + 6, '"');
+    if (!content_start) {
+        http_response_free(resp);
+        return E_PROTOCOL_FORMAT;
+    }
+    content_start++;  /* Move past the quote */
+
+    /* Find closing quote */
     char* content_end = strchr(content_start, '"');
     if (!content_end) {
         http_response_free(resp);

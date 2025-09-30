@@ -121,15 +121,30 @@ static int claude_api_query(ci_provider_t* provider, const char* prompt,
         return E_PROTOCOL_HTTP;
     }
 
-    /* Extract content from response JSON (simplified) */
-    char* content_start = strstr(resp->body, "\"text\":\"");
-    if (!content_start) {
-        LOG_ERROR("No content in Claude API response");
+    /* Extract content from response JSON - find "text" in content array */
+    char* content_array = strstr(resp->body, "\"content\"");
+    if (!content_array) {
+        LOG_ERROR("No content array in Claude API response: %s", resp->body);
         http_response_free(resp);
         return E_PROTOCOL_FORMAT;
     }
 
-    content_start += 8;  /* Skip past "text":" */
+    char* text_key = strstr(content_array, "\"text\"");
+    if (!text_key) {
+        LOG_ERROR("No text in Claude API content: %s", resp->body);
+        http_response_free(resp);
+        return E_PROTOCOL_FORMAT;
+    }
+
+    /* Find the opening quote after "text": (skip colon and possible space) */
+    char* content_start = strchr(text_key + 6, '"');
+    if (!content_start) {
+        http_response_free(resp);
+        return E_PROTOCOL_FORMAT;
+    }
+    content_start++;  /* Move past the opening quote */
+
+    /* Find closing quote */
     char* content_end = strchr(content_start, '"');
     if (!content_end) {
         http_response_free(resp);
