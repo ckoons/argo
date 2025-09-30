@@ -26,6 +26,7 @@ typedef struct ollama_context {
     char endpoint[256];
     char model[64];
     int port;
+    bool use_streaming;  /* Default true */
 
     /* Connection state */
     int socket_fd;
@@ -61,7 +62,7 @@ static int ollama_disconnect(ollama_context_t* ctx);
 
 /* HTTP helpers */
 static int build_http_request(char* buffer, size_t size,
-                             const char* model, const char* prompt);
+                             const char* model, const char* prompt, bool streaming);
 static int connect_to_ollama(const char* host, int port);
 
 /* Create Ollama provider */
@@ -101,6 +102,7 @@ ci_provider_t* ollama_create_provider(const char* model_name) {
     strncpy(ctx->endpoint, OLLAMA_DEFAULT_ENDPOINT, sizeof(ctx->endpoint) - 1);
     ctx->port = OLLAMA_DEFAULT_PORT;
     ctx->socket_fd = -1;
+    ctx->use_streaming = true;  /* Default to streaming */
 
     LOG_INFO("Created Ollama provider for model %s", ctx->model);
     return &ctx->provider;
@@ -163,9 +165,9 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
         }
     }
 
-    /* Build HTTP request */
+    /* Build HTTP request - use non-streaming for regular query */
     char request[8192];
-    int req_len = build_http_request(request, sizeof(request), ctx->model, prompt);
+    int req_len = build_http_request(request, sizeof(request), ctx->model, prompt, false);
     if (req_len < 0) {
         return E_PROTOCOL_SIZE;
     }
@@ -299,15 +301,138 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
 /* Stream response from Ollama */
 static int ollama_stream(ci_provider_t* provider, const char* prompt,
                         ci_stream_callback callback, void* userdata) {
-    /* Mark unused parameters */
-    (void)provider;
-    (void)prompt;
-    (void)callback;
-    (void)userdata;
+    ARGO_CHECK_NULL(provider);
+    ARGO_CHECK_NULL(prompt);
+    ARGO_CHECK_NULL(callback);
 
-    /* Similar to query but calls callback for each chunk */
-    /* Implementation would be similar to ollama_query but with per-chunk callbacks */
-    return E_INTERNAL_NOTIMPL;  /* TODO: Implement if needed */
+    ollama_context_t* ctx = (ollama_context_t*)provider->context;
+    ARGO_CHECK_NULL(ctx);
+
+    /* Ensure connected */
+    if (!ctx->connected) {
+        int result = ollama_connect(provider);
+        if (result != ARGO_SUCCESS) {
+            return result;
+        }
+    }
+
+    /* Build HTTP request with streaming enabled */
+    char request[8192];
+    int req_len = build_http_request(request, sizeof(request), ctx->model, prompt, true);
+    if (req_len < 0) {
+        return E_PROTOCOL_SIZE;
+    }
+
+    /* Send request */
+    ssize_t sent = send(ctx->socket_fd, request, req_len, MSG_NOSIGNAL);
+    if (sent != req_len) {
+        LOG_ERROR("Failed to send request to Ollama: %s", strerror(errno));
+        ollama_disconnect(ctx);
+        return E_SYSTEM_SOCKET;
+    }
+
+    /* Clear buffers */
+    ctx->buffer_pos = 0;
+    memset(ctx->buffer, 0, sizeof(ctx->buffer));
+
+    /* Read streaming response */
+    time_t start = time(NULL);
+    bool headers_complete = false;
+    char line_buffer[8192];
+
+    while (time(NULL) - start < OLLAMA_TIMEOUT_SECONDS) {
+        ssize_t bytes = recv(ctx->socket_fd,
+                           ctx->buffer + ctx->buffer_pos,
+                           sizeof(ctx->buffer) - ctx->buffer_pos - 1,
+                           MSG_DONTWAIT);
+
+        if (bytes > 0) {
+            ctx->buffer_pos += bytes;
+            ctx->buffer[ctx->buffer_pos] = '\0';
+
+            /* Skip headers if not done yet */
+            if (!headers_complete) {
+                char* header_end = strstr(ctx->buffer, "\r\n\r\n");
+                if (header_end) {
+                    /* Move past headers */
+                    char* json_start = header_end + 4;
+                    size_t remaining = ctx->buffer_pos - (json_start - ctx->buffer);
+                    memmove(ctx->buffer, json_start, remaining);
+                    ctx->buffer_pos = remaining;
+                    headers_complete = true;
+                }
+            }
+
+            if (headers_complete) {
+                /* Process lines from buffer */
+                char* p = ctx->buffer;
+                char* line_start = ctx->buffer;
+
+                while (p < ctx->buffer + ctx->buffer_pos) {
+                    if (*p == '\n') {
+                        /* Complete line found - copy to line buffer */
+                        size_t line_len = p - line_start;
+                        if (line_len > 0 && line_len < sizeof(line_buffer)) {
+                            memcpy(line_buffer, line_start, line_len);
+                            line_buffer[line_len] = '\0';
+
+                            /* Parse JSON line and extract response */
+                            char* response_field = strstr(line_buffer, "\"response\":\"");
+                            if (response_field) {
+                                response_field += 12;
+                                char* end = response_field;
+                                while (*end && !(*end == '"' && *(end-1) != '\\')) end++;
+
+                                /* Extract the chunk */
+                                size_t chunk_len = end - response_field;
+                                char chunk[1024];
+                                if (chunk_len < sizeof(chunk)) {
+                                    strncpy(chunk, response_field, chunk_len);
+                                    chunk[chunk_len] = '\0';
+
+                                    /* Call callback with chunk */
+                                    callback(chunk, chunk_len, userdata);
+                                }
+                            }
+
+                            /* Check if done */
+                            if (strstr(line_buffer, "\"done\":true")) {
+                                /* Streaming complete */
+                                ollama_disconnect(ctx);
+                                ctx->total_queries++;
+                                ctx->last_query = time(NULL);
+                                return ARGO_SUCCESS;
+                            }
+                        }
+
+                        /* Move to next line */
+                        line_start = p + 1;
+                    }
+                    p++;
+                }
+
+                /* Move remaining partial line to start of buffer */
+                size_t remaining = ctx->buffer + ctx->buffer_pos - line_start;
+                if (remaining > 0) {
+                    memmove(ctx->buffer, line_start, remaining);
+                    ctx->buffer_pos = remaining;
+                } else {
+                    ctx->buffer_pos = 0;
+                }
+            }
+        } else if (bytes == 0) {
+            break;
+        } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            LOG_ERROR("recv() error: %s", strerror(errno));
+            ollama_disconnect(ctx);
+            return E_SYSTEM_SOCKET;
+        }
+
+        usleep(10000);  /* 10ms */
+    }
+
+    ollama_disconnect(ctx);
+    return E_CI_TIMEOUT;
 }
 
 /* Cleanup Ollama provider */
@@ -345,12 +470,12 @@ static int ollama_disconnect(ollama_context_t* ctx) {
 
 /* Build HTTP POST request for Ollama */
 static int build_http_request(char* buffer, size_t size,
-                             const char* model, const char* prompt) {
+                             const char* model, const char* prompt, bool streaming) {
     /* Build JSON body */
     char json_body[4096];
     int json_len = snprintf(json_body, sizeof(json_body),
                            OLLAMA_REQUEST_FORMAT,
-                           model, prompt);
+                           model, prompt, streaming ? "true" : "false");
 
     if (json_len >= (int)sizeof(json_body)) {
         return -1;
@@ -373,7 +498,39 @@ static int build_http_request(char* buffer, size_t size,
     return req_len;
 }
 
-/* Note: Streaming parsing removed - using non-streaming API for now */
+/* Streaming control functions */
+void ollama_set_streaming(ci_provider_t* provider, bool enabled) {
+    if (!provider || !provider->context) return;
+    ollama_context_t* ctx = (ollama_context_t*)provider->context;
+    ctx->use_streaming = enabled;
+}
+
+bool ollama_get_streaming(ci_provider_t* provider) {
+    if (!provider || !provider->context) return false;
+    ollama_context_t* ctx = (ollama_context_t*)provider->context;
+    return ctx->use_streaming;
+}
+
+/* Default query - uses streaming by default */
+int ollama_query_default(ci_provider_t* provider, const char* prompt,
+                        ci_stream_callback callback, void* userdata) {
+    if (!provider || !provider->context) {
+        return -1;
+    }
+
+    ollama_context_t* ctx = (ollama_context_t*)provider->context;
+
+    /* Use streaming if enabled (default) */
+    if (ctx->use_streaming && provider->stream) {
+        return provider->stream(provider, prompt, callback, userdata);
+    } else if (provider->query) {
+        /* Fall back to non-streaming, but need to adapt callback */
+        /* This would require a wrapper - for now just use streaming */
+        return provider->stream(provider, prompt, callback, userdata);
+    }
+
+    return E_INTERNAL_NOTIMPL;
+}
 
 /* Connect to Ollama server */
 static int connect_to_ollama(const char* host, int port) {

@@ -46,6 +46,25 @@ static void capture_callback(const ci_response_t* response, void* userdata) {
     *flag = true;
 }
 
+/* Stream callback that accumulates chunks */
+static char g_stream_buffer[8192];
+static size_t g_stream_pos = 0;
+static int g_chunk_count = 0;
+
+static void stream_callback(const char* chunk, size_t len, void* userdata) {
+    bool* flag = (bool*)userdata;
+
+    /* Debug: show each chunk */
+    printf("  Chunk %d (%zu bytes): %s\n", ++g_chunk_count, len, chunk);
+
+    if (g_stream_pos + len < sizeof(g_stream_buffer) - 1) {
+        memcpy(g_stream_buffer + g_stream_pos, chunk, len);
+        g_stream_pos += len;
+        g_stream_buffer[g_stream_pos] = '\0';
+    }
+    *flag = true;  /* Mark that we received at least one chunk */
+}
+
 /* Test socket server */
 int test_socket_server(void) {
     printf("\n=== Testing Socket Server ===\n");
@@ -76,9 +95,9 @@ int test_socket_server(void) {
     return 0;
 }
 
-/* Test Ollama provider */
-int test_ollama_provider(void) {
-    printf("\n=== Testing Ollama Provider ===\n");
+/* Test Ollama provider - Non-streaming */
+int test_ollama_nonstreaming(void) {
+    printf("\n=== Testing Ollama Provider (Non-Streaming) ===\n");
     g_tests_run++;
 
     /* Check if Ollama is running */
@@ -105,8 +124,8 @@ int test_ollama_provider(void) {
         return -1;
     }
 
-    /* Test query with simple prompt */
-    printf("Sending test query to Ollama (this may take a moment)...\n");
+    /* Test non-streaming query */
+    printf("Testing non-streaming mode...\n");
 
     bool response_received = false;
 
@@ -116,7 +135,7 @@ int test_ollama_provider(void) {
                            &response_received);
 
     if (result != ARGO_SUCCESS) {
-        printf("FAIL: Query failed: %s\n", argo_error_string(result));
+        printf("FAIL: Non-streaming query failed: %s\n", argo_error_string(result));
         provider->cleanup(provider);
         return -1;
     }
@@ -129,24 +148,90 @@ int test_ollama_provider(void) {
     }
 
     if (!response_received) {
-        printf("FAIL: Timeout waiting for Ollama response\n");
+        printf("FAIL: Timeout waiting for non-streaming response\n");
         provider->cleanup(provider);
         return -1;
     }
 
     if (!g_last_response.success) {
-        printf("FAIL: Ollama returned error: %s\n",
+        printf("FAIL: Non-streaming returned error: %s\n",
                argo_error_string(g_last_response.error_code));
         provider->cleanup(provider);
         return -1;
     }
 
-    printf("Response from %s: %s\n", g_last_response.model_used, g_last_response.content);
+    printf("Non-streaming response: %s\n", g_last_response.content);
 
     /* Cleanup */
     provider->cleanup(provider);
 
-    printf("PASS: Ollama provider test\n");
+    printf("PASS: Ollama non-streaming test\n");
+    g_tests_passed++;
+    return 0;
+}
+
+/* Test Ollama provider - Streaming */
+int test_ollama_streaming(void) {
+    printf("\n=== Testing Ollama Provider (Streaming) ===\n");
+    g_tests_run++;
+
+    /* Check if Ollama is running */
+    if (!ollama_is_running()) {
+        printf("SKIP: Ollama is not running on localhost:11434\n");
+        printf("      Start Ollama to test: ollama serve\n");
+        g_tests_skipped++;
+        return 0;
+    }
+
+    /* Create provider - use small, fast model */
+    ci_provider_t* provider = ollama_create_provider("gemma3:4b");
+    if (!provider) {
+        printf("FAIL: Could not create Ollama provider\n");
+        return -1;
+    }
+
+    /* Initialize */
+    int result = provider->init(provider);
+    if (result != ARGO_SUCCESS) {
+        printf("FAIL: Could not initialize Ollama: %s\n",
+               argo_error_string(result));
+        provider->cleanup(provider);
+        return -1;
+    }
+
+    /* Test streaming query */
+    printf("Testing streaming mode...\n");
+
+    /* Clear stream buffer */
+    g_stream_pos = 0;
+    g_stream_buffer[0] = '\0';
+    g_chunk_count = 0;
+    bool chunks_received = false;
+
+    result = provider->stream(provider,
+                            "Say hello",  /* Simple prompt for testing */
+                            stream_callback,
+                            &chunks_received);
+
+    if (result != ARGO_SUCCESS) {
+        printf("FAIL: Streaming query failed: %s\n", argo_error_string(result));
+        provider->cleanup(provider);
+        return -1;
+    }
+
+    /* Check if we got any response */
+    if (!chunks_received || g_stream_pos == 0) {
+        printf("FAIL: No streaming chunks received\n");
+        provider->cleanup(provider);
+        return -1;
+    }
+
+    printf("Streaming response (%zu bytes): %s\n", g_stream_pos, g_stream_buffer);
+
+    /* Cleanup */
+    provider->cleanup(provider);
+
+    printf("PASS: Ollama streaming test\n");
     g_tests_passed++;
     return 0;
 }
@@ -284,7 +369,11 @@ int main(int argc, char* argv[]) {
     test_async_loop();
 
     if (g_running) {
-        test_ollama_provider();
+        test_ollama_nonstreaming();
+    }
+
+    if (g_running) {
+        test_ollama_streaming();
     }
 
     if (g_running) {
