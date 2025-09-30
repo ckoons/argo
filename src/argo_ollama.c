@@ -16,6 +16,7 @@
 /* Project includes */
 #include "argo_ci.h"
 #include "argo_ci_defaults.h"
+#include "argo_ci_common.h"
 #include "argo_error.h"
 #include "argo_log.h"
 #include "argo_ollama.h"
@@ -74,12 +75,8 @@ ci_provider_t* ollama_create_provider(const char* model_name) {
     }
 
     /* Setup provider interface */
-    ctx->provider.init = ollama_init;
-    ctx->provider.connect = ollama_connect;
-    ctx->provider.query = ollama_query;
-    ctx->provider.stream = ollama_stream;
-    ctx->provider.cleanup = ollama_cleanup;
-    ctx->provider.context = ctx;
+    init_provider_base(&ctx->provider, ctx, ollama_init, ollama_connect,
+                      ollama_query, ollama_stream, ollama_cleanup);
 
     /* Set model configuration */
     if (model_name) {
@@ -110,9 +107,7 @@ ci_provider_t* ollama_create_provider(const char* model_name) {
 
 /* Initialize Ollama provider */
 static int ollama_init(ci_provider_t* provider) {
-    ARGO_CHECK_NULL(provider);
-    ollama_context_t* ctx = (ollama_context_t*)provider->context;
-    ARGO_CHECK_NULL(ctx);
+    ARGO_GET_CONTEXT(provider, ollama_context_t, ctx);
 
     /* Allocate response buffer */
     ctx->response_capacity = 16384;  /* Start with 16KB */
@@ -127,9 +122,7 @@ static int ollama_init(ci_provider_t* provider) {
 
 /* Connect to Ollama server */
 static int ollama_connect(ci_provider_t* provider) {
-    ARGO_CHECK_NULL(provider);
-    ollama_context_t* ctx = (ollama_context_t*)provider->context;
-    ARGO_CHECK_NULL(ctx);
+    ARGO_GET_CONTEXT(provider, ollama_context_t, ctx);
 
     if (ctx->connected) {
         return ARGO_SUCCESS;
@@ -150,20 +143,12 @@ static int ollama_connect(ci_provider_t* provider) {
 /* Query Ollama (async with callback) */
 static int ollama_query(ci_provider_t* provider, const char* prompt,
                        ci_response_callback callback, void* userdata) {
-    ARGO_CHECK_NULL(provider);
     ARGO_CHECK_NULL(prompt);
     ARGO_CHECK_NULL(callback);
-
-    ollama_context_t* ctx = (ollama_context_t*)provider->context;
-    ARGO_CHECK_NULL(ctx);
+    ARGO_GET_CONTEXT(provider, ollama_context_t, ctx);
 
     /* Ensure connected */
-    if (!ctx->connected) {
-        int result = ollama_connect(provider);
-        if (result != ARGO_SUCCESS) {
-            return result;
-        }
-    }
+    ARGO_ENSURE_CONNECTED(provider, ctx);
 
     /* Build HTTP request - use non-streaming for regular query */
     char request[8192];
@@ -266,9 +251,11 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
 
     /* Copy response */
     size_t response_len = p - response_start;
-    if (response_len >= ctx->response_capacity) {
-        ctx->response_capacity = response_len + 1;
-        ctx->response_content = realloc(ctx->response_content, ctx->response_capacity);
+    int result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
+                                       response_len + 1);
+    if (result != ARGO_SUCCESS) {
+        ollama_disconnect(ctx);
+        return result;
     }
 
     strncpy(ctx->response_content, response_start, response_len);
@@ -279,17 +266,12 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
     ollama_disconnect(ctx);
 
     /* Build response */
-    ci_response_t response = {
-        .success = true,
-        .error_code = ARGO_SUCCESS,
-        .content = ctx->response_content,
-        .model_used = ctx->model,
-        .timestamp = time(NULL)
-    };
+    ci_response_t response;
+    build_ci_response(&response, true, ARGO_SUCCESS,
+                     ctx->response_content, ctx->model);
 
     /* Update statistics */
-    ctx->total_queries++;
-    ctx->last_query = time(NULL);
+    ARGO_UPDATE_STATS(ctx);
 
     /* Invoke callback */
     callback(&response, userdata);
@@ -301,20 +283,12 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
 /* Stream response from Ollama */
 static int ollama_stream(ci_provider_t* provider, const char* prompt,
                         ci_stream_callback callback, void* userdata) {
-    ARGO_CHECK_NULL(provider);
     ARGO_CHECK_NULL(prompt);
     ARGO_CHECK_NULL(callback);
-
-    ollama_context_t* ctx = (ollama_context_t*)provider->context;
-    ARGO_CHECK_NULL(ctx);
+    ARGO_GET_CONTEXT(provider, ollama_context_t, ctx);
 
     /* Ensure connected */
-    if (!ctx->connected) {
-        int result = ollama_connect(provider);
-        if (result != ARGO_SUCCESS) {
-            return result;
-        }
-    }
+    ARGO_ENSURE_CONNECTED(provider, ctx);
 
     /* Build HTTP request with streaming enabled */
     char request[8192];
@@ -399,8 +373,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
                             if (strstr(line_buffer, "\"done\":true")) {
                                 /* Streaming complete */
                                 ollama_disconnect(ctx);
-                                ctx->total_queries++;
-                                ctx->last_query = time(NULL);
+                                ARGO_UPDATE_STATS(ctx);
                                 return ARGO_SUCCESS;
                             }
                         }

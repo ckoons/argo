@@ -15,6 +15,7 @@
 #include "argo_socket.h"
 #include "argo_ollama.h"
 #include "argo_claude.h"
+#include "argo_ci_common.h"
 
 /* Global test state */
 static int g_tests_run = 0;
@@ -44,6 +45,54 @@ static void capture_callback(const ci_response_t* response, void* userdata) {
     bool* flag = (bool*)userdata;
     memcpy(&g_last_response, response, sizeof(ci_response_t));
     *flag = true;
+}
+
+/* Test harness for provider tests */
+typedef int (*provider_test_func)(ci_provider_t* provider);
+
+static int run_provider_test(const char* test_name, ci_provider_t* provider,
+                            provider_test_func test_func) {
+    printf("\n=== Testing %s ===\n", test_name);
+    g_tests_run++;
+
+    if (!provider) {
+        printf("FAIL: Could not create provider\n");
+        return -1;
+    }
+
+    /* Initialize */
+    int result = provider->init(provider);
+    if (result != ARGO_SUCCESS) {
+        printf("FAIL: Could not initialize: %s\n", argo_error_string(result));
+        provider->cleanup(provider);
+        return -1;
+    }
+
+    /* Run the actual test */
+    result = test_func(provider);
+
+    /* Cleanup */
+    provider->cleanup(provider);
+
+    if (result == 0) {
+        printf("PASS: %s test\n", test_name);
+        g_tests_passed++;
+    }
+
+    return result;
+}
+
+/* Helper to wait for response */
+static int wait_for_flag(bool* flag, int timeout_ms) {
+    int wait_count = 0;
+    int max_wait = timeout_ms / 100;
+
+    while (!*flag && wait_count < max_wait) {
+        usleep(100000);  /* 100ms */
+        wait_count++;
+    }
+
+    return *flag ? ARGO_SUCCESS : E_CI_TIMEOUT;
 }
 
 /* Stream callback that accumulates chunks */
@@ -95,111 +144,53 @@ int test_socket_server(void) {
     return 0;
 }
 
-/* Test Ollama provider - Non-streaming */
-int test_ollama_nonstreaming(void) {
-    printf("\n=== Testing Ollama Provider (Non-Streaming) ===\n");
-    g_tests_run++;
-
-    /* Check if Ollama is running */
-    if (!ollama_is_running()) {
-        printf("SKIP: Ollama is not running on localhost:11434\n");
-        printf("      Start Ollama to test: ollama serve\n");
-        g_tests_skipped++;
-        return 0;
-    }
-
-    /* Create provider - use small, fast model */
-    ci_provider_t* provider = ollama_create_provider("gemma3:4b");
-    if (!provider) {
-        printf("FAIL: Could not create Ollama provider\n");
-        return -1;
-    }
-
-    /* Initialize */
-    int result = provider->init(provider);
-    if (result != ARGO_SUCCESS) {
-        printf("FAIL: Could not initialize Ollama: %s\n",
-               argo_error_string(result));
-        provider->cleanup(provider);
-        return -1;
-    }
-
-    /* Test non-streaming query */
+/* Ollama non-streaming test logic */
+static int ollama_nonstream_test_logic(ci_provider_t* provider) {
     printf("Testing non-streaming mode...\n");
 
     bool response_received = false;
-
-    result = provider->query(provider,
-                           "Say hello",  /* Simple prompt for testing */
-                           capture_callback,
-                           &response_received);
+    int result = provider->query(provider, "Say hello",
+                                capture_callback, &response_received);
 
     if (result != ARGO_SUCCESS) {
         printf("FAIL: Non-streaming query failed: %s\n", argo_error_string(result));
-        provider->cleanup(provider);
         return -1;
     }
 
-    /* Wait for response (with timeout) */
-    int wait_count = 0;
-    while (!response_received && wait_count < 600) {  /* 60 seconds max */
-        usleep(100000);  /* 100ms */
-        wait_count++;
-    }
-
-    if (!response_received) {
-        printf("FAIL: Timeout waiting for non-streaming response\n");
-        provider->cleanup(provider);
+    if (wait_for_flag(&response_received, 60000) != ARGO_SUCCESS) {
+        printf("FAIL: Timeout waiting for response\n");
         return -1;
     }
 
     if (!g_last_response.success) {
-        printf("FAIL: Non-streaming returned error: %s\n",
+        printf("FAIL: Returned error: %s\n",
                argo_error_string(g_last_response.error_code));
-        provider->cleanup(provider);
         return -1;
     }
 
     printf("Non-streaming response: %s\n", g_last_response.content);
-
-    /* Cleanup */
-    provider->cleanup(provider);
-
-    printf("PASS: Ollama non-streaming test\n");
-    g_tests_passed++;
     return 0;
 }
 
-/* Test Ollama provider - Streaming */
-int test_ollama_streaming(void) {
-    printf("\n=== Testing Ollama Provider (Streaming) ===\n");
-    g_tests_run++;
-
+/* Test Ollama provider - Non-streaming */
+int test_ollama_nonstreaming(void) {
     /* Check if Ollama is running */
     if (!ollama_is_running()) {
+        printf("\n=== Testing Ollama Provider (Non-Streaming) ===\n");
+        g_tests_run++;
         printf("SKIP: Ollama is not running on localhost:11434\n");
         printf("      Start Ollama to test: ollama serve\n");
         g_tests_skipped++;
         return 0;
     }
 
-    /* Create provider - use small, fast model */
     ci_provider_t* provider = ollama_create_provider("gemma3:4b");
-    if (!provider) {
-        printf("FAIL: Could not create Ollama provider\n");
-        return -1;
-    }
+    return run_provider_test("Ollama Provider (Non-Streaming)",
+                           provider, ollama_nonstream_test_logic);
+}
 
-    /* Initialize */
-    int result = provider->init(provider);
-    if (result != ARGO_SUCCESS) {
-        printf("FAIL: Could not initialize Ollama: %s\n",
-               argo_error_string(result));
-        provider->cleanup(provider);
-        return -1;
-    }
-
-    /* Test streaming query */
+/* Ollama streaming test logic */
+static int ollama_stream_test_logic(ci_provider_t* provider) {
     printf("Testing streaming mode...\n");
 
     /* Clear stream buffer */
@@ -208,93 +199,74 @@ int test_ollama_streaming(void) {
     g_chunk_count = 0;
     bool chunks_received = false;
 
-    result = provider->stream(provider,
-                            "Say hello",  /* Simple prompt for testing */
-                            stream_callback,
-                            &chunks_received);
+    int result = provider->stream(provider, "Say hello",
+                                 stream_callback, &chunks_received);
 
     if (result != ARGO_SUCCESS) {
         printf("FAIL: Streaming query failed: %s\n", argo_error_string(result));
-        provider->cleanup(provider);
         return -1;
     }
 
-    /* Check if we got any response */
     if (!chunks_received || g_stream_pos == 0) {
         printf("FAIL: No streaming chunks received\n");
-        provider->cleanup(provider);
         return -1;
     }
 
     printf("Streaming response (%zu bytes): %s\n", g_stream_pos, g_stream_buffer);
+    return 0;
+}
 
-    /* Cleanup */
-    provider->cleanup(provider);
+/* Test Ollama provider - Streaming */
+int test_ollama_streaming(void) {
+    /* Check if Ollama is running */
+    if (!ollama_is_running()) {
+        printf("\n=== Testing Ollama Provider (Streaming) ===\n");
+        g_tests_run++;
+        printf("SKIP: Ollama is not running on localhost:11434\n");
+        printf("      Start Ollama to test: ollama serve\n");
+        g_tests_skipped++;
+        return 0;
+    }
 
-    printf("PASS: Ollama streaming test\n");
-    g_tests_passed++;
+    ci_provider_t* provider = ollama_create_provider("gemma3:4b");
+    return run_provider_test("Ollama Provider (Streaming)",
+                           provider, ollama_stream_test_logic);
+}
+
+/* Claude Code test logic */
+static int claude_code_test_logic(ci_provider_t* provider) {
+    printf("Testing Claude Code prompt mode...\n");
+
+    bool response_received = false;
+    int result = provider->query(provider,
+                               "What is 2 + 2? Please respond with just the number.",
+                               capture_callback, &response_received);
+
+    if (result != ARGO_SUCCESS) {
+        printf("FAIL: Query failed: %s\n", argo_error_string(result));
+        return -1;
+    }
+
+    if (!response_received) {
+        printf("FAIL: No response received\n");
+        return -1;
+    }
+
+    if (!g_last_response.success) {
+        printf("FAIL: Returned error: %s\n",
+               argo_error_string(g_last_response.error_code));
+        return -1;
+    }
+
+    printf("Claude Code response: %s\n", g_last_response.content);
     return 0;
 }
 
 /* Test Claude Code prompt mode */
 int test_claude_code_provider(void) {
-    printf("\n=== Testing Claude Code Prompt Mode ===\n");
-    g_tests_run++;
-
-    /* Create provider */
     ci_provider_t* provider = claude_code_create_provider("test_claude_code");
-    if (!provider) {
-        printf("FAIL: Could not create Claude Code provider\n");
-        return -1;
-    }
-
-    /* Initialize */
-    int result = provider->init(provider);
-    if (result != ARGO_SUCCESS) {
-        printf("FAIL: Could not initialize Claude Code: %s\n",
-               argo_error_string(result));
-        provider->cleanup(provider);
-        return -1;
-    }
-
-    /* Test query */
-    printf("Testing Claude Code prompt mode...\n");
-
-    bool response_received = false;
-
-    result = provider->query(provider,
-                           "What is 2 + 2? Please respond with just the number.",
-                           capture_callback,
-                           &response_received);
-
-    if (result != ARGO_SUCCESS) {
-        printf("FAIL: Query failed: %s\n", argo_error_string(result));
-        provider->cleanup(provider);
-        return -1;
-    }
-
-    /* Check response immediately (simulated) */
-    if (!response_received) {
-        printf("FAIL: No response received from Claude Code\n");
-        provider->cleanup(provider);
-        return -1;
-    }
-
-    if (!g_last_response.success) {
-        printf("FAIL: Claude Code returned error: %s\n",
-               argo_error_string(g_last_response.error_code));
-        provider->cleanup(provider);
-        return -1;
-    }
-
-    printf("Claude Code response: %s\n", g_last_response.content);
-
-    /* Cleanup */
-    provider->cleanup(provider);
-
-    printf("PASS: Claude Code prompt mode test\n");
-    g_tests_passed++;
-    return 0;
+    return run_provider_test("Claude Code Prompt Mode",
+                           provider, claude_code_test_logic);
 }
 
 /* Test Claude provider */

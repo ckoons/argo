@@ -18,6 +18,7 @@
 /* Project includes */
 #include "argo_ci.h"
 #include "argo_ci_defaults.h"
+#include "argo_ci_common.h"
 #include "argo_error.h"
 #include "argo_log.h"
 #include "argo_claude.h"
@@ -66,12 +67,8 @@ ci_provider_t* claude_code_create_provider(const char* ci_name) {
     }
 
     /* Setup provider interface */
-    ctx->provider.init = claude_code_init;
-    ctx->provider.connect = claude_code_connect;
-    ctx->provider.query = claude_code_query;
-    ctx->provider.stream = claude_code_stream;
-    ctx->provider.cleanup = claude_code_cleanup;
-    ctx->provider.context = ctx;
+    init_provider_base(&ctx->provider, ctx, claude_code_init, claude_code_connect,
+                      claude_code_query, claude_code_stream, claude_code_cleanup);
 
     /* Set provider info */
     strncpy(ctx->provider.name, "claude_code", sizeof(ctx->provider.name) - 1);
@@ -99,9 +96,7 @@ ci_provider_t* claude_code_create_provider(const char* ci_name) {
 
 /* Initialize Claude Code provider */
 static int claude_code_init(ci_provider_t* provider) {
-    ARGO_CHECK_NULL(provider);
-    claude_code_context_t* ctx = (claude_code_context_t*)provider->context;
-    ARGO_CHECK_NULL(ctx);
+    ARGO_GET_CONTEXT(provider, claude_code_context_t, ctx);
 
     /* Create directories if needed */
     mkdir(".argo", 0755);
@@ -124,9 +119,7 @@ static int claude_code_init(ci_provider_t* provider) {
 
 /* Connect to Claude Code (no-op for prompt mode) */
 static int claude_code_connect(ci_provider_t* provider) {
-    ARGO_CHECK_NULL(provider);
-    claude_code_context_t* ctx = (claude_code_context_t*)provider->context;
-    ARGO_CHECK_NULL(ctx);
+    ARGO_GET_CONTEXT(provider, claude_code_context_t, ctx);
 
     ctx->connected = true;
     LOG_INFO("Claude Code provider ready for prompts");
@@ -136,12 +129,9 @@ static int claude_code_connect(ci_provider_t* provider) {
 /* Query Claude Code via prompt file */
 static int claude_code_query(ci_provider_t* provider, const char* prompt,
                             ci_response_callback callback, void* userdata) {
-    ARGO_CHECK_NULL(provider);
     ARGO_CHECK_NULL(prompt);
     ARGO_CHECK_NULL(callback);
-
-    claude_code_context_t* ctx = (claude_code_context_t*)provider->context;
-    ARGO_CHECK_NULL(ctx);
+    ARGO_GET_CONTEXT(provider, claude_code_context_t, ctx);
 
     /* Increment counter for unique prompt */
     ctx->prompt_counter++;
@@ -168,25 +158,21 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
 
     /* Copy response to context buffer */
     size_t resp_len = strlen(simulated_response);
-    if (resp_len >= ctx->response_capacity) {
-        ctx->response_capacity = resp_len + 1;
-        ctx->response_content = realloc(ctx->response_content, ctx->response_capacity);
+    int result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
+                                       resp_len + 1);
+    if (result != ARGO_SUCCESS) {
+        return result;
     }
     strcpy(ctx->response_content, simulated_response);
     ctx->response_size = resp_len;
 
     /* Build response */
-    ci_response_t response = {
-        .success = true,
-        .error_code = ARGO_SUCCESS,
-        .content = ctx->response_content,
-        .model_used = "claude-code-prompt",
-        .timestamp = time(NULL)
-    };
+    ci_response_t response;
+    build_ci_response(&response, true, ARGO_SUCCESS,
+                     ctx->response_content, "claude-code-prompt");
 
     /* Update statistics */
-    ctx->total_queries++;
-    ctx->last_query = time(NULL);
+    ARGO_UPDATE_STATS(ctx);
 
     /* Invoke callback */
     callback(&response, userdata);
