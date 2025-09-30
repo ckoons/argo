@@ -11,25 +11,44 @@ SRC_DIR = src
 INC_DIR = include
 TEST_DIR = tests
 BUILD_DIR = build
+SCRIPT_DIR = scripts
 LOG_DIR = .argo/logs
 SESSION_DIR = .argo/sessions
 
-# Source files
-SOURCES = $(SRC_DIR)/argo_socket.c \
-          $(SRC_DIR)/argo_ollama.c \
-          $(SRC_DIR)/argo_claude.c \
-          $(SRC_DIR)/argo_claude_code.c \
-          $(SRC_DIR)/argo_http.c \
-          $(SRC_DIR)/argo_claude_api.c \
-          $(SRC_DIR)/argo_openai_api.c \
-          $(SRC_DIR)/argo_gemini_api.c \
-          $(SRC_DIR)/argo_api_common.c \
-          $(SRC_DIR)/argo_error.c \
-          $(SRC_DIR)/argo_registry.c \
-          $(SRC_DIR)/argo_memory.c
+# Core library sources (no provider implementations)
+CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
+               $(SRC_DIR)/argo_http.c \
+               $(SRC_DIR)/argo_error.c \
+               $(SRC_DIR)/argo_registry.c \
+               $(SRC_DIR)/argo_memory.c
+
+# Provider implementation sources
+PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
+                   $(SRC_DIR)/argo_claude.c \
+                   $(SRC_DIR)/argo_claude_code.c \
+                   $(SRC_DIR)/argo_claude_api.c \
+                   $(SRC_DIR)/argo_openai_api.c \
+                   $(SRC_DIR)/argo_gemini_api.c \
+                   $(SRC_DIR)/argo_api_common.c
+
+# All sources
+SOURCES = $(CORE_SOURCES) $(PROVIDER_SOURCES)
 
 # Object files
-OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
+CORE_OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(CORE_SOURCES))
+PROVIDER_OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(PROVIDER_SOURCES))
+OBJECTS = $(CORE_OBJECTS) $(PROVIDER_OBJECTS)
+
+# Core library
+CORE_LIB = $(BUILD_DIR)/libargo_core.a
+
+# Script sources
+SCRIPT_SOURCES = $(SCRIPT_DIR)/argo_monitor.c \
+                 $(SCRIPT_DIR)/argo_memory_inspect.c \
+                 $(SCRIPT_DIR)/argo_update_models.c
+
+# Script executables
+SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
 
 # Test files
 TEST_SOURCES = $(TEST_DIR)/test_ci_providers.c
@@ -47,7 +66,7 @@ REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_registry
 MEMORY_TEST_TARGET = $(BUILD_DIR)/test_memory
 
 # Default target
-all: directories $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -138,6 +157,17 @@ $(BUILD_DIR)/%.o: $(TEST_DIR)/%.c
 $(BUILD_DIR)/stubs.o: $(BUILD_DIR)/stubs.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Build core library
+$(CORE_LIB): $(CORE_OBJECTS) $(STUB_OBJECTS)
+	ar rcs $@ $^
+	@echo "Created core library: $@"
+
+# Build script executables
+$(BUILD_DIR)/%: $(SCRIPT_DIR)/%.c $(CORE_LIB)
+	$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
+	@ln -sf ../build/$(@F) $(SCRIPT_DIR)/$(@F)
+	@echo "Built script: $(@F) -> scripts/$(@F)"
+
 # Build test executable
 $(TEST_TARGET): $(OBJECTS) $(TEST_OBJECTS) $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
@@ -218,6 +248,9 @@ count-core:
 # Clean build artifacts
 clean:
 	rm -rf $(BUILD_DIR)
+	@for script in $(SCRIPT_TARGETS); do \
+		rm -f $(SCRIPT_DIR)/$$(basename $$script); \
+	done
 
 # Deep clean (includes logs and sessions)
 distclean: clean
@@ -246,6 +279,9 @@ update-models:
 	@echo "Updating model defaults from API providers..."
 	@./scripts/update_models.sh
 
-.PHONY: all directories test-quick test-all test-providers test-registry \
+.PHONY: all directories scripts test-quick test-all test-providers test-registry \
         test-memory test-api test-api-calls count-core clean distclean \
         check debug update-models
+
+# Build just the scripts
+scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
