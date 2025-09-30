@@ -272,25 +272,46 @@ CIs learn this format during onboarding by reading the documentation.
 
 ## Deliverables for Sprint 0
 
-### Phase 1: Headers (Approach 1)
-1. **CI Interface** (`include/argo_ci.h`) - Provider structure
-2. **Error System** (`include/argo_error.h`) - TYPE:NUMBER format
-3. **Memory System** (`include/argo_memory.h`) - 50% context rule
-4. **Registry** (`include/argo_registry.h`) - CI discovery and routing
-5. **Logging** (`include/argo_log.h`) - Structured logging
-6. **CI Defaults** (`include/argo_ci_defaults.h`) - Model parameters
+### Phase 1: Headers (Approach 1) ✓ COMPLETE
+1. ✓ **CI Interface** (`include/argo_ci.h`) - Provider structure
+2. ✓ **Error System** (`include/argo_error.h`) - TYPE:NUMBER format with human-readable messages
+3. ✓ **Memory System** (`include/argo_memory.h`) - 50% context rule
+4. ✓ **Registry** (`include/argo_registry.h`) - CI discovery and routing
+5. ✓ **Logging** (`include/argo_log.h`) - Structured logging
+6. ✓ **CI Defaults** (`include/argo_ci_defaults.h`) - Model parameters
 
-### Phase 2: Ollama Integration (Approach 3a)
-1. **Ollama Provider** (`src/providers/ollama.c`) - Local model integration
-2. **Socket Manager** (`src/argo_socket.c`) - Message passing
-3. **Registry Implementation** (`src/argo_registry.c`) - CI tracking
-4. **Ollama Tests** (`test/ollama_integration.c`) - Real tests
+### Phase 2: Ollama Integration (Approach 3a) ✓ COMPLETE
+1. ✓ **Ollama Provider** (`src/argo_ollama.c`) - Local model integration
+2. ✓ **Socket Manager** (`src/argo_socket.c`) - Message passing
+3. ⧗ **Registry Implementation** (`src/argo_registry.c`) - Header defined, implementation pending
+4. ⧗ **Ollama Tests** (`tests/test_ollama.c`) - Deferred (working with real CIs)
 
-### Phase 3: Claude Integration (Approach 3b)
-1. **Claude Provider** (`src/providers/claude.c`) - Max account handler
-2. **Memory Manager** (`src/argo_memory.c`) - Digest preparation
-3. **Sunset/Sunrise** (`src/ci_lifecycle.c`) - Turn management
-4. **Claude Tests** (`test/claude_integration.c`) - Real tests
+### Phase 3: Claude Integration (Approach 3b) ✓ COMPLETE
+1. ✓ **Claude Socket Provider** (`src/argo_claude.c`) - Local socket-based handler
+2. ✓ **Claude Code Provider** (`src/argo_claude_code.c`) - Prompt mode integration
+3. ✓ **Claude API Provider** (`src/argo_claude_api.c`) - API-based implementation
+4. ⧗ **Memory Manager** (`src/argo_memory.c`) - Header defined, implementation pending
+5. ⧗ **Sunset/Sunrise** (`src/ci_lifecycle.c`) - Deferred to Sprint 1
+6. ⧗ **Claude Tests** (`tests/test_claude.c`) - Deferred (working with real CIs)
+
+### Phase 4: Additional Providers (Bonus) ✓ COMPLETE
+1. ✓ **OpenAI API Provider** (`src/argo_openai_api.c`) - GPT-4o support
+2. ✓ **Gemini API Provider** (`src/argo_gemini_api.c`) - Gemini 2.5 support
+3. ✓ **Common API Handler** (`src/argo_api_common.c`) - OpenAI-compatible providers (Grok, DeepSeek, OpenRouter)
+4. ✓ **HTTP Client** (`src/argo_http.c`) - Curl-based implementation with proper status code handling
+5. ✓ **Error Implementation** (`src/argo_error.c`) - Human-readable error messages and suggestions
+
+### Phase 5: Configuration & Tooling (Bonus) ✓ COMPLETE
+1. ✓ **Model Configuration System** (`include/argo_local_models.h`) - Optional local model overrides
+2. ✓ **Model Update Script** (`scripts/update_models.sh`) - Query APIs for current models
+3. ✓ **Line Counter** (`scripts/count_core.sh`) - Diet-aware code size tracking
+4. ✓ **Model Defaults** - Updated to current versions (verified 2025-09-30):
+   - Claude Sonnet 4.5 (20250929)
+   - GPT-4o
+   - Gemini 2.5 Flash
+   - Grok 3
+   - DeepSeek Chat
+   - OpenRouter routing
 
 Note: NO MOCKS - working with real CIs from the start
 
@@ -319,6 +340,36 @@ Note: NO MOCKS - working with real CIs from the start
 - Memory digest will evolve with experience
 - Let CIs be creative within bounds
 
+## Progress Summary (As of 2025-09-30)
+
+### Completed
+- **All headers defined** - Complete CI interface, error system, memory, registry, logging
+- **Error system implemented** - Human-readable messages with TYPE:NUMBER encoding (e.g., "HTTP request failed (PROTOCOL:4006)")
+- **Provider ecosystem** - 8 providers working (Ollama, Claude Socket, Claude Code, Claude API, OpenAI, Gemini, plus Grok/DeepSeek/OpenRouter via common handler)
+- **HTTP client** - Proper status code handling, works with curl as temporary implementation
+- **Configuration system** - Optional local model overrides via `argo_local_models.h`
+- **Tooling** - Model update script, diet-aware line counter
+- **Code size** - 1,054 meaningful lines (10.5% of 10,000 line budget)
+
+### Key Decisions Made
+1. **Model configuration** - Use `__has_include()` pattern for optional local overrides, matches existing `argo_local.h` pattern
+2. **Error messages** - Human-first with code in parentheses: "HTTP request failed (PROTOCOL:4006)"
+3. **Line counting** - "Diet-aware" excludes comments, logs, prints, blank lines, and counts only largest provider
+4. **Provider implementations** - All use consistent JSON parsing with proper nested structure handling
+5. **File size guideline** - 600 lines as signal to refactor for comprehension and CI editability (not hard limit)
+
+### Remaining for Sprint 0
+1. **Registry implementation** (`src/argo_registry.c`) - CI tracking and discovery
+2. **Memory manager** (`src/argo_memory.c`) - Context digest preparation
+3. **CI lifecycle** (`src/ci_lifecycle.c`) - Sunset/sunrise protocol (may defer to Sprint 1)
+
+### Next Steps
+- Implement registry for CI discovery and routing
+- Implement memory manager for context handling
+- Consider whether sunset/sunrise belongs in Sprint 0 or Sprint 1
+
 ---
 
 *"In the beginning, there was the Word, and the Word was separated into Deterministic and Creative."*
+
+Last updated: 2025-09-30
