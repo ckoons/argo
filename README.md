@@ -5,22 +5,26 @@
 
 Argo is a minimal C library (<10,000 lines) that coordinates multiple Companion Intelligences (CIs) in software development workflows. It provides deterministic control while CIs provide creative contribution.
 
-## Status: Sprint 0 - CI Foundation (95% Complete)
+## Status: Sprint 0 - CI Foundation (Complete)
 
-Current: 1,054 meaningful lines (10.5% of budget)
+Current: 2,127 meaningful lines (21% of budget)
 
 ### What Works Now
 - ✅ **8 CI Providers**: Ollama, Claude (socket/code/API), OpenAI, Gemini, Grok, DeepSeek, OpenRouter
+- ✅ **Common Utilities**: JSON parsing, HTTP helpers, API abstractions
 - ✅ **Error System**: Human-readable messages with TYPE:NUMBER encoding
 - ✅ **Configuration**: Optional local model overrides
 - ✅ **Tooling**: Model update script, diet-aware line counter
+- ✅ **Testing**: 33/33 tests passing (registry, memory, lifecycle, providers)
 
 ### Core Principles
-1. **Deterministic vs Creative**: Argo controls workflow, CIs provide solutions
-2. **Sprint = Branch**: Each sprint is an atomic Git branch
-3. **No Mocks**: Working with real CIs from day one
-4. **Provider Agnostic**: Works with any model/API
-5. **Lean Code**: Stay under 10,000 meaningful lines
+1. **"What you don't build, you don't debug"** - Reuse over rewrite
+2. **Simple beats clever** - Follow patterns that work
+3. **Deterministic vs Creative**: Argo controls workflow, CIs provide solutions
+4. **Sprint = Branch**: Each sprint is an atomic Git branch
+5. **No Mocks**: Working with real CIs from day one
+6. **Provider Agnostic**: Works with any model/API
+7. **Lean Code**: Stay under 10,000 meaningful lines
 
 ## Quick Start
 

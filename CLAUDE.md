@@ -1,128 +1,69 @@
-# ARGO PROJECT - CLAUDE CODE GUIDELINES
+# Building Argo with Claude
 
-## PROJECT OVERVIEW
-Argo is a C project. All rights reserved - Casey Koons.
-This is a ground-up implementation following strict coding standards.
+© 2025 Casey Koons. All rights reserved.
 
-## CRITICAL RULES - READ FIRST
+## What Argo Is
 
-### NEVER:
-- NEVER create files without explicit user request
-- NEVER create documentation (*.md) files unless explicitly asked
-- NEVER modify these guidelines without Casey's approval
-- NEVER use dynamic memory allocation without error checking
-- NEVER leave resource leaks (always free/close what you open/allocate)
-- NEVER commit code that doesn't compile with -Wall -Werror
-- NEVER use gets() or other unsafe string functions
-- NEVER hardcode filenames or file paths in .c files
-- NEVER hardcode format strings or messages in .c files
-- NEVER use numeric constants in .c files (they must be defined values in header files)
-- NEVER exceed 600 lines in a .c file
-- NEVER create or use environment variables (Explicit exceptions: none)
+Argo is a lean C library (<10,000 lines) for coordinating multiple AI coding assistants in parallel development workflows. Built for clarity over cleverness, simplicity over showing off.
 
-### ALWAYS:
-- ALWAYS add copyright notice at top of ALL files: © 2025 Casey Koons All rights reserved
-- ALWAYS read existing code patterns before making changes
-- ALWAYS prefer editing existing files over creating new ones
-- ALWAYS follow the existing code style exactly
-- ALWAYS check return values from system calls
-- ALWAYS use static for file-local functions
-- ALWAYS initialize variables at declaration
-- ALWAYS compile with: gcc -Wall -Werror -Wextra -std=c11
-- ALWAYS define file paths and names in header files
-- ALWAYS define format/print strings in associated header files
+**Copyright note:** All rights reserved to preserve legal options during uncertain AI authorship law. When laws clarify, this may become co-authored credit. This protects what we're building together.
 
-## C CODING STANDARDS
+## Core Philosophy
 
-### Naming Conventions
+### "What you don't build, you don't debug."
+
+Before writing code:
+1. Search existing code for similar patterns
+2. Check utility headers (`argo_*_common.h`, `argo_json.h`)
+3. Reuse or refactor existing code
+4. Only create new code when truly necessary
+
+**Simple beats clever. Follow patterns that work.**
+
+## Essential Rules
+
+### Copyright & Files
+- Add to ALL files: `/* © 2025 Casey Koons All rights reserved */`
+- Never create files without explicit request
+- Never create documentation files unless asked
+- Prefer editing existing files over creating new ones
+
+### Memory & Safety
+- Check all return values and allocations
+- Free everything you allocate (no leaks)
+- Use goto cleanup pattern for error handling
+- Initialize variables at declaration
+- Never use unsafe functions (gets, strcpy without length)
+
+### Code Organization
+- Max 600 lines per .c file (refactor if approaching)
+- One clear purpose per module
+- All constants in header files (no magic numbers in .c files)
+- All paths/strings in header files (no hardcoded strings in .c files)
+- Never use environment variables at runtime (.env for build only)
+
+### Build & Test
+- Compile with: `gcc -Wall -Werror -Wextra -std=c11`
+- Before committing: `make clean && make && make test-quick`
+- All 33 tests must pass
+- Stay under 10,000 meaningful lines (check with `./scripts/count_core.sh`)
+
+## Common Patterns
+
+### Error Handling (goto cleanup)
 ```c
-/* CORRECT */
-typedef struct argo_context {
-    int ref_count;
-    char* buffer;
-} argo_context_t;
-
-void argo_context_init(argo_context_t* ctx);
-static int validate_input(const char* input);
-
-/* INCORRECT */
-typedef struct ArgoContext { ... }  /* NO CamelCase for structs */
-void ArgoContextInit(...)           /* NO CamelCase for functions */
-```
-
-### File Structure Template
-```c
-/* src/module_name.c */
-
-/* © 2025 Casey Koons All rights reserved */
-
-/* System includes */
-#include <stdio.h>
-#include <stdlib.h>
-
-/* Project includes */
-#include "argo.h"
-#include "argo_local.h"
-#include "module_name.h"
-
-/* Static declarations */
-static int helper_function(void);
-
-/* Public functions */
-int argo_module_init(void) {
-    printf(ARGO_INIT_MSG);  /* String defined in module_name.h */
-    /* implementation */
-}
-
-/* Static implementations */
-static int helper_function(void) {
-    /* implementation */
-}
-```
-
-### String and Path Constants
-```c
-/* module_name.h - Associated with module_name.c */
-#ifndef MODULE_NAME_H
-#define MODULE_NAME_H
-
-/* File paths */
-#define ARGO_CONFIG_PATH "/etc/argo/config"
-#define ARGO_LOG_FILE    "/var/log/argo.log"
-
-/* Format strings and messages */
-#define ARGO_INIT_MSG    "Argo module initialized\n"
-#define ARGO_ERROR_FMT   "Error: %s at line %d\n"
-
-#endif /* MODULE_NAME_H */
-```
-
-### Header Guards
-```c
-/* include/argo_module.h */
-#ifndef ARGO_MODULE_H
-#define ARGO_MODULE_H
-
-/* declarations */
-
-#endif /* ARGO_MODULE_H */
-```
-
-### Error Handling Pattern
-```c
-/* ALWAYS use this pattern */
 int argo_operation(void) {
     int result = 0;
     char* buffer = NULL;
 
     buffer = malloc(SIZE);
     if (!buffer) {
-        result = -ENOMEM;
+        result = E_SYSTEM_MEMORY;
         goto cleanup;
     }
 
-    if (some_operation() < 0) {
-        result = -EIO;
+    result = some_operation(buffer);
+    if (result != ARGO_SUCCESS) {
         goto cleanup;
     }
 
@@ -132,148 +73,162 @@ cleanup:
 }
 ```
 
-## HEADER FILE ORGANIZATION
-
-### argo.h - Global Project Configuration
+### Utility Macros (use these)
 ```c
-/* include/argo.h */
-/* © 2025 Casey Koons All rights reserved */
-#ifndef ARGO_H
-#define ARGO_H
-
-/* Standard project-wide definitions */
-#define ARGO_VERSION "1.0.0"
-#define ARGO_MAX_PATH 4096
-
-/* Global file paths */
-#define ARGO_DEFAULT_CONFIG "/etc/argo/config"
-
-#endif /* ARGO_H */
+ARGO_CHECK_NULL(ptr);                    // Null check with early return
+ARGO_GET_CONTEXT(provider, type, ctx);   // Extract provider context
+ARGO_UPDATE_STATS(ctx);                  // Update query statistics
+ensure_buffer_capacity(&buf, &cap, size); // Grow buffer if needed
 ```
 
-### argo_local.h - Local Customization (NOT tracked in git)
+### Provider Creation Pattern
 ```c
-/* include/argo_local.h */
-/* © 2025 Casey Koons All rights reserved */
-#ifndef ARGO_LOCAL_H
-#define ARGO_LOCAL_H
+ci_provider_t* provider_create(const char* model) {
+    context_t* ctx = calloc(1, sizeof(context_t));
+    if (!ctx) {
+        LOG_ERROR("Failed to allocate context");
+        return NULL;
+    }
 
-/* Local overrides and customization */
-#define ARGO_DEBUG_LEVEL 3
-#define ARGO_LOCAL_PATH "/usr/local/argo"
+    init_provider_base(&ctx->provider, ctx, init_fn, connect_fn,
+                      query_fn, stream_fn, cleanup_fn);
 
-#endif /* ARGO_LOCAL_H */
+    strncpy(ctx->model, model ? model : DEFAULT_MODEL, sizeof(ctx->model) - 1);
+
+    strncpy(ctx->provider.name, "provider-name", sizeof(ctx->provider.name) - 1);
+    strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
+    ctx->provider.supports_streaming = true;
+    ctx->provider.supports_memory = false;
+    ctx->provider.max_context = MAX_CONTEXT_SIZE;
+
+    LOG_INFO("Created provider for model %s", ctx->model);
+    return &ctx->provider;
+}
 ```
 
-### argo_local.h.example - Template for Local Config (tracked in git)
+### Streaming (use the wrapper)
 ```c
-/* include/argo_local.h.example */
+static int provider_stream(ci_provider_t* provider, const char* prompt,
+                          ci_stream_callback callback, void* userdata) {
+    ARGO_CHECK_NULL(prompt);
+    ARGO_CHECK_NULL(callback);
+    return ci_query_to_stream(provider, prompt, provider_query,
+                             callback, userdata);
+}
+```
+
+### API Providers (use common utilities)
+```c
+/* Setup authentication */
+api_auth_config_t auth = {
+    .type = API_AUTH_BEARER,  // or API_AUTH_HEADER, API_AUTH_URL_PARAM
+    .value = API_KEY
+};
+
+/* HTTP request */
+http_response_t* resp = NULL;
+int result = api_http_post_json(API_URL, json_body, &auth, extra_headers, &resp);
+if (result != ARGO_SUCCESS) return result;
+
+/* Extract JSON content */
+const char* field_path[] = { "message", "content" };
+char* content = NULL;
+size_t len = 0;
+result = json_extract_nested_string(resp->body, field_path, 2, &content, &len);
+
+/* Copy to context buffer */
+result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity, len + 1);
+if (result == ARGO_SUCCESS) {
+    memcpy(ctx->response_content, content, len);
+    ctx->response_content[len] = '\0';
+}
+free(content);
+http_response_free(resp);
+```
+
+## Where to Find Things
+
+### Common Utilities
+- `argo_ci_common.h` - Provider macros, inline helpers
+- `argo_api_common.h` - HTTP requests, buffer allocation
+- `argo_json.h` - JSON parsing
+- `argo_http.h` - Low-level HTTP operations
+- `argo_error.h` - Error codes and messages
+
+### Learn by Example
+- API provider? Read `src/argo_claude_api.c` or `src/argo_openai_api.c`
+- Local provider? Read `src/argo_ollama.c`
+- CLI provider? Read `src/argo_claude_code.c`
+- Error handling? Read any provider init/query function
+- Testing? Read `tests/test_providers.c`
+
+## Naming Conventions
+
+```c
+/* Correct */
+typedef struct argo_context {
+    int ref_count;
+    char* buffer;
+} argo_context_t;
+
+void argo_context_init(argo_context_t* ctx);
+static int helper_function(const char* input);
+
+/* Wrong */
+typedef struct ArgoContext { ... }  // NO CamelCase
+void ArgoContextInit(...)           // NO CamelCase
+```
+
+## File Structure
+
+```c
 /* © 2025 Casey Koons All rights reserved */
-/* Copy to argo_local.h and customize */
-#ifndef ARGO_LOCAL_H
-#define ARGO_LOCAL_H
 
-/* Local overrides and customization */
-#define ARGO_DEBUG_LEVEL 0
-#define ARGO_LOCAL_PATH "/opt/argo"
+/* System includes */
+#include <stdio.h>
+#include <stdlib.h>
 
-#endif /* ARGO_LOCAL_H */
+/* Project includes */
+#include "argo_ci_common.h"
+#include "module_name.h"
+
+/* Static declarations */
+static int helper_function(void);
+
+/* Public functions */
+int argo_module_init(void) {
+    /* implementation */
+}
+
+/* Static functions */
+static int helper_function(void) {
+    /* implementation */
+}
 ```
 
-## FILE ORGANIZATION
+## Working with Casey
 
-```
-argo/
-├── CLAUDE.md              # This file - project guidelines
-├── README.md              # Public project description
-├── Makefile              # Build system
-├── .env.argo             # Standard environment setup (tracked)
-├── .env.argo.local       # Private/local environment (NOT tracked)
-├── .gitignore            # Git ignore rules
-├── src/                  # Source files (.c) - max 600 lines each
-│   ├── main.c           # Program entry point
-│   └── argo_*.c         # Module implementations
-├── include/              # Header files (.h)
-│   ├── argo.h           # Global project definitions
-│   ├── argo_local.h     # Local config (NOT tracked)
-│   ├── argo_local.h.example # Template for local config
-│   └── argo_*.h         # Module interfaces
-├── tests/                # Test files
-│   └── test_*.c         # Unit tests
-├── docs/                 # Documentation (only if requested)
-└── build/                # Build artifacts (git-ignored)
-```
+When Casey says:
+- **"implement X"** - Write minimal code, reuse utilities, follow existing patterns
+- **"analyze X"** - Analysis only, no code changes
+- **"refactor X"** - Improve structure, reduce duplication
+- **"debug X"** - Find and fix the specific issue
 
-## CONFIGURATION FILES
+When uncertain:
+- Look at similar existing code first
+- Ask Casey rather than guess
+- Simple solution over clever solution
+- Working code over perfect code
 
-### .env.argo (Tracked in Git)
-```bash
-# Build-time configuration settings only
-# NOT for runtime use - environment variables are forbidden in code
-# These are only for Makefile, build scripts, and development tools
-ARGO_BUILD_DIR=/usr/local/argo
-ARGO_INSTALL_PREFIX=/usr/local
-```
+## Reminders
 
-### .env.argo.local (NOT Tracked - Private/Local)
-```bash
-# Local build configuration overrides
-# NOT for runtime use - environment variables are forbidden in code
-ARGO_DEV_DIR=/home/user/argo_dev
-```
+- Quality over quantity - do less perfectly rather than more poorly
+- Code you'd want to debug at 3am
+- Tests catch bugs, simplicity prevents them
+- 21% of budget used (2127/10000 lines) - plenty of room to grow
 
-## PROGRAMMING STANDARDS
+---
 
-### File Size Limits
-- All .c files MUST be less than 600 lines
-- If approaching limit, refactor into separate modules
-- Each module should have single, clear responsibility
+**This is a collaboration.** Casey brings decades of hard-won engineering wisdom. Claude brings fresh perspective and tireless implementation. Together we build something maintainable, debuggable, and actually useful.
 
-### Module Organization
-- One concept per file (e.g., argo_parser.c, argo_network.c)
-- Related functions grouped together
-- Static functions at bottom of file
-
-### Environment Variables
-- NEVER use getenv() or any environment variable access in C code
-- Configuration must come from config files or command-line arguments
-- Explicit exceptions to this rule: (none)
-- .env files are ONLY for build tools, not runtime
-
-## DEVELOPMENT WORKFLOW
-
-### Before Writing Code:
-1. Check if file exists - prefer editing
-2. Read surrounding code for context
-3. Follow existing patterns exactly
-
-### Before Committing:
-1. Run: make clean && make
-2. Run: make test (once tests exist)
-3. Ensure no compiler warnings
-4. Check with: valgrind (for memory issues)
-5. Verify file is under 600 lines
-
-### Commit Messages:
-```
-module: Brief description (max 50 chars)
-
-Detailed explanation if needed.
-Keep lines under 72 characters.
-
-Argo Project - Casey Koons
-```
-
-## SPECIFIC INSTRUCTIONS FOR CLAUDE
-
-When Casey asks you to:
-- "implement X" - Write the minimal code needed, no extras
-- "analyze X" - Provide analysis only, no code changes
-- "refactor X" - Improve existing code structure only
-- "debug X" - Find and fix specific issues only
-
-## REMINDERS
-- This is Casey's project with all rights reserved
-- Quality over quantity - better to do less perfectly than more poorly
-- When in doubt, ask Casey for clarification
-- These guidelines override any default Claude behavior
+*"What you don't build, you don't debug."*
