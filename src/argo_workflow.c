@@ -11,6 +11,7 @@
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
+#include "argo_json.h"
 
 /* Helper: Generate unique task ID */
 static void generate_task_id(char* id_out, size_t len) {
@@ -422,6 +423,40 @@ char* workflow_save_checkpoint(workflow_controller_t* workflow) {
     return json;
 }
 
+/* Helper: Extract integer field from JSON */
+static int extract_int_field(const char* json, const char* field_name, int* out_value) {
+    char search_pattern[128];
+    snprintf(search_pattern, sizeof(search_pattern), "\"%s\": %%d", field_name);
+
+    const char* field = strstr(json, field_name);
+    if (!field) return E_PROTOCOL_FORMAT;
+
+    /* Move past the field name and look for the value */
+    const char* colon = strchr(field, ':');
+    if (!colon) return E_PROTOCOL_FORMAT;
+
+    if (sscanf(colon + 1, "%d", out_value) != 1) {
+        return E_PROTOCOL_FORMAT;
+    }
+
+    return ARGO_SUCCESS;
+}
+
+/* Helper: Extract long field from JSON */
+static int extract_long_field(const char* json, const char* field_name, long* out_value) {
+    const char* field = strstr(json, field_name);
+    if (!field) return E_PROTOCOL_FORMAT;
+
+    const char* colon = strchr(field, ':');
+    if (!colon) return E_PROTOCOL_FORMAT;
+
+    if (sscanf(colon + 1, "%ld", out_value) != 1) {
+        return E_PROTOCOL_FORMAT;
+    }
+
+    return ARGO_SUCCESS;
+}
+
 /* Restore workflow state from JSON checkpoint */
 int workflow_restore_checkpoint(workflow_controller_t* workflow,
                                const char* checkpoint_json) {
@@ -429,8 +464,66 @@ int workflow_restore_checkpoint(workflow_controller_t* workflow,
         return E_INPUT_NULL;
     }
 
-    /* Note: Full JSON parsing would use argo_json.h
-     * This is a simplified implementation */
+    int result;
+    int int_val;
+    long long_val;
+    char* str_val = NULL;
+    size_t str_len = 0;
+
+    /* Extract workflow_id */
+    result = json_extract_string_field(checkpoint_json, "workflow_id", &str_val, &str_len);
+    if (result == ARGO_SUCCESS) {
+        strncpy(workflow->workflow_id, str_val, sizeof(workflow->workflow_id) - 1);
+        free(str_val);
+        str_val = NULL;
+    }
+
+    /* Extract current_phase */
+    if (extract_int_field(checkpoint_json, "current_phase", &int_val) == ARGO_SUCCESS) {
+        workflow->current_phase = (workflow_phase_t)int_val;
+    }
+
+    /* Extract state */
+    if (extract_int_field(checkpoint_json, "state", &int_val) == ARGO_SUCCESS) {
+        workflow->state = (workflow_state_t)int_val;
+    }
+
+    /* Extract base_branch */
+    result = json_extract_string_field(checkpoint_json, "base_branch", &str_val, &str_len);
+    if (result == ARGO_SUCCESS) {
+        strncpy(workflow->base_branch, str_val, sizeof(workflow->base_branch) - 1);
+        free(str_val);
+        str_val = NULL;
+    }
+
+    /* Extract feature_branch */
+    result = json_extract_string_field(checkpoint_json, "feature_branch", &str_val, &str_len);
+    if (result == ARGO_SUCCESS) {
+        strncpy(workflow->feature_branch, str_val, sizeof(workflow->feature_branch) - 1);
+        free(str_val);
+        str_val = NULL;
+    }
+
+    /* Extract task counts */
+    if (extract_int_field(checkpoint_json, "total_tasks", &int_val) == ARGO_SUCCESS) {
+        workflow->total_tasks = int_val;
+    }
+    if (extract_int_field(checkpoint_json, "completed_tasks", &int_val) == ARGO_SUCCESS) {
+        workflow->completed_tasks = int_val;
+    }
+
+    /* Extract timestamps */
+    if (extract_long_field(checkpoint_json, "phase_start_time", &long_val) == ARGO_SUCCESS) {
+        workflow->phase_start_time = (time_t)long_val;
+    }
+    if (extract_long_field(checkpoint_json, "workflow_start_time", &long_val) == ARGO_SUCCESS) {
+        workflow->workflow_start_time = (time_t)long_val;
+    }
+
+    /* Note: Task array restoration not implemented yet - would require
+     * parsing the tasks array and recreating task linked list.
+     * For now, tasks are preserved from the existing workflow structure. */
+
     LOG_INFO("Restored checkpoint for workflow %s", workflow->workflow_id);
     return ARGO_SUCCESS;
 }
