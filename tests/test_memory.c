@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../include/argo_memory.h"
+#include "../include/argo_api_common.h"
 #include "../include/argo_error.h"
 
 static int tests_run = 0;
@@ -250,6 +251,95 @@ static void test_validation(void) {
     PASS();
 }
 
+/* Test prompt augmentation */
+static void test_prompt_augmentation(void) {
+    TEST("Prompt augmentation with memory");
+
+    ci_memory_digest_t* digest = memory_digest_create(8000);
+
+    /* Add some memory context */
+    memory_set_sunset_notes(digest, "Previous session: implemented feature X");
+    memory_set_sunrise_brief(digest, "Current session: testing feature X");
+    memory_add_breadcrumb(digest, "Completed phase 1");
+    memory_add_breadcrumb(digest, "Started phase 2");
+
+    /* Add and select some memories */
+    memory_add_item(digest, MEMORY_TYPE_DECISION, "Decided to use approach A", "Argo");
+    memory_add_item(digest, MEMORY_TYPE_FACT, "Project uses C11 standard", "Maia");
+
+    /* Select the first memory item (simulate selection) */
+    if (digest->suggestion_count > 0 || digest->selected_count < MEMORY_MAX_ITEMS) {
+        /* Manually add first item to selected array for testing */
+        memory_item_t* first_item = (memory_item_t*)calloc(1, sizeof(memory_item_t));
+        first_item->type = MEMORY_TYPE_DECISION;
+        first_item->content = strdup("Use modular architecture");
+        digest->selected[digest->selected_count++] = first_item;
+    }
+
+    /* Augment a simple prompt */
+    const char* original_prompt = "Implement new feature";
+    char* augmented = NULL;
+
+    int result = api_augment_prompt_with_memory(digest, original_prompt, &augmented);
+    if (result != ARGO_SUCCESS || !augmented) {
+        FAIL("Prompt augmentation failed");
+        memory_digest_destroy(digest);
+        return;
+    }
+
+    /* Verify augmented prompt contains original and memory context */
+    if (strstr(augmented, "Implement new feature") == NULL) {
+        FAIL("Augmented prompt missing original");
+        free(augmented);
+        memory_digest_destroy(digest);
+        return;
+    }
+
+    if (strstr(augmented, "Previous Session Summary") == NULL) {
+        FAIL("Augmented prompt missing sunset notes");
+        free(augmented);
+        memory_digest_destroy(digest);
+        return;
+    }
+
+    if (strstr(augmented, "Session Context") == NULL) {
+        FAIL("Augmented prompt missing sunrise brief");
+        free(augmented);
+        memory_digest_destroy(digest);
+        return;
+    }
+
+    if (strstr(augmented, "Progress Breadcrumbs") == NULL) {
+        FAIL("Augmented prompt missing breadcrumbs");
+        free(augmented);
+        memory_digest_destroy(digest);
+        return;
+    }
+
+    /* Test with NULL memory digest (should return copy of prompt) */
+    char* augmented_null = NULL;
+    result = api_augment_prompt_with_memory(NULL, original_prompt, &augmented_null);
+    if (result != ARGO_SUCCESS || !augmented_null) {
+        FAIL("Augmentation with NULL digest failed");
+        free(augmented);
+        memory_digest_destroy(digest);
+        return;
+    }
+
+    if (strcmp(augmented_null, original_prompt) != 0) {
+        FAIL("NULL digest should return prompt copy");
+        free(augmented);
+        free(augmented_null);
+        memory_digest_destroy(digest);
+        return;
+    }
+
+    free(augmented);
+    free(augmented_null);
+    memory_digest_destroy(digest);
+    PASS();
+}
+
 int main(void) {
     printf("\n========================================\n");
     printf("ARGO MEMORY TESTS\n");
@@ -264,6 +354,7 @@ int main(void) {
     test_suggestion();
     test_json_serialization();
     test_validation();
+    test_prompt_augmentation();
 
     printf("\n========================================\n");
     printf("Tests run:    %d\n", tests_run);

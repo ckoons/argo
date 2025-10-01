@@ -54,11 +54,31 @@ ci_provider_t* generic_api_create_provider(const api_provider_config_t* config,
     strncpy(ctx->provider.name, config->provider_name, sizeof(ctx->provider.name) - 1);
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = config->supports_streaming;
-    ctx->provider.supports_memory = false;
+    ctx->provider.supports_memory = true;  /* Generic providers now support memory */
     ctx->provider.max_context = config->max_context;
+
+    /* Initialize memory to NULL */
+    ctx->memory = NULL;
 
     LOG_INFO("Created %s provider for model %s", config->provider_name, ctx->model);
     return &ctx->provider;
+}
+
+/* Set memory digest for provider */
+int generic_api_set_memory(ci_provider_t* provider, ci_memory_digest_t* memory) {
+    ARGO_CHECK_NULL(provider);
+
+    /* Verify this is a generic API provider by checking context type */
+    if (!provider->context) {
+        argo_report_error(E_INPUT_NULL, "generic_api_set_memory", "Provider context is NULL");
+        return E_INPUT_NULL;
+    }
+
+    generic_api_context_t* ctx = (generic_api_context_t*)provider->context;
+    ctx->memory = memory;
+
+    LOG_DEBUG("Set memory digest for %s provider", provider->name);
+    return ARGO_SUCCESS;
 }
 
 /* Initialize */
@@ -92,11 +112,25 @@ static int generic_api_query(ci_provider_t* provider, const char* prompt,
 
     const api_provider_config_t* cfg = ctx->config;
 
+    /* Augment prompt with memory if available */
+    char* augmented_prompt = NULL;
+    const char* final_prompt = prompt;
+
+    if (ctx->memory) {
+        int result = api_augment_prompt_with_memory(ctx->memory, prompt, &augmented_prompt);
+        if (result == ARGO_SUCCESS && augmented_prompt) {
+            final_prompt = augmented_prompt;
+            LOG_DEBUG("Augmented prompt with memory context");
+        }
+        /* If augmentation fails, fall back to original prompt */
+    }
+
     /* Build request JSON using provider-specific builder */
     char json_body[API_REQUEST_BUFFER_SIZE];
     int json_len = cfg->build_request(json_body, sizeof(json_body),
-                                      ctx->model, prompt);
+                                      ctx->model, final_prompt);
     if (json_len < 0) {
+        free(augmented_prompt);
         argo_report_error(E_PROTOCOL_FORMAT, "generic_api_query", ERR_MSG_JSON_BUILD_FAILED);
         return E_PROTOCOL_FORMAT;
     }
@@ -116,6 +150,7 @@ static int generic_api_query(ci_provider_t* provider, const char* prompt,
                                     cfg->extra_headers, &resp);
     if (result != ARGO_SUCCESS) {
         argo_report_error(result, "generic_api_query", ERR_MSG_HTTP_REQUEST_FAILED);
+        free(augmented_prompt);
         return result;
     }
 
@@ -129,6 +164,7 @@ static int generic_api_query(ci_provider_t* provider, const char* prompt,
     if (result != ARGO_SUCCESS) {
         argo_report_error(result, "generic_api_query", ERR_MSG_JSON_EXTRACT_FAILED);
         http_response_free(resp);
+        free(augmented_prompt);
         return result;
     }
 
@@ -138,6 +174,7 @@ static int generic_api_query(ci_provider_t* provider, const char* prompt,
     if (result != ARGO_SUCCESS) {
         free(extracted_content);
         http_response_free(resp);
+        free(augmented_prompt);
         return result;
     }
 
@@ -157,6 +194,9 @@ static int generic_api_query(ci_provider_t* provider, const char* prompt,
 
     /* Invoke callback */
     callback(&response, userdata);
+
+    /* Free augmented prompt if allocated */
+    free(augmented_prompt);
 
     return ARGO_SUCCESS;
 }

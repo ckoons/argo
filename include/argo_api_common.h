@@ -106,6 +106,7 @@ typedef struct {
     time_t last_query;
     ci_provider_t provider;
     const api_provider_config_t* config;  /* Provider-specific configuration */
+    ci_memory_digest_t* memory;           /* Optional memory digest for context */
 } generic_api_context_t;
 
 /* Create generic API provider from configuration
@@ -119,5 +120,21 @@ typedef struct {
  */
 ci_provider_t* generic_api_create_provider(const api_provider_config_t* config,
                                            const char* model);
+
+/* Set memory digest for generic API provider
+ *
+ * Attaches a memory digest to the provider. When set, all queries will
+ * automatically augment prompts with memory context before sending to API.
+ *
+ * Parameters:
+ *   provider - Provider to attach memory to
+ *   memory - Memory digest (NULL to clear)
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_INPUT_NULL if provider is NULL
+ *   E_SYSTEM_TYPE if provider is not a generic API provider
+ */
+int generic_api_set_memory(ci_provider_t* provider, ci_memory_digest_t* memory);
 
 #endif /* ARGO_API_COMMON_H */
