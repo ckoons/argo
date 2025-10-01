@@ -24,7 +24,7 @@
 typedef struct socket_context {
     /* Server socket */
     int listen_fd;
-    char socket_path[256];
+    char socket_path[SOCKET_PATH_MAX];
 
     /* Registry for CI lookup */
     ci_registry_t* registry;
@@ -36,7 +36,7 @@ typedef struct socket_context {
 
     /* Message parsing */
     jsmn_parser parser;
-    jsmntok_t tokens[128];  /* Enough for reasonable JSON */
+    jsmntok_t tokens[SOCKET_JSON_TOKEN_MAX];  /* Enough for reasonable JSON */
     char recv_buffer[CI_MAX_MESSAGE];
     size_t recv_pos;
 
@@ -359,7 +359,7 @@ static int accept_client(void) {
 
 static int handle_client_data(int fd, int index) {
     (void)index;  /* Used for cleanup on error */
-    char buffer[4096];
+    char buffer[SOCKET_BUFFER_SIZE];
 
     ssize_t bytes = recv(fd, buffer, sizeof(buffer) - 1, 0);
     if (bytes < 0) {
@@ -418,10 +418,10 @@ static int parse_json_message(const char* json, ci_message_t* msg) {
 
     /* Parse JSON */
     jsmn_parser parser;
-    jsmntok_t tokens[128];
+    jsmntok_t tokens[SOCKET_JSON_TOKEN_MAX];
     jsmn_init(&parser);
 
-    int token_count = jsmn_parse(&parser, json, strlen(json), tokens, 128);
+    int token_count = jsmn_parse(&parser, json, strlen(json), tokens, SOCKET_JSON_TOKEN_MAX);
     if (token_count < 0) {
         return E_PROTOCOL_FORMAT;
     }
@@ -459,7 +459,7 @@ static void check_request_timeouts(void) {
     for (int i = 0; i < g_socket_ctx->request_count; i++) {
         socket_request_t* req = &g_socket_ctx->requests[i];
 
-        if ((now - req->timestamp) * 1000 > req->timeout_ms) {
+        if ((now - req->timestamp) * MS_PER_SECOND > req->timeout_ms) {
             /* Timeout occurred */
             LOG_DEBUG("Request %u timed out", req->id);
 

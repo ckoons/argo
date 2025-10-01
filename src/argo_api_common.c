@@ -75,22 +75,39 @@ int api_http_post_json(const char* base_url, const char* json_body,
     int status = (*response)->status_code;
     if (status != API_HTTP_OK) {
         int error_code = E_PROTOCOL_HTTP;  /* Default */
+        const char* status_desc = "Unknown";
 
         /* Map HTTP status codes to specific errors */
         switch (status) {
-            case 400: error_code = E_HTTP_BAD_REQUEST; break;
-            case 401: error_code = E_HTTP_UNAUTHORIZED; break;
-            case 403: error_code = E_HTTP_FORBIDDEN; break;
-            case 404: error_code = E_HTTP_NOT_FOUND; break;
-            case 429: error_code = E_HTTP_RATE_LIMIT; break;
+            case HTTP_STATUS_BAD_REQUEST:
+                error_code = E_HTTP_BAD_REQUEST;
+                status_desc = "Bad Request";
+                break;
+            case HTTP_STATUS_UNAUTHORIZED:
+                error_code = E_HTTP_UNAUTHORIZED;
+                status_desc = "Unauthorized";
+                break;
+            case HTTP_STATUS_FORBIDDEN:
+                error_code = E_HTTP_FORBIDDEN;
+                status_desc = "Forbidden";
+                break;
+            case HTTP_STATUS_NOT_FOUND:
+                error_code = E_HTTP_NOT_FOUND;
+                status_desc = "Not Found";
+                break;
+            case HTTP_STATUS_RATE_LIMIT:
+                error_code = E_HTTP_RATE_LIMIT;
+                status_desc = "Rate Limit Exceeded";
+                break;
             default:
-                if (status >= 500) {
+                if (status >= HTTP_STATUS_SERVER_ERROR) {
                     error_code = E_HTTP_SERVER_ERROR;
+                    status_desc = "Server Error";
                 }
                 break;
         }
 
-        argo_report_error(error_code, "api_http_post_json", "HTTP status %d", status);
+        argo_report_error(error_code, "api_http_post_json", "HTTP %d (%s)", status, status_desc);
         return error_code;
     }
 

@@ -30,7 +30,7 @@ http_request_t* http_request_new(http_method_t method, const char* url) {
 
     req->method = method;
     req->url = strdup(url);
-    req->timeout_seconds = 30;
+    req->timeout_seconds = HTTP_DEFAULT_TIMEOUT_SECONDS;
 
     return req;
 }
@@ -91,7 +91,7 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
     if (!req || !resp) return E_INPUT_NULL;
 
     /* Build curl command with status code output */
-    char cmd[8192];
+    char cmd[HTTP_CMD_BUFFER_SIZE];
     int cmd_len = snprintf(cmd, sizeof(cmd), "curl -s -w '\\n%%{http_code}' -X %s",
                           req->method == HTTP_POST ? "POST" : "GET");
 
@@ -129,12 +129,12 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
         }
 
         /* Read response */
-        char* response_buf = malloc(65536);
+        char* response_buf = malloc(HTTP_RESPONSE_BUFFER_SIZE);
         size_t response_size = 0;
-        size_t response_capacity = 65536;
+        size_t response_capacity = HTTP_RESPONSE_BUFFER_SIZE;
 
         while (!feof(fp)) {
-            if (response_size + 4096 > response_capacity) {
+            if (response_size + HTTP_CHUNK_SIZE > response_capacity) {
                 response_capacity *= 2;
                 response_buf = realloc(response_buf, response_capacity);
             }
@@ -149,7 +149,7 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
         unlink(temp_file);
 
         /* Extract HTTP status code from last line */
-        int status_code = 200;  /* Default */
+        int status_code = HTTP_STATUS_OK;  /* Default */
         char* last_newline = strrchr(response_buf, '\n');
         if (last_newline && last_newline > response_buf) {
             /* Parse status code from last line */
@@ -181,12 +181,12 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
         }
 
         /* Read response */
-        char* response_buf = malloc(65536);
+        char* response_buf = malloc(HTTP_RESPONSE_BUFFER_SIZE);
         size_t response_size = 0;
-        size_t response_capacity = 65536;
+        size_t response_capacity = HTTP_RESPONSE_BUFFER_SIZE;
 
         while (!feof(fp)) {
-            if (response_size + 4096 > response_capacity) {
+            if (response_size + HTTP_CHUNK_SIZE > response_capacity) {
                 response_capacity *= 2;
                 response_buf = realloc(response_buf, response_capacity);
             }
@@ -200,7 +200,7 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
         pclose(fp);
 
         /* Extract HTTP status code from last line */
-        int status_code = 200;  /* Default */
+        int status_code = HTTP_STATUS_OK;  /* Default */
         char* last_newline = strrchr(response_buf, '\n');
         if (last_newline && last_newline > response_buf) {
             /* Parse status code from last line */
@@ -266,10 +266,10 @@ int http_parse_url(const char* url, char** host, int* port, char** path) {
 
     if (strncmp(p, "https://", 8) == 0) {
         p += 8;
-        *port = 443;
+        *port = HTTP_PORT_HTTPS;
     } else if (strncmp(p, "http://", 7) == 0) {
         p += 7;
-        *port = 80;
+        *port = HTTP_PORT_HTTP;
     } else {
         return -1;
     }

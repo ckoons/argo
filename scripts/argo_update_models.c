@@ -20,16 +20,17 @@ static void print_usage(const char* prog) {
     printf("\n");
 }
 
-/* TODO: Add JSON parser helpers when implementing actual API queries
- * - find_json_string(json, key)
- * - extract_first_model_id(json, prefix)
+/*
+ * Model query functions return current defaults
+ * Future: Could query provider APIs to get latest model IDs
+ * Would require: API key access, JSON parsing (use argo_json.h)
  */
 
 static char* query_claude_model(void) {
     printf("Checking Claude models... ");
     fflush(stdout);
 
-    /* In real implementation, would check for API key */
+    /* Could query API for latest models if needed */
     printf("(using default - API query not implemented)\n");
     return strdup("claude-sonnet-4-5-20250929");
 }

@@ -60,16 +60,22 @@ static inline void provider_stats_update(provider_stats_t* stats, uint64_t token
 #define ARGO_ALLOC_BUFFER(ctx_ptr, buffer_field, capacity_field, size) \
     do { \
         (ctx_ptr)->buffer_field = malloc(size); \
-        if (!(ctx_ptr)->buffer_field) return E_SYSTEM_MEMORY; \
+        if (!(ctx_ptr)->buffer_field) { \
+            argo_report_error(E_SYSTEM_MEMORY, __func__, "failed to allocate %zu bytes", (size_t)(size)); \
+            return E_SYSTEM_MEMORY; \
+        } \
         (ctx_ptr)->capacity_field = (size); \
     } while(0)
 
 /* Ensure buffer capacity */
+#define BUFFER_HEADROOM 1024
 static inline int ensure_buffer_capacity(char** buffer, size_t* capacity, size_t required) {
     if (required >= *capacity) {
-        size_t new_capacity = required + 1024;  /* Add some headroom */
+        size_t new_capacity = required + BUFFER_HEADROOM;
         char* new_buffer = realloc(*buffer, new_capacity);
         if (!new_buffer) {
+            argo_report_error(E_SYSTEM_MEMORY, "ensure_buffer_capacity",
+                            "failed to realloc %zu bytes", new_capacity);
             return E_SYSTEM_MEMORY;
         }
         *buffer = new_buffer;

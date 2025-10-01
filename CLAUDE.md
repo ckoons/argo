@@ -45,8 +45,8 @@ Before writing code:
 ### Code Organization
 - Max 600 lines per .c file (refactor if approaching)
 - One clear purpose per module
-- All constants in header files (no magic numbers in .c files)
-- All paths/strings in header files (no hardcoded strings in .c files)
+- **NEVER use numeric constants in .c files** - ALL constants in headers
+- **NEVER use string literals in .c files** - ALL strings in headers
 - Never use environment variables at runtime (.env for build only)
 
 ### Build & Test
@@ -54,6 +54,38 @@ Before writing code:
 - Before committing: `make clean && make && make test-quick`
 - All 33 tests must pass
 - Stay under 10,000 meaningful lines (check with `./scripts/count_core.sh`)
+
+## Mandatory Daily Practices
+
+### Before Every Code Change
+1. **Read before write** - Always read existing files first
+2. **Search for patterns** - Grep for similar code before creating new
+3. **Check headers** - Look for existing constants/macros before defining new ones
+
+### During Coding
+1. **No magic numbers** - Every numeric constant goes in a header with a descriptive name
+2. **No string literals** - Every string (except format strings) defined as constant in header
+3. **HTTP errors** - Always log "HTTP {code} ({description})" format, never lose information
+4. **Buffer allocation** - Use `ARGO_ALLOC_BUFFER()` or `ensure_buffer_capacity()` with error reporting
+5. **Error reporting** - Always call `argo_report_error()` with meaningful context, never silent failures
+6. **Memory cleanup** - Every malloc has corresponding free, use goto cleanup pattern
+7. **Null checks** - Use `ARGO_CHECK_NULL()` at function entry for all pointer parameters
+
+### After Coding
+1. **Compile clean** - Zero warnings, zero errors with `-Wall -Werror -Wextra`
+2. **Run tests** - `make test-quick` must pass 100%
+3. **Check stubs** - Remove TODO comments or convert to clear future work notes
+4. **Verify constants** - Grep for `[0-9]{2,}` in your .c file - should find nothing (except line numbers)
+5. **Check line count** - `./scripts/count_core.sh` - stay under budget
+
+### Never Commit
+- Code with magic numbers in .c files
+- Code with TODOs (convert to clear comments or implement)
+- Code that doesn't compile with `-Werror`
+- Code that fails any test
+- Code with memory leaks (check with valgrind if uncertain)
+- Functions over 100 lines (refactor first)
+- Files over 600 lines (split into modules)
 
 ## Common Patterns
 
@@ -156,11 +188,37 @@ http_response_free(resp);
 ## Where to Find Things
 
 ### Common Utilities
-- `argo_ci_common.h` - Provider macros, inline helpers
-- `argo_api_common.h` - HTTP requests, buffer allocation
+- `argo_ci_common.h` - Provider macros, inline helpers, buffer allocation
+- `argo_api_common.h` - HTTP requests, API authentication
 - `argo_json.h` - JSON parsing
-- `argo_http.h` - Low-level HTTP operations
+- `argo_http.h` - Low-level HTTP operations, HTTP constants
+- `argo_socket.h` - Socket configuration, buffer sizes
 - `argo_error.h` - Error codes and messages
+- `argo_error_messages.h` - Internationalization-ready error strings
+
+### Constants by Category
+**HTTP** (`argo_http.h`):
+```c
+HTTP_DEFAULT_TIMEOUT_SECONDS, HTTP_CMD_BUFFER_SIZE
+HTTP_RESPONSE_BUFFER_SIZE, HTTP_CHUNK_SIZE
+HTTP_STATUS_OK, HTTP_STATUS_BAD_REQUEST, HTTP_STATUS_UNAUTHORIZED
+HTTP_STATUS_FORBIDDEN, HTTP_STATUS_NOT_FOUND, HTTP_STATUS_RATE_LIMIT
+HTTP_STATUS_SERVER_ERROR, HTTP_PORT_HTTPS, HTTP_PORT_HTTP
+```
+
+**Socket** (`argo_socket.h`):
+```c
+SOCKET_PATH_MAX, SOCKET_JSON_TOKEN_MAX
+SOCKET_BUFFER_SIZE, MS_PER_SECOND
+SOCKET_BACKLOG, MAX_PENDING_REQUESTS
+```
+
+**Error Messages** (`argo_error_messages.h`):
+```c
+ERR_MSG_MEMORY_ALLOC_FAILED, ERR_MSG_FILE_OPEN_FAILED
+ERR_MSG_HTTP_BAD_REQUEST, ERR_MSG_API_KEY_MISSING
+... and 40+ more internationalization-ready messages
+```
 
 ### Learn by Example
 - API provider? Read `src/argo_claude_api.c` or `src/argo_openai_api.c`
@@ -227,12 +285,43 @@ When uncertain:
 - Simple solution over clever solution
 - Working code over perfect code
 
+## Known Stubs & Future Work
+
+Current intentional stubs in `argo_registry.c`:
+- `registry_load_config()` - Config file loading (not yet needed)
+- `registry_connect_ci()` - CI socket connection (handled at higher level)
+- `registry_disconnect_ci()` - CI socket disconnection (handled at higher level)
+- `registry_save_state()` - State persistence (not yet needed)
+- `registry_load_state()` - State restoration (not yet needed)
+
+These are documented placeholders for future functionality. They return success safely and won't break anything.
+
+## JSON Builder Pattern (Future)
+
+When implementing complex JSON construction, consider this pattern:
+```c
+typedef struct {
+    char* buffer;
+    size_t capacity;
+    size_t used;
+} json_builder_t;
+
+int json_builder_init(json_builder_t* jb, size_t initial_size);
+int json_builder_add_string(json_builder_t* jb, const char* key, const char* value);
+int json_builder_add_int(json_builder_t* jb, const char* key, int value);
+char* json_builder_finalize(json_builder_t* jb);  /* Caller must free */
+```
+
+Currently we use `snprintf()` for JSON which works fine for simple cases. Implement builder only when needed for complex nested JSON.
+
 ## Reminders
 
 - Quality over quantity - do less perfectly rather than more poorly
 - Code you'd want to debug at 3am
 - Tests catch bugs, simplicity prevents them
-- 21% of budget used (2127/10000 lines) - plenty of room to grow
+- Budget: 3,217 / 10,000 lines (32%) - plenty of room to grow
+- All 33 tests passing
+- 6 API providers (claude, openai, gemini, grok, deepseek, openrouter)
 
 ---
 

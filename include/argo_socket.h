@@ -12,6 +12,10 @@
 #define SOCKET_BACKLOG 5
 #define MAX_PENDING_REQUESTS 50
 #define DEFAULT_REQUEST_TIMEOUT 30000  /* 30 seconds */
+#define SOCKET_PATH_MAX 256
+#define SOCKET_JSON_TOKEN_MAX 128
+#define SOCKET_BUFFER_SIZE 4096
+#define MS_PER_SECOND 1000
 
 /* Message format strings */
 #define MSG_JSON_FORMAT "{\"from\":\"%s\",\"to\":\"%s\",\"type\":\"%s\",\"content\":\"%s\"}"

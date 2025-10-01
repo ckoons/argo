@@ -281,12 +281,12 @@ static int claude_query(ci_provider_t* provider, const char* prompt,
         return result;
     }
 
-    /* Update working memory with response */
+    /* Update working memory session tracking */
     working_memory_t* mem = (working_memory_t*)ctx->working_memory;
     if (mem && mem->magic == WORKING_MEMORY_MAGIC) {
         mem->turn_count++;
         mem->last_update = time(NULL);
-        /* TODO: Add response to memory if needed */
+        /* Response content stored in memory_digest at higher level */
     }
 
     /* Build response */
