@@ -34,6 +34,9 @@ PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
                    $(SRC_DIR)/argo_claude_api.c \
                    $(SRC_DIR)/argo_openai_api.c \
                    $(SRC_DIR)/argo_gemini_api.c \
+                   $(SRC_DIR)/argo_grok_api.c \
+                   $(SRC_DIR)/argo_deepseek_api.c \
+                   $(SRC_DIR)/argo_openrouter.c \
                    $(SRC_DIR)/argo_api_common.c \
                    $(SRC_DIR)/argo_api_provider_common.c \
                    $(SRC_DIR)/argo_json.c
