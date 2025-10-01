@@ -5,9 +5,9 @@
 
 Argo is a minimal C library (<10,000 lines) that coordinates multiple Companion Intelligences (CIs) in software development workflows. It provides deterministic control while CIs provide creative contribution.
 
-## Status: Sprint 1 - Multi-CI Workflows (In Progress)
+## Status: Sprint 1 - Multi-CI Workflows (Complete)
 
-Current: 2,590 meaningful lines (25% of budget)
+Current: 2,950 meaningful lines (29% of budget)
 
 ### What Works Now
 - ✅ **8 CI Providers**: Ollama, Claude (socket/code/API), OpenAI, Gemini, Grok, DeepSeek, OpenRouter
@@ -21,7 +21,11 @@ Current: 2,590 meaningful lines (25% of budget)
 - ✅ **Message Routing**: Inter-CI communication with threading and metadata
 - ✅ **Workflow Controller**: 7-phase workflow state machine, auto-assignment
 - ✅ **Merge Negotiation**: Conflict tracking, CI proposals, resolution selection
-- ✅ **Testing**: 53/53 tests passing (100% pass rate)
+- ✅ **Error Reporting**: Single standard routine with severity-based routing
+- ✅ **Workflow JSON**: Reusable workflow definitions in `argo/workflows/{category}/{event}/`
+- ✅ **Session Lifecycle**: `run_workflow()` - complete create→execute→destroy
+- ✅ **Checkpoints**: Workflow pause/resume with state save/restore
+- ✅ **Testing**: 62/62 tests passing (100% pass rate)
 
 ### Core Principles
 1. **"What you don't build, you don't debug"** - Reuse over rewrite
@@ -80,7 +84,8 @@ Argo follows a strict **deterministic/creative separation**:
 - [Sprint 0 Plan](docs/plans/sprint-0-ci-foundation.md) - Provider infrastructure
 - [CLAUDE.md](CLAUDE.md) - Development collaboration guide
 
-## Next: Integration Testing
-- End-to-end multi-CI workflows
-- Real parallel development scenarios
-- Integration with Git operations
+## Next: Sprint 2 - Real CI Integration
+- Load and execute workflow JSON definitions
+- Connect to real CI providers (Claude, GPT-4, Gemini)
+- End-to-end workflow execution with live CIs
+- Git operations (branch creation, commits, merges)

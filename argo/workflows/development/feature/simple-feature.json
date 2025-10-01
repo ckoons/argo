@@ -1,0 +1,120 @@
+{
+  "name": "simple-feature",
+  "description": "Basic feature development workflow with single CI",
+  "category": "development",
+  "event": "feature",
+
+  "personnel": [
+    {
+      "role": "builder",
+      "provider": "claude",
+      "min_count": 1,
+      "max_count": 1
+    }
+  ],
+
+  "phases": [
+    {
+      "phase": 0,
+      "name": "Initialize",
+      "description": "Setup development environment",
+      "checkpoint": false,
+      "tasks": [
+        {
+          "description": "Create feature branch",
+          "required_role": "builder",
+          "parallel_allowed": false
+        },
+        {
+          "description": "Setup build environment",
+          "required_role": "builder",
+          "parallel_allowed": false
+        }
+      ]
+    },
+    {
+      "phase": 1,
+      "name": "Planning",
+      "description": "Define requirements and design",
+      "checkpoint": true,
+      "tasks": [
+        {
+          "description": "Write feature specification",
+          "required_role": "builder",
+          "parallel_allowed": false
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Development",
+      "description": "Implement the feature",
+      "checkpoint": false,
+      "tasks": [
+        {
+          "description": "Implement core functionality",
+          "required_role": "builder",
+          "parallel_allowed": false
+        },
+        {
+          "description": "Add error handling",
+          "required_role": "builder",
+          "parallel_allowed": false
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Testing",
+      "description": "Write and run tests",
+      "checkpoint": false,
+      "tasks": [
+        {
+          "description": "Write unit tests",
+          "required_role": "builder",
+          "parallel_allowed": false
+        },
+        {
+          "description": "Run all tests",
+          "required_role": "builder",
+          "parallel_allowed": false
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Complete",
+      "description": "Finalize and commit",
+      "checkpoint": false,
+      "tasks": [
+        {
+          "description": "Create commit",
+          "required_role": "builder",
+          "parallel_allowed": false
+        }
+      ]
+    }
+  ],
+
+  "artifacts": [
+    {
+      "name": "feature-spec.md",
+      "location": "argo/workflow",
+      "lifecycle": "workflow",
+      "required": true
+    },
+    {
+      "name": "test-results.log",
+      "location": "/tmp",
+      "lifecycle": "temp",
+      "required": false
+    }
+  ],
+
+  "success_criteria": {
+    "all_tasks_complete": true,
+    "all_tests_pass": true,
+    "no_conflicts": true,
+    "custom_check": ""
+  }
+}

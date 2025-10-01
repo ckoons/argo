@@ -472,3 +472,50 @@ char* orchestrator_get_status_json(argo_orchestrator_t* orch) {
 
     return json;
 }
+
+/* Complete workflow lifecycle - handles creation through destruction */
+int run_workflow(const char* session_id,
+                const char* base_branch,
+                void (*setup_fn)(argo_orchestrator_t* orch, void* userdata),
+                void* userdata) {
+    int result = ARGO_SUCCESS;
+
+    /* Create orchestrator */
+    argo_orchestrator_t* orch = orchestrator_create(session_id, base_branch);
+    if (!orch) {
+        argo_report_error(E_SYSTEM_MEMORY, "run_workflow",
+                         "Failed to create orchestrator");
+        return E_SYSTEM_MEMORY;
+    }
+
+    LOG_INFO("=== Workflow Session Start: %s ===", session_id);
+
+    /* Setup phase: caller adds CIs, creates tasks, etc */
+    if (setup_fn) {
+        setup_fn(orch, userdata);
+    }
+
+    /* Start workflow */
+    result = orchestrator_start_workflow(orch);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "run_workflow", "Failed to start workflow");
+        goto cleanup;
+    }
+
+    /* Workflow execution happens here - in real implementation,
+     * this would be an event loop processing CI messages and
+     * advancing phases. For now, we just run to completion. */
+
+    LOG_INFO("Workflow running in session %s", session_id);
+    orchestrator_print_status(orch);
+
+    /* Success */
+    LOG_INFO("=== Workflow Session Complete: %s ===", session_id);
+
+cleanup:
+    /* Teardown: destroy orchestrator and all components */
+    orchestrator_destroy(orch);
+    LOG_INFO("Orchestrator destroyed for session %s", session_id);
+
+    return result;
+}

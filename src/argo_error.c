@@ -8,6 +8,7 @@
 
 /* Project includes */
 #include "argo_error.h"
+#include "argo_log.h"
 
 /* Error descriptions - human readable messages */
 static const char* get_error_description(int code) {
@@ -189,4 +190,45 @@ void argo_error_print(int code, const char* context) {
         fprintf(stderr, " in %s", context);
     }
     fprintf(stderr, ": %s\n", argo_error_string(code));
+}
+
+/* Standard error reporting with routing based on severity */
+void argo_report_error(int code, const char* context, const char* details) {
+    if (code == ARGO_SUCCESS) return;
+
+    int type = ARGO_ERROR_TYPE(code);
+    int num = ARGO_ERROR_NUM(code);
+    const char* type_str = argo_error_type_string(type);
+    const char* message = argo_error_message(code);
+
+    /* Format: [ARGO ERROR] context: message (details) [TYPE:NUM] */
+    char error_line[512];
+    int pos = 0;
+
+    pos += snprintf(error_line + pos, sizeof(error_line) - pos, "[ARGO ERROR]");
+
+    if (context) {
+        pos += snprintf(error_line + pos, sizeof(error_line) - pos, " %s:", context);
+    }
+
+    pos += snprintf(error_line + pos, sizeof(error_line) - pos, " %s", message);
+
+    if (details) {
+        pos += snprintf(error_line + pos, sizeof(error_line) - pos, " (%s)", details);
+    }
+
+    snprintf(error_line + pos, sizeof(error_line) - pos, " [%s:%d]", type_str, num);
+
+    /* Route based on severity:
+     * INTERNAL/SYSTEM -> stderr + log (critical)
+     * CI/INPUT/PROTOCOL -> log only (expected)
+     */
+    int to_stderr = (type == ERR_INTERNAL || type == ERR_SYSTEM);
+
+    if (to_stderr) {
+        fprintf(stderr, "%s\n", error_line);
+    }
+
+    /* Always log errors */
+    LOG_ERROR("%s", error_line);
 }

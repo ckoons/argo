@@ -95,4 +95,14 @@ const char* workflow_phase_name(workflow_phase_t phase);
 /* Auto-assignment based on CI roles */
 int workflow_auto_assign_tasks(workflow_controller_t* workflow);
 
+/* Checkpoint save/restore for pause/resume */
+char* workflow_save_checkpoint(workflow_controller_t* workflow);
+int workflow_restore_checkpoint(workflow_controller_t* workflow,
+                               const char* checkpoint_json);
+int workflow_checkpoint_to_file(workflow_controller_t* workflow,
+                               const char* filepath);
+workflow_controller_t* workflow_restore_from_file(ci_registry_t* registry,
+                                                  lifecycle_manager_t* lifecycle,
+                                                  const char* filepath);
+
 #endif /* ARGO_WORKFLOW_H */

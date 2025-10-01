@@ -103,4 +103,10 @@ const char* orchestrator_current_phase_name(argo_orchestrator_t* orch);
 void orchestrator_print_status(argo_orchestrator_t* orch);
 char* orchestrator_get_status_json(argo_orchestrator_t* orch);
 
+/* Complete workflow lifecycle - one call from start to finish */
+int run_workflow(const char* session_id,
+                const char* base_branch,
+                void (*setup_fn)(argo_orchestrator_t* orch, void* userdata),
+                void* userdata);
+
 #endif /* ARGO_ORCHESTRATOR_H */

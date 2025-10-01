@@ -85,6 +85,9 @@ const char* argo_error_ci_hint(int code);
 int argo_error_format(char* buffer, size_t size, int code);
 void argo_error_print(int code, const char* context);
 
+/* Standard error reporting - routes to stderr/log based on severity */
+void argo_report_error(int code, const char* context, const char* details);
+
 /* Defensive coding macros */
 #define ARGO_CHECK_NULL(ptr) \
     do { if (!(ptr)) return E_INPUT_NULL; } while(0)
