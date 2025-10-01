@@ -27,8 +27,7 @@
 ci_registry_t* registry_create(void) {
     ci_registry_t* registry = calloc(1, sizeof(ci_registry_t));
     if (!registry) {
-        argo_report_error(E_SYSTEM_MEMORY, "registry_create",
-                         "Failed to allocate registry");
+        argo_report_error(E_SYSTEM_MEMORY, "registry_create", "");
         return NULL;
     }
 
@@ -367,8 +366,7 @@ int registry_send_message(ci_registry_t* registry,
     /* Parse the message to get full structure */
     ci_message_t* msg = message_from_json(message_json);
     if (!msg) {
-        argo_report_error(E_PROTOCOL_FORMAT, "registry_send_message",
-                         "Failed to parse JSON");
+        argo_report_error(E_PROTOCOL_FORMAT, "registry_send_message", "");
         return E_PROTOCOL_FORMAT;
     }
 
@@ -385,9 +383,7 @@ int registry_send_message(ci_registry_t* registry,
     message_destroy(msg);
 
     if (result != ARGO_SUCCESS) {
-        char details[128];
-        snprintf(details, sizeof(details), "from %s to %s", from_ci, to_ci);
-        argo_report_error(result, "registry_send_message", details);
+        argo_report_error(result, "registry_send_message", "from %s to %s", from_ci, to_ci);
         if (to_entry) {
             to_entry->errors_count++;
             to_entry->last_error = time(NULL);

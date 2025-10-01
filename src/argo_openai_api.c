@@ -40,7 +40,7 @@ static void openai_api_cleanup(ci_provider_t* provider);
 ci_provider_t* openai_api_create_provider(const char* model) {
     openai_api_context_t* ctx = calloc(1, sizeof(openai_api_context_t));
     if (!ctx) {
-        LOG_ERROR("Failed to allocate OpenAI API context");
+        argo_report_error(E_SYSTEM_MEMORY, "openai_api_create_provider", "");
         return NULL;
     }
 
@@ -112,7 +112,7 @@ static int openai_api_query(ci_provider_t* provider, const char* prompt,
     int result = api_http_post_json(OPENAI_API_URL, json_body, &auth,
                                     NULL, &resp);
     if (result != ARGO_SUCCESS) {
-        LOG_ERROR("Failed to execute OpenAI API request");
+        argo_report_error(result, "openai_api_query", "HTTP request failed");
         return result;
     }
 
@@ -124,7 +124,7 @@ static int openai_api_query(ci_provider_t* provider, const char* prompt,
                                        &extracted_content, &content_len);
 
     if (result != ARGO_SUCCESS) {
-        LOG_ERROR("Failed to extract content from OpenAI API response");
+        argo_report_error(result, "openai_api_query", "JSON extraction failed");
         http_response_free(resp);
         return result;
     }

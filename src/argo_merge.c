@@ -19,15 +19,13 @@ static void generate_session_id(char* id_out, size_t len) {
 merge_negotiation_t* merge_negotiation_create(const char* branch_a,
                                               const char* branch_b) {
     if (!branch_a || !branch_b) {
-        argo_report_error(E_INPUT_NULL, "merge_negotiation_create",
-                         "Invalid branch names");
+        argo_report_error(E_INPUT_NULL, "merge_negotiation_create", "");
         return NULL;
     }
 
     merge_negotiation_t* negotiation = calloc(1, sizeof(merge_negotiation_t));
     if (!negotiation) {
-        argo_report_error(E_SYSTEM_MEMORY, "merge_negotiation_create",
-                         "Failed to allocate negotiation");
+        argo_report_error(E_SYSTEM_MEMORY, "merge_negotiation_create", "");
         return NULL;
     }
 
@@ -86,15 +84,13 @@ merge_conflict_t* merge_add_conflict(merge_negotiation_t* negotiation,
                                     const char* content_a,
                                     const char* content_b) {
     if (!negotiation || !file || !content_a || !content_b) {
-        argo_report_error(E_INPUT_NULL, "merge_add_conflict",
-                         "Invalid parameters");
+        argo_report_error(E_INPUT_NULL, "merge_add_conflict", "");
         return NULL;
     }
 
     merge_conflict_t* conflict = calloc(1, sizeof(merge_conflict_t));
     if (!conflict) {
-        argo_report_error(E_SYSTEM_MEMORY, "merge_add_conflict",
-                         "Failed to allocate conflict");
+        argo_report_error(E_SYSTEM_MEMORY, "merge_add_conflict", "");
         return NULL;
     }
 
@@ -133,8 +129,7 @@ int merge_propose_resolution(merge_negotiation_t* negotiation,
 
     merge_proposal_t* proposal = calloc(1, sizeof(merge_proposal_t));
     if (!proposal) {
-        argo_report_error(E_SYSTEM_MEMORY, "merge_propose_resolution",
-                         "Failed to allocate proposal");
+        argo_report_error(E_SYSTEM_MEMORY, "merge_propose_resolution", "");
         return E_SYSTEM_MEMORY;
     }
 
@@ -205,8 +200,7 @@ char* merge_conflict_to_json(merge_conflict_t* conflict) {
     size_t max_size = 4096;
     char* json = malloc(max_size);
     if (!json) {
-        argo_report_error(E_SYSTEM_MEMORY, "merge_conflict_to_json",
-                         "Failed to allocate JSON buffer");
+        argo_report_error(E_SYSTEM_MEMORY, "merge_conflict_to_json", "");
         return NULL;
     }
 
@@ -236,8 +230,7 @@ char* merge_negotiation_to_json(merge_negotiation_t* negotiation) {
     size_t max_size = 16384;
     char* json = malloc(max_size);
     if (!json) {
-        argo_report_error(E_SYSTEM_MEMORY, "merge_negotiation_to_json",
-                         "Failed to allocate JSON buffer");
+        argo_report_error(E_SYSTEM_MEMORY, "merge_negotiation_to_json", "");
         return NULL;
     }
 

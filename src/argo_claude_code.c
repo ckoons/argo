@@ -63,7 +63,7 @@ static void claude_code_cleanup(ci_provider_t* provider);
 ci_provider_t* claude_code_create_provider(const char* ci_name) {
     claude_code_context_t* ctx = calloc(1, sizeof(claude_code_context_t));
     if (!ctx) {
-        LOG_ERROR("Failed to allocate Claude Code context");
+        argo_report_error(E_SYSTEM_MEMORY, "claude_code_create_provider", "");
         return NULL;
     }
 
@@ -133,7 +133,7 @@ static int claude_code_connect(ci_provider_t* provider) {
 static int write_prompt_file(claude_code_context_t* ctx, const char* prompt) {
     FILE* fp = fopen(ctx->prompt_file, "w");
     if (!fp) {
-        LOG_ERROR("Failed to create prompt file: %s", ctx->prompt_file);
+        argo_report_error(E_SYSTEM_FILE, "write_prompt_file", "failed to open %s", ctx->prompt_file);
         return E_SYSTEM_FILE;
     }
 
@@ -222,7 +222,7 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
     }
 
     if (waited >= timeout) {
-        LOG_ERROR("Timeout waiting for Claude Code response");
+        argo_report_error(E_CI_TIMEOUT, "claude_code_query", "");
         return E_CI_TIMEOUT;
     }
 

@@ -3,6 +3,7 @@
 /* Error string and formatting functions */
 
 /* System includes */
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -193,7 +194,7 @@ void argo_error_print(int code, const char* context) {
 }
 
 /* Standard error reporting with routing based on severity */
-void argo_report_error(int code, const char* context, const char* details) {
+void argo_report_error(int code, const char* context, const char* fmt, ...) {
     if (code == ARGO_SUCCESS) return;
 
     int type = ARGO_ERROR_TYPE(code);
@@ -213,7 +214,13 @@ void argo_report_error(int code, const char* context, const char* details) {
 
     pos += snprintf(error_line + pos, sizeof(error_line) - pos, " %s", message);
 
-    if (details) {
+    /* Add formatted details if provided */
+    if (fmt && fmt[0] != '\0') {
+        va_list args;
+        va_start(args, fmt);
+        char details[256];
+        vsnprintf(details, sizeof(details), fmt, args);
+        va_end(args);
         pos += snprintf(error_line + pos, sizeof(error_line) - pos, " (%s)", details);
     }
 

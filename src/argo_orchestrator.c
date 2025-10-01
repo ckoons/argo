@@ -14,15 +14,13 @@
 argo_orchestrator_t* orchestrator_create(const char* session_id,
                                         const char* base_branch) {
     if (!session_id || !base_branch) {
-        argo_report_error(E_INPUT_NULL, "orchestrator_create",
-                         "Missing session_id or base_branch");
+        argo_report_error(E_INPUT_NULL, "orchestrator_create", "");
         return NULL;
     }
 
     argo_orchestrator_t* orch = calloc(1, sizeof(argo_orchestrator_t));
     if (!orch) {
-        argo_report_error(E_SYSTEM_MEMORY, "orchestrator_create",
-                         "Failed to allocate orchestrator");
+        argo_report_error(E_SYSTEM_MEMORY, "orchestrator_create", "");
         return NULL;
     }
 
@@ -334,8 +332,7 @@ int orchestrator_add_conflict(argo_orchestrator_t* orch,
     }
 
     if (!orch->active_merge) {
-        argo_report_error(E_INVALID_STATE, "orchestrator_add_conflict",
-                         "No active merge negotiation");
+        argo_report_error(E_INVALID_STATE, "orchestrator_add_conflict", "");
         return E_INVALID_STATE;
     }
 
@@ -486,8 +483,7 @@ int run_workflow(const char* session_id,
     /* Create orchestrator */
     argo_orchestrator_t* orch = orchestrator_create(session_id, base_branch);
     if (!orch) {
-        argo_report_error(E_SYSTEM_MEMORY, "run_workflow",
-                         "Failed to create orchestrator");
+        argo_report_error(E_SYSTEM_MEMORY, "run_workflow", "");
         return E_SYSTEM_MEMORY;
     }
 

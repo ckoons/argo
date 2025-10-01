@@ -86,7 +86,7 @@ int argo_error_format(char* buffer, size_t size, int code);
 void argo_error_print(int code, const char* context);
 
 /* Standard error reporting - routes to stderr/log based on severity */
-void argo_report_error(int code, const char* context, const char* details);
+void argo_report_error(int code, const char* context, const char* fmt, ...);
 
 /* Defensive coding macros */
 #define ARGO_CHECK_NULL(ptr) \

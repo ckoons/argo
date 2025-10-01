@@ -115,7 +115,7 @@ static char* build_context_with_memory(claude_context_t* ctx, const char* prompt
 ci_provider_t* claude_create_provider(const char* ci_name) {
     claude_context_t* ctx = calloc(1, sizeof(claude_context_t));
     if (!ctx) {
-        LOG_ERROR("Failed to allocate Claude context");
+        argo_report_error(E_SYSTEM_MEMORY, "claude_create_provider", "");
         return NULL;
     }
 
@@ -359,14 +359,14 @@ static int spawn_claude_process(claude_context_t* ctx) {
     if (pipe(ctx->stdin_pipe) < 0 ||
         pipe(ctx->stdout_pipe) < 0 ||
         pipe(ctx->stderr_pipe) < 0) {
-        LOG_ERROR("Failed to create pipes: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_FORK, "spawn_claude_process", "pipe() failed: %s", strerror(errno));
         return E_SYSTEM_FORK;
     }
 
     /* Fork process */
     ctx->claude_pid = fork();
     if (ctx->claude_pid < 0) {
-        LOG_ERROR("fork() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_FORK, "spawn_claude_process", "fork() failed: %s", strerror(errno));
         return E_SYSTEM_FORK;
     }
 
@@ -434,13 +434,13 @@ static int setup_working_memory(claude_context_t* ctx, const char* ci_name) {
     /* Open or create session file */
     ctx->memory_fd = open(ctx->session_path, O_RDWR | O_CREAT, 0600);
     if (ctx->memory_fd < 0) {
-        LOG_ERROR("Failed to open session file: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_FILE, "setup_working_memory", "open() failed: %s", strerror(errno));
         return E_SYSTEM_FILE;
     }
 
     /* Ensure file is correct size */
     if (ftruncate(ctx->memory_fd, WORKING_MEMORY_SIZE) < 0) {
-        LOG_ERROR("Failed to set session file size: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_FILE, "setup_working_memory", "ftruncate() failed: %s", strerror(errno));
         close(ctx->memory_fd);
         return E_SYSTEM_FILE;
     }
@@ -451,7 +451,7 @@ static int setup_working_memory(claude_context_t* ctx, const char* ci_name) {
                               MAP_SHARED, ctx->memory_fd, 0);
 
     if (ctx->working_memory == MAP_FAILED) {
-        LOG_ERROR("Failed to mmap session file: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_MEMORY, "setup_working_memory", "mmap() failed: %s", strerror(errno));
         close(ctx->memory_fd);
         return E_SYSTEM_MEMORY;
     }
@@ -576,7 +576,7 @@ static int save_working_memory(claude_context_t* ctx) {
     /* Memory is mapped, so changes are automatic */
     /* Just sync to disk */
     if (msync(ctx->working_memory, ctx->memory_size, MS_SYNC) < 0) {
-        LOG_ERROR("Failed to sync working memory: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_FILE, "save_working_memory", "msync() failed: %s", strerror(errno));
         return E_SYSTEM_FILE;
     }
     return ARGO_SUCCESS;

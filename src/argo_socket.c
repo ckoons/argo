@@ -115,7 +115,7 @@ int socket_server_run(int timeout_ms) {
         if (errno == EINTR) {
             return ARGO_SUCCESS;  /* Interrupted by signal */
         }
-        LOG_ERROR("poll() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "socket_server_run", "poll() failed: %s", strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -136,7 +136,7 @@ int socket_server_run(int timeout_ms) {
         /* Check for errors */
         if (g_socket_ctx->pollfds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
             if (i == 0) {
-                LOG_ERROR("Server socket error");
+                argo_report_error(E_SYSTEM_SOCKET, "socket_server_run", "server socket error");
                 return E_SYSTEM_SOCKET;
             }
             LOG_DEBUG("Client %d disconnected", i);
@@ -172,7 +172,7 @@ int socket_send_message(const ci_message_t* msg, socket_callback_fn callback, vo
     ARGO_CHECK_NULL(g_socket_ctx);
 
     if (g_socket_ctx->request_count >= MAX_PENDING_REQUESTS) {
-        LOG_ERROR("Too many pending requests");
+        argo_report_error(E_PROTOCOL_QUEUE, "socket_send_message", "");
         return E_PROTOCOL_QUEUE;
     }
 
@@ -181,7 +181,7 @@ int socket_send_message(const ci_message_t* msg, socket_callback_fn callback, vo
     /* TODO: Look up target CI from registry by msg->to field */
 
     if (target_fd < 0) {
-        LOG_ERROR("Target CI '%s' not connected", msg->to);
+        argo_report_error(E_CI_DISCONNECTED, "socket_send_message", "target CI %s", msg->to);
         return E_CI_DISCONNECTED;
     }
 
@@ -199,7 +199,7 @@ int socket_send_message(const ci_message_t* msg, socket_callback_fn callback, vo
     /* Send message */
     ssize_t sent = send(target_fd, json_buffer, len, MSG_NOSIGNAL);
     if (sent != len) {
-        LOG_ERROR("Failed to send message: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "socket_send_message", "send failed: %s", strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -255,7 +255,7 @@ static int setup_server_socket(const char* ci_name) {
     /* Create socket */
     g_socket_ctx->listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (g_socket_ctx->listen_fd < 0) {
-        LOG_ERROR("socket() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", "socket() failed: %s", strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -275,14 +275,14 @@ static int setup_server_socket(const char* ci_name) {
     strncpy(addr.sun_path, g_socket_ctx->socket_path, sizeof(addr.sun_path) - 1);
 
     if (bind(g_socket_ctx->listen_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        LOG_ERROR("bind() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", "bind() failed: %s", strerror(errno));
         close(g_socket_ctx->listen_fd);
         return E_SYSTEM_SOCKET;
     }
 
     /* Listen for connections */
     if (listen(g_socket_ctx->listen_fd, SOCKET_BACKLOG) < 0) {
-        LOG_ERROR("listen() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", "listen() failed: %s", strerror(errno));
         close(g_socket_ctx->listen_fd);
         unlink(g_socket_ctx->socket_path);
         return E_SYSTEM_SOCKET;
@@ -294,12 +294,12 @@ static int setup_server_socket(const char* ci_name) {
 static int make_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0) {
-        LOG_ERROR("fcntl(F_GETFL) failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "make_nonblocking", "fcntl(F_GETFL) failed: %s", strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
     if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-        LOG_ERROR("fcntl(F_SETFL) failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "make_nonblocking", "fcntl(F_SETFL) failed: %s", strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -315,7 +315,7 @@ static int accept_client(void) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return ARGO_SUCCESS;  /* No pending connections */
         }
-        LOG_ERROR("accept() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "accept_client", "accept() failed: %s", strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -328,7 +328,7 @@ static int accept_client(void) {
 
     /* Add to poll array */
     if (g_socket_ctx->nfds >= REGISTRY_MAX_CIS) {
-        LOG_ERROR("Too many clients");
+        argo_report_error(E_PROTOCOL_QUEUE, "accept_client", "");
         close(client_fd);
         return E_PROTOCOL_QUEUE;
     }

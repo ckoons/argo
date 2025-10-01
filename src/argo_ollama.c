@@ -71,7 +71,7 @@ static int connect_to_ollama(const char* host, int port);
 ci_provider_t* ollama_create_provider(const char* model_name) {
     ollama_context_t* ctx = calloc(1, sizeof(ollama_context_t));
     if (!ctx) {
-        LOG_ERROR("Failed to allocate Ollama context");
+        argo_report_error(E_SYSTEM_MEMORY, "ollama_create_provider", "");
         return NULL;
     }
 
@@ -133,7 +133,7 @@ static int ollama_connect(ci_provider_t* provider) {
     /* Connect to Ollama */
     ctx->socket_fd = connect_to_ollama("localhost", ctx->port);
     if (ctx->socket_fd < 0) {
-        LOG_ERROR("Failed to connect to Ollama at localhost:%d", ctx->port);
+        argo_report_error(E_CI_NO_PROVIDER, "ollama_connect", "failed to connect at localhost:%d", ctx->port);
         return E_CI_NO_PROVIDER;
     }
 
@@ -162,7 +162,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
     /* Send request */
     ssize_t sent = send(ctx->socket_fd, request, req_len, MSG_NOSIGNAL);
     if (sent != req_len) {
-        LOG_ERROR("Failed to send request to Ollama: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "ollama_query", "send failed: %s", strerror(errno));
         ollama_disconnect(ctx);
         return E_SYSTEM_SOCKET;
     }
@@ -212,7 +212,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
         } else if (bytes == 0) {
             break;
         } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            LOG_ERROR("recv() error: %s", strerror(errno));
+            argo_report_error(E_SYSTEM_SOCKET, "ollama_query", "recv() error: %s", strerror(errno));
             ollama_disconnect(ctx);
             return E_SYSTEM_SOCKET;
         }
@@ -221,7 +221,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
     }
 
     if (!json_start) {
-        LOG_ERROR("No JSON response from Ollama");
+        argo_report_error(E_PROTOCOL_FORMAT, "ollama_query", "no JSON in response");
         ollama_disconnect(ctx);
         return E_PROTOCOL_FORMAT;
     }
@@ -229,7 +229,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
     /* Simple extraction of response field - jsmn has issues with emojis */
     char* response_start = strstr(json_start, "\"response\":\"");
     if (!response_start) {
-        LOG_ERROR("No 'response' field in JSON");
+        argo_report_error(E_PROTOCOL_FORMAT, "ollama_query", "no response field in JSON");
         ollama_disconnect(ctx);
         return E_PROTOCOL_FORMAT;
     }
@@ -246,7 +246,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
     }
 
     if (*p != '"') {
-        LOG_ERROR("Unterminated response string");
+        argo_report_error(E_PROTOCOL_FORMAT, "ollama_query", "unterminated response string");
         ollama_disconnect(ctx);
         return E_PROTOCOL_FORMAT;
     }
@@ -302,7 +302,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
     /* Send request */
     ssize_t sent = send(ctx->socket_fd, request, req_len, MSG_NOSIGNAL);
     if (sent != req_len) {
-        LOG_ERROR("Failed to send request to Ollama: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "ollama_stream", "send failed: %s", strerror(errno));
         ollama_disconnect(ctx);
         return E_SYSTEM_SOCKET;
     }
@@ -398,7 +398,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
         } else if (bytes == 0) {
             break;
         } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            LOG_ERROR("recv() error: %s", strerror(errno));
+            argo_report_error(E_SYSTEM_SOCKET, "ollama_stream", "recv() error: %s", strerror(errno));
             ollama_disconnect(ctx);
             return E_SYSTEM_SOCKET;
         }
@@ -516,7 +516,7 @@ static int connect_to_ollama(const char* host, int port) {
     /* Create socket */
     sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd < 0) {
-        LOG_ERROR("socket() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "connect_to_ollama", "socket() failed: %s", strerror(errno));
         return -1;
     }
 
@@ -532,7 +532,7 @@ static int connect_to_ollama(const char* host, int port) {
 
     /* Connect */
     if (connect(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        LOG_ERROR("connect() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "connect_to_ollama", "connect() failed: %s", strerror(errno));
         close(sock_fd);
         return -1;
     }

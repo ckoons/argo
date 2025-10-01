@@ -19,8 +19,7 @@
 lifecycle_manager_t* lifecycle_manager_create(ci_registry_t* registry) {
     lifecycle_manager_t* manager = calloc(1, sizeof(lifecycle_manager_t));
     if (!manager) {
-        argo_report_error(E_SYSTEM_MEMORY, "lifecycle_manager_create",
-                         "Failed to allocate manager");
+        argo_report_error(E_SYSTEM_MEMORY, "lifecycle_manager_create", "");
         return NULL;
     }
 
@@ -399,8 +398,7 @@ int lifecycle_report_error(lifecycle_manager_t* manager,
     free(ci->last_error);
     ci->last_error = error_message ? strdup(error_message) : NULL;
 
-    argo_report_error(E_CI_INVALID, ci_name,
-                     error_message ? error_message : "unknown");
+    argo_report_error(E_CI_INVALID, ci_name, "%s", error_message ? error_message : "unknown");
 
     return lifecycle_transition(manager, ci_name,
                                LIFECYCLE_EVENT_ERROR,

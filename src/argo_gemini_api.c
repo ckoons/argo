@@ -40,7 +40,7 @@ static void gemini_api_cleanup(ci_provider_t* provider);
 ci_provider_t* gemini_api_create_provider(const char* model) {
     gemini_api_context_t* ctx = calloc(1, sizeof(gemini_api_context_t));
     if (!ctx) {
-        LOG_ERROR("Failed to allocate Gemini API context");
+        argo_report_error(E_SYSTEM_MEMORY, "gemini_api_create_provider", "");
         return NULL;
     }
 
@@ -123,7 +123,7 @@ static int gemini_api_query(ci_provider_t* provider, const char* prompt,
     int result = api_http_post_json(base_url, json_body, &auth,
                                     NULL, &resp);
     if (result != ARGO_SUCCESS) {
-        LOG_ERROR("Failed to execute Gemini API request");
+        argo_report_error(result, "gemini_api_query", "HTTP request failed");
         return result;
     }
 
@@ -135,7 +135,7 @@ static int gemini_api_query(ci_provider_t* provider, const char* prompt,
                                        &extracted_content, &content_len);
 
     if (result != ARGO_SUCCESS) {
-        LOG_ERROR("Failed to extract content from Gemini API response");
+        argo_report_error(result, "gemini_api_query", "JSON extraction failed");
         http_response_free(resp);
         return result;
     }

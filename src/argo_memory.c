@@ -18,8 +18,7 @@ static uint32_t g_next_memory_id = 1;
 ci_memory_digest_t* memory_digest_create(size_t context_limit) {
     ci_memory_digest_t* digest = calloc(1, sizeof(ci_memory_digest_t));
     if (!digest) {
-        argo_report_error(E_SYSTEM_MEMORY, "memory_digest_create",
-                         "Failed to allocate digest");
+        argo_report_error(E_SYSTEM_MEMORY, "memory_digest_create", "");
         return NULL;
     }
 
@@ -62,8 +61,7 @@ int memory_add_item(ci_memory_digest_t* digest,
     ARGO_CHECK_NULL(content);
 
     if (digest->selected_count >= MEMORY_MAX_ITEMS) {
-        argo_report_error(E_PROTOCOL_QUEUE, "memory_add_item",
-                         "Memory digest full");
+        argo_report_error(E_PROTOCOL_QUEUE, "memory_add_item", "");
         return E_PROTOCOL_QUEUE;
     }
 
@@ -97,8 +95,7 @@ int memory_add_breadcrumb(ci_memory_digest_t* digest,
     ARGO_CHECK_NULL(breadcrumb);
 
     if (digest->breadcrumb_count >= MEMORY_BREADCRUMB_MAX) {
-        argo_report_error(E_PROTOCOL_QUEUE, "memory_add_breadcrumb",
-                         "Too many breadcrumbs");
+        argo_report_error(E_PROTOCOL_QUEUE, "memory_add_breadcrumb", "");
         return E_PROTOCOL_QUEUE;
     }
 
@@ -155,9 +152,7 @@ int memory_select_item(ci_memory_digest_t* digest,
         }
     }
 
-    char details[32];
-    snprintf(details, sizeof(details), "item %u", memory_id);
-    argo_report_error(E_INPUT_INVALID, "memory_mark_selected", details);
+    argo_report_error(E_INPUT_INVALID, "memory_mark_selected", "item %u", memory_id);
     return E_INPUT_INVALID;
 }
 
@@ -401,14 +396,12 @@ int memory_validate_digest(ci_memory_digest_t* digest) {
     ARGO_CHECK_NULL(digest);
 
     if (!memory_check_size_limit(digest)) {
-        argo_report_error(E_PROTOCOL_SIZE, "memory_validate_digest",
-                         "Digest exceeds size limit");
+        argo_report_error(E_PROTOCOL_SIZE, "memory_validate_digest", "");
         return E_PROTOCOL_SIZE;
     }
 
     if (digest->selected_count > MEMORY_MAX_ITEMS) {
-        argo_report_error(E_PROTOCOL_QUEUE, "memory_validate_digest",
-                         "Too many memory items");
+        argo_report_error(E_PROTOCOL_QUEUE, "memory_validate_digest", "");
         return E_PROTOCOL_QUEUE;
     }
 

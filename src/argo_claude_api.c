@@ -40,7 +40,7 @@ static void claude_api_cleanup(ci_provider_t* provider);
 ci_provider_t* claude_api_create_provider(const char* model) {
     claude_api_context_t* ctx = calloc(1, sizeof(claude_api_context_t));
     if (!ctx) {
-        LOG_ERROR("Failed to allocate Claude API context");
+        argo_report_error(E_SYSTEM_MEMORY, "claude_api_create_provider", "");
         return NULL;
     }
 
@@ -119,7 +119,7 @@ static int claude_api_query(ci_provider_t* provider, const char* prompt,
     int result = api_http_post_json(ANTHROPIC_API_URL, json_body, &auth,
                                     extra_headers, &resp);
     if (result != ARGO_SUCCESS) {
-        LOG_ERROR("Failed to execute Claude API request");
+        argo_report_error(result, "claude_api_query", "HTTP request failed");
         return result;
     }
 
@@ -131,7 +131,7 @@ static int claude_api_query(ci_provider_t* provider, const char* prompt,
                                        &extracted_content, &content_len);
 
     if (result != ARGO_SUCCESS) {
-        LOG_ERROR("Failed to extract content from Claude API response");
+        argo_report_error(result, "claude_api_query", "JSON extraction failed");
         http_response_free(resp);
         return result;
     }

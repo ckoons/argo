@@ -22,15 +22,13 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
                                       lifecycle_manager_t* lifecycle,
                                       const char* workflow_id) {
     if (!registry || !lifecycle || !workflow_id) {
-        argo_report_error(E_INPUT_NULL, "workflow_create",
-                         "Missing required parameters");
+        argo_report_error(E_INPUT_NULL, "workflow_create", "");
         return NULL;
     }
 
     workflow_controller_t* workflow = calloc(1, sizeof(workflow_controller_t));
     if (!workflow) {
-        argo_report_error(E_SYSTEM_MEMORY, "workflow_create",
-                         "Failed to allocate controller");
+        argo_report_error(E_SYSTEM_MEMORY, "workflow_create", "");
         return NULL;
     }
 
@@ -202,15 +200,13 @@ ci_task_t* workflow_create_task(workflow_controller_t* workflow,
                                const char* description,
                                workflow_phase_t phase) {
     if (!workflow || !description) {
-        argo_report_error(E_INPUT_NULL, "workflow_create_task",
-                         "Missing workflow or description");
+        argo_report_error(E_INPUT_NULL, "workflow_create_task", "");
         return NULL;
     }
 
     ci_task_t* task = calloc(1, sizeof(ci_task_t));
     if (!task) {
-        argo_report_error(E_SYSTEM_MEMORY, "workflow_create_task",
-                         "Failed to allocate task");
+        argo_report_error(E_SYSTEM_MEMORY, "workflow_create_task", "");
         return NULL;
     }
 

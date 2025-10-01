@@ -67,14 +67,13 @@ int api_http_post_json(const char* base_url, const char* json_body,
     http_request_free(req);
 
     if (result != ARGO_SUCCESS) {
-        LOG_ERROR("HTTP POST failed: %s", argo_error_string(result));
+        argo_report_error(result, "api_http_post_json", "HTTP POST failed");
         return result;
     }
 
     /* Check HTTP status */
     if ((*response)->status_code != API_HTTP_OK) {
-        LOG_ERROR("API returned status %d: %s",
-                 (*response)->status_code, (*response)->body);
+        argo_report_error(E_PROTOCOL_HTTP, "api_http_post_json", "status %d", (*response)->status_code);
         return E_PROTOCOL_HTTP;
     }
 
@@ -88,7 +87,7 @@ int api_allocate_response_buffer(char** buffer, size_t* capacity, size_t size) {
 
     *buffer = malloc(size);
     if (!*buffer) {
-        LOG_ERROR("Failed to allocate response buffer of size %zu", size);
+        argo_report_error(E_SYSTEM_MEMORY, "api_allocate_response_buffer", "size %zu", size);
         return E_SYSTEM_MEMORY;
     }
 

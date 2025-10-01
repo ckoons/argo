@@ -32,9 +32,7 @@ int json_extract_string_field(const char* json, const char* field_name,
     /* Find opening quote after the field name and colon */
     char* content_start = strchr(field_start + strlen(search_key), '"');
     if (!content_start) {
-        char details[128];
-        snprintf(details, sizeof(details), "No opening quote for '%s'", field_name);
-        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", details);
+        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", "%s", field_name);
         return E_PROTOCOL_FORMAT;
     }
     content_start++; /* Move past the quote */
@@ -51,7 +49,7 @@ int json_extract_string_field(const char* json, const char* field_name,
     }
 
     if (*content_end != '"') {
-        LOG_ERROR("No closing quote for field '%s'", field_name);
+        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", "%s", field_name);
         return E_PROTOCOL_FORMAT;
     }
 
@@ -93,7 +91,8 @@ int json_extract_nested_string(const char* json, const char** field_path,
         /* Find the field at this level */
         char* field_pos = strstr(current_pos, search_key);
         if (!field_pos) {
-            LOG_ERROR("Nested field '%s' not found in JSON path", field_path[i]);
+            argo_report_error(E_PROTOCOL_FORMAT, "json_extract_nested_string",
+                             field_path[i]);
             return E_PROTOCOL_FORMAT;
         }
 
