@@ -5,9 +5,9 @@
 
 Argo is a minimal C library (<10,000 lines) that coordinates multiple Companion Intelligences (CIs) in software development workflows. It provides deterministic control while CIs provide creative contribution.
 
-## Status: Sprint 0 - CI Foundation (Complete)
+## Status: Sprint 1 - Multi-CI Workflows (In Progress)
 
-Current: 2,127 meaningful lines (21% of budget)
+Current: 2,590 meaningful lines (25% of budget)
 
 ### What Works Now
 - ✅ **8 CI Providers**: Ollama, Claude (socket/code/API), OpenAI, Gemini, Grok, DeepSeek, OpenRouter
@@ -15,7 +15,13 @@ Current: 2,127 meaningful lines (21% of budget)
 - ✅ **Error System**: Human-readable messages with TYPE:NUMBER encoding
 - ✅ **Configuration**: Optional local model overrides
 - ✅ **Tooling**: Model update script, diet-aware line counter
-- ✅ **Testing**: 33/33 tests passing (registry, memory, lifecycle, providers)
+- ✅ **CI Registry**: Track multiple CIs with roles, status, and statistics
+- ✅ **Lifecycle Manager**: CI state transitions, task assignment, heartbeats
+- ✅ **Memory Manager**: Sunset/sunrise protocol, digest generation
+- ✅ **Message Routing**: Inter-CI communication with threading and metadata
+- ✅ **Workflow Controller**: 7-phase workflow state machine, auto-assignment
+- ✅ **Merge Negotiation**: Conflict tracking, CI proposals, resolution selection
+- ✅ **Testing**: 53/53 tests passing (100% pass rate)
 
 ### Core Principles
 1. **"What you don't build, you don't debug"** - Reuse over rewrite
@@ -29,26 +35,52 @@ Current: 2,127 meaningful lines (21% of budget)
 ## Quick Start
 
 ```bash
-# Build
+# Build everything
 make clean && make
 
-# Test providers (costs real money!)
+# Run fast tests (no API calls)
+make test-quick
+
+# Test specific components
+make test-registry     # CI registry and messaging
+make test-memory       # Memory management
+make test-lifecycle    # CI lifecycle and state
+make test-providers    # Provider system
+make test-messaging    # Inter-CI messaging
+make test-workflow     # Workflow orchestration
+
+# Check code size (diet-aware counting)
+./scripts/count_core.sh
+
+# Test API providers (costs real money!)
 build/test_api_calls --yes-i-want-to-spend-money claude
 build/test_api_calls --yes-i-want-to-spend-money openai
 build/test_api_calls --yes-i-want-to-spend-money gemini
-
-# Update model defaults
-make update-models
-
-# Check code size
-./scripts/count_core.sh
 ```
 
-## Documentation
-- [Sprint 0 Plan](docs/plans/sprint-0-ci-foundation.md) - Current sprint details
-- [Architecture](docs/plans/architecture.md) - System design
+## Architecture
 
-## Next: Sprint 1
-- Multi-CI parallel development
-- Automated merge negotiation
-- Workflow controller
+Argo follows a strict **deterministic/creative separation**:
+
+**Deterministic Layer** (Argo Controls):
+- Workflow state machine and phase transitions
+- CI registry and lifecycle management
+- Message routing between CIs
+- Task assignment based on roles
+- Merge conflict detection and orchestration
+
+**Creative Layer** (CIs Contribute):
+- Code implementation
+- Merge conflict resolution proposals
+- Test writing and execution
+- Design decisions within assigned tasks
+
+## Documentation
+- [Architecture](docs/plans/architecture.md) - System design and protocols
+- [Sprint 0 Plan](docs/plans/sprint-0-ci-foundation.md) - Provider infrastructure
+- [CLAUDE.md](CLAUDE.md) - Development collaboration guide
+
+## Next: Integration Testing
+- End-to-end multi-CI workflows
+- Real parallel development scenarios
+- Integration with Git operations

@@ -61,7 +61,7 @@ void lifecycle_manager_destroy(lifecycle_manager_t* manager) {
 static ci_lifecycle_t* find_ci_lifecycle(lifecycle_manager_t* manager,
                                         const char* ci_name) {
     for (int i = 0; i < manager->count; i++) {
-        if (strcmp(manager->cis[i]->ci_name, ci_name) == 0) {
+        if (manager->cis[i] && strcmp(manager->cis[i]->ci_name, ci_name) == 0) {
             return manager->cis[i];
         }
     }
@@ -104,7 +104,8 @@ int lifecycle_create_ci(lifecycle_manager_t* manager,
     ARGO_CHECK_NULL(model);
 
     /* Check if already exists */
-    if (find_ci_lifecycle(manager, ci_name)) {
+    ci_lifecycle_t* existing = find_ci_lifecycle(manager, ci_name);
+    if (existing) {
         LOG_ERROR("CI %s already exists", ci_name);
         return E_INPUT_INVALID;
     }

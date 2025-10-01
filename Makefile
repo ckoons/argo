@@ -24,7 +24,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_lifecycle.c \
                $(SRC_DIR)/argo_provider.c \
                $(SRC_DIR)/argo_workflow.c \
-               $(SRC_DIR)/argo_merge.c
+               $(SRC_DIR)/argo_merge.c \
+               $(SRC_DIR)/argo_orchestrator.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -74,9 +75,10 @@ LIFECYCLE_TEST_TARGET = $(BUILD_DIR)/test_lifecycle
 PROVIDER_TEST_TARGET = $(BUILD_DIR)/test_providers
 MESSAGING_TEST_TARGET = $(BUILD_DIR)/test_messaging
 WORKFLOW_TEST_TARGET = $(BUILD_DIR)/test_workflow
+INTEGRATION_TEST_TARGET = $(BUILD_DIR)/test_integration
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -214,8 +216,12 @@ $(MESSAGING_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_messaging.o $(STUB_OBJECT
 $(WORKFLOW_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build integration test executable
+$(INTEGRATION_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_integration.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -278,6 +284,13 @@ test-workflow: $(WORKFLOW_TEST_TARGET)
 	@echo "=========================================="
 	@./$(WORKFLOW_TEST_TARGET)
 
+test-integration: $(INTEGRATION_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Integration Tests"
+	@echo "=========================================="
+	@./$(INTEGRATION_TEST_TARGET)
+
 test-api: $(API_TEST_TARGET)
 	@echo ""
 	@echo "=========================================="
@@ -335,7 +348,8 @@ update-models:
 
 .PHONY: all directories scripts test-quick test-all test-providers test-registry \
         test-memory test-lifecycle test-providers test-messaging test-workflow \
-        test-api test-api-calls count-core clean distclean check debug update-models
+        test-integration test-api test-api-calls count-core clean distclean check \
+        debug update-models
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
