@@ -27,7 +27,8 @@
 ci_registry_t* registry_create(void) {
     ci_registry_t* registry = calloc(1, sizeof(ci_registry_t));
     if (!registry) {
-        LOG_ERROR("Failed to allocate registry");
+        argo_report_error(E_SYSTEM_MEMORY, "registry_create",
+                         "Failed to allocate registry");
         return NULL;
     }
 
@@ -82,13 +83,13 @@ int registry_add_ci(ci_registry_t* registry,
     ARGO_CHECK_NULL(model);
 
     if (registry->count >= REGISTRY_MAX_CIS) {
-        LOG_ERROR("Registry full, cannot add %s", name);
+        argo_report_error(E_PROTOCOL_QUEUE, "registry_add_ci", name);
         return E_PROTOCOL_QUEUE;
     }
 
     /* Check if already exists */
     if (registry_find_ci(registry, name)) {
-        LOG_ERROR("CI %s already registered", name);
+        argo_report_error(E_INPUT_INVALID, "registry_add_ci", name);
         return E_INPUT_INVALID;
     }
 
@@ -137,7 +138,7 @@ int registry_remove_ci(ci_registry_t* registry, const char* name) {
         pp = &(*pp)->next;
     }
 
-    LOG_ERROR("CI %s not found in registry", name);
+    argo_report_error(E_INPUT_INVALID, "registry_remove_ci", name);
     return E_INPUT_INVALID;
 }
 
@@ -186,7 +187,7 @@ int registry_allocate_port(ci_registry_t* registry, const char* role) {
         }
     }
 
-    LOG_ERROR("No available ports for role %s", role);
+    argo_report_error(E_PROTOCOL_QUEUE, "registry_allocate_port", role);
     return -1;
 }
 
@@ -353,7 +354,7 @@ int registry_send_message(ci_registry_t* registry,
     /* Find recipient CI */
     ci_registry_entry_t* to_entry = registry_find_ci(registry, to_ci);
     if (!to_entry) {
-        LOG_ERROR("Recipient CI not found: %s", to_ci);
+        argo_report_error(E_CI_NO_PROVIDER, "registry_send_message", to_ci);
         return E_CI_NO_PROVIDER;
     }
 
@@ -366,7 +367,8 @@ int registry_send_message(ci_registry_t* registry,
     /* Parse the message to get full structure */
     ci_message_t* msg = message_from_json(message_json);
     if (!msg) {
-        LOG_ERROR("Failed to parse message JSON");
+        argo_report_error(E_PROTOCOL_FORMAT, "registry_send_message",
+                         "Failed to parse JSON");
         return E_PROTOCOL_FORMAT;
     }
 
@@ -383,7 +385,9 @@ int registry_send_message(ci_registry_t* registry,
     message_destroy(msg);
 
     if (result != ARGO_SUCCESS) {
-        LOG_ERROR("Failed to send message from %s to %s", from_ci, to_ci);
+        char details[128];
+        snprintf(details, sizeof(details), "from %s to %s", from_ci, to_ci);
+        argo_report_error(result, "registry_send_message", details);
         if (to_entry) {
             to_entry->errors_count++;
             to_entry->last_error = time(NULL);

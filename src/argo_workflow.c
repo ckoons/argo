@@ -22,13 +22,15 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
                                       lifecycle_manager_t* lifecycle,
                                       const char* workflow_id) {
     if (!registry || !lifecycle || !workflow_id) {
-        LOG_ERROR("Invalid parameters for workflow creation");
+        argo_report_error(E_INPUT_NULL, "workflow_create",
+                         "Missing required parameters");
         return NULL;
     }
 
     workflow_controller_t* workflow = calloc(1, sizeof(workflow_controller_t));
     if (!workflow) {
-        LOG_ERROR("Failed to allocate workflow controller");
+        argo_report_error(E_SYSTEM_MEMORY, "workflow_create",
+                         "Failed to allocate controller");
         return NULL;
     }
 
@@ -200,13 +202,15 @@ ci_task_t* workflow_create_task(workflow_controller_t* workflow,
                                const char* description,
                                workflow_phase_t phase) {
     if (!workflow || !description) {
-        LOG_ERROR("Invalid parameters for task creation");
+        argo_report_error(E_INPUT_NULL, "workflow_create_task",
+                         "Missing workflow or description");
         return NULL;
     }
 
     ci_task_t* task = calloc(1, sizeof(ci_task_t));
     if (!task) {
-        LOG_ERROR("Failed to allocate task");
+        argo_report_error(E_SYSTEM_MEMORY, "workflow_create_task",
+                         "Failed to allocate task");
         return NULL;
     }
 
@@ -240,14 +244,14 @@ int workflow_assign_task(workflow_controller_t* workflow,
     /* Find task */
     ci_task_t* task = workflow_find_task(workflow, task_id);
     if (!task) {
-        LOG_ERROR("Task not found: %s", task_id);
+        argo_report_error(E_NOT_FOUND, "workflow_assign_task", task_id);
         return E_NOT_FOUND;
     }
 
     /* Verify CI exists and is ready */
     ci_registry_entry_t* ci = registry_find_ci(workflow->registry, ci_name);
     if (!ci) {
-        LOG_ERROR("CI not found: %s", ci_name);
+        argo_report_error(E_CI_NO_PROVIDER, "workflow_assign_task", ci_name);
         return E_CI_NO_PROVIDER;
     }
 
@@ -273,7 +277,7 @@ int workflow_complete_task(workflow_controller_t* workflow,
 
     ci_task_t* task = workflow_find_task(workflow, task_id);
     if (!task) {
-        LOG_ERROR("Task not found: %s", task_id);
+        argo_report_error(E_NOT_FOUND, "workflow_complete_task", task_id);
         return E_NOT_FOUND;
     }
 

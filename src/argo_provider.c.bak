@@ -18,7 +18,7 @@
 provider_registry_t* provider_registry_create(void) {
     provider_registry_t* registry = calloc(1, sizeof(provider_registry_t));
     if (!registry) {
-        argo_report_error(E_SYSTEM_MEMORY, "provider_registry_create", "Failed to allocate registry");
+        LOG_ERROR("Failed to allocate provider registry");
         return NULL;
     }
 
@@ -214,12 +214,12 @@ int provider_registry_set_default(provider_registry_t* registry,
 
     provider_entry_t* entry = provider_registry_find(registry, provider_name);
     if (!entry) {
-        argo_report_error(E_INPUT_INVALID, "provider_set_default", provider_name);
+        LOG_ERROR("Provider %s not found", provider_name);
         return E_INPUT_INVALID;
     }
 
     if (entry->status != PROVIDER_STATUS_AVAILABLE) {
-        argo_report_error(E_CI_NO_PROVIDER, "provider_set_default", provider_name);
+        LOG_ERROR("Provider %s not available", provider_name);
         return E_CI_NO_PROVIDER;
     }
 
@@ -308,19 +308,19 @@ int provider_assign_ci(provider_registry_t* provider_reg,
     /* Find CI */
     ci_registry_entry_t* ci = registry_find_ci(ci_reg, ci_name);
     if (!ci) {
-        argo_report_error(E_INPUT_INVALID, "provider_assign_to_ci", ci_name);
+        LOG_ERROR("CI %s not found", ci_name);
         return E_INPUT_INVALID;
     }
 
     /* Find provider */
     provider_entry_t* entry = provider_registry_find(provider_reg, provider_name);
     if (!entry) {
-        argo_report_error(E_INPUT_INVALID, "provider_assign_to_ci", provider_name);
+        LOG_ERROR("Provider %s not found", provider_name);
         return E_INPUT_INVALID;
     }
 
     if (entry->status != PROVIDER_STATUS_AVAILABLE) {
-        argo_report_error(E_CI_NO_PROVIDER, "provider_assign_to_ci", provider_name);
+        LOG_ERROR("Provider %s not available", provider_name);
         return E_CI_NO_PROVIDER;
     }
 

@@ -35,6 +35,13 @@ Before writing code:
 - Initialize variables at declaration
 - Never use unsafe functions (gets, strcpy without length)
 
+### Error Reporting
+- **ONLY use `argo_report_error()` for ALL errors** - single breakpoint location
+- Format: `argo_report_error(code, "function_name", "additional details")`
+- Never use `fprintf(stderr, ...)` or `LOG_ERROR()` directly for errors
+- `LOG_ERROR()` is for informational logging only (non-error events)
+- All errors route through one function for consistent format and debugging
+
 ### Code Organization
 - Max 600 lines per .c file (refactor if approaching)
 - One clear purpose per module

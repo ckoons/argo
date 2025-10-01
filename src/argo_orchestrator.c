@@ -14,13 +14,15 @@
 argo_orchestrator_t* orchestrator_create(const char* session_id,
                                         const char* base_branch) {
     if (!session_id || !base_branch) {
-        LOG_ERROR("Invalid parameters for orchestrator creation");
+        argo_report_error(E_INPUT_NULL, "orchestrator_create",
+                         "Missing session_id or base_branch");
         return NULL;
     }
 
     argo_orchestrator_t* orch = calloc(1, sizeof(argo_orchestrator_t));
     if (!orch) {
-        LOG_ERROR("Failed to allocate orchestrator");
+        argo_report_error(E_SYSTEM_MEMORY, "orchestrator_create",
+                         "Failed to allocate orchestrator");
         return NULL;
     }
 
@@ -332,7 +334,8 @@ int orchestrator_add_conflict(argo_orchestrator_t* orch,
     }
 
     if (!orch->active_merge) {
-        LOG_ERROR("No active merge negotiation");
+        argo_report_error(E_INVALID_STATE, "orchestrator_add_conflict",
+                         "No active merge negotiation");
         return E_INVALID_STATE;
     }
 

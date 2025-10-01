@@ -18,7 +18,8 @@ static uint32_t g_next_memory_id = 1;
 ci_memory_digest_t* memory_digest_create(size_t context_limit) {
     ci_memory_digest_t* digest = calloc(1, sizeof(ci_memory_digest_t));
     if (!digest) {
-        LOG_ERROR("Failed to allocate memory digest");
+        argo_report_error(E_SYSTEM_MEMORY, "memory_digest_create",
+                         "Failed to allocate digest");
         return NULL;
     }
 
@@ -61,7 +62,8 @@ int memory_add_item(ci_memory_digest_t* digest,
     ARGO_CHECK_NULL(content);
 
     if (digest->selected_count >= MEMORY_MAX_ITEMS) {
-        LOG_ERROR("Memory digest full");
+        argo_report_error(E_PROTOCOL_QUEUE, "memory_add_item",
+                         "Memory digest full");
         return E_PROTOCOL_QUEUE;
     }
 
@@ -95,7 +97,8 @@ int memory_add_breadcrumb(ci_memory_digest_t* digest,
     ARGO_CHECK_NULL(breadcrumb);
 
     if (digest->breadcrumb_count >= MEMORY_BREADCRUMB_MAX) {
-        LOG_ERROR("Too many breadcrumbs");
+        argo_report_error(E_PROTOCOL_QUEUE, "memory_add_breadcrumb",
+                         "Too many breadcrumbs");
         return E_PROTOCOL_QUEUE;
     }
 
@@ -152,7 +155,9 @@ int memory_select_item(ci_memory_digest_t* digest,
         }
     }
 
-    LOG_ERROR("Memory item %u not found", memory_id);
+    char details[32];
+    snprintf(details, sizeof(details), "item %u", memory_id);
+    argo_report_error(E_INPUT_INVALID, "memory_mark_selected", details);
     return E_INPUT_INVALID;
 }
 
@@ -354,7 +359,7 @@ ci_memory_digest_t* memory_load_from_file(const char* filepath,
 
     FILE* fp = fopen(filepath, "r");
     if (!fp) {
-        LOG_ERROR("Failed to open %s", filepath);
+        argo_report_error(E_SYSTEM_FILE, "memory_load_from_file", filepath);
         return NULL;
     }
 
@@ -396,12 +401,14 @@ int memory_validate_digest(ci_memory_digest_t* digest) {
     ARGO_CHECK_NULL(digest);
 
     if (!memory_check_size_limit(digest)) {
-        LOG_ERROR("Memory digest exceeds size limit");
+        argo_report_error(E_PROTOCOL_SIZE, "memory_validate_digest",
+                         "Digest exceeds size limit");
         return E_PROTOCOL_SIZE;
     }
 
     if (digest->selected_count > MEMORY_MAX_ITEMS) {
-        LOG_ERROR("Too many memory items");
+        argo_report_error(E_PROTOCOL_QUEUE, "memory_validate_digest",
+                         "Too many memory items");
         return E_PROTOCOL_QUEUE;
     }
 

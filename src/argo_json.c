@@ -25,14 +25,16 @@ int json_extract_string_field(const char* json, const char* field_name,
     /* Find the field */
     char* field_start = strstr(json, search_key);
     if (!field_start) {
-        LOG_ERROR("Field '%s' not found in JSON", field_name);
+        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", field_name);
         return E_PROTOCOL_FORMAT;
     }
 
     /* Find opening quote after the field name and colon */
     char* content_start = strchr(field_start + strlen(search_key), '"');
     if (!content_start) {
-        LOG_ERROR("No opening quote for field '%s'", field_name);
+        char details[128];
+        snprintf(details, sizeof(details), "No opening quote for '%s'", field_name);
+        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", details);
         return E_PROTOCOL_FORMAT;
     }
     content_start++; /* Move past the quote */

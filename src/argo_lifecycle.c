@@ -19,7 +19,8 @@
 lifecycle_manager_t* lifecycle_manager_create(ci_registry_t* registry) {
     lifecycle_manager_t* manager = calloc(1, sizeof(lifecycle_manager_t));
     if (!manager) {
-        LOG_ERROR("Failed to allocate lifecycle manager");
+        argo_report_error(E_SYSTEM_MEMORY, "lifecycle_manager_create",
+                         "Failed to allocate manager");
         return NULL;
     }
 
@@ -106,7 +107,7 @@ int lifecycle_create_ci(lifecycle_manager_t* manager,
     /* Check if already exists */
     ci_lifecycle_t* existing = find_ci_lifecycle(manager, ci_name);
     if (existing) {
-        LOG_ERROR("CI %s already exists", ci_name);
+        argo_report_error(E_INPUT_INVALID, "lifecycle_create_ci", ci_name);
         return E_INPUT_INVALID;
     }
 
@@ -373,7 +374,6 @@ int lifecycle_check_heartbeats(lifecycle_manager_t* manager) {
             stale_count++;
 
             if (ci->missed_heartbeats >= manager->max_missed_heartbeats) {
-                LOG_ERROR("CI %s exceeded max missed heartbeats", ci->ci_name);
                 lifecycle_report_error(manager, ci->ci_name,
                                       "Max missed heartbeats exceeded");
             }
@@ -399,7 +399,8 @@ int lifecycle_report_error(lifecycle_manager_t* manager,
     free(ci->last_error);
     ci->last_error = error_message ? strdup(error_message) : NULL;
 
-    LOG_ERROR("CI %s error: %s", ci_name, error_message ? error_message : "unknown");
+    argo_report_error(E_CI_INVALID, ci_name,
+                     error_message ? error_message : "unknown");
 
     return lifecycle_transition(manager, ci_name,
                                LIFECYCLE_EVENT_ERROR,

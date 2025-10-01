@@ -1,9 +1,9 @@
-# Argo
+# Argo - Automated Resolution of GitHub Obstacles
 © 2025 Casey Koons. All rights reserved.
 
-**Automated Companion Intelligence (CI) Workflow with Parallel Development and Merge Negotiation**
+**Multi-CI Workflow Orchestration with Parallel Development and Merge Negotiation**
 
-Argo is a minimal C library (<10,000 lines) that coordinates multiple Companion Intelligences (CIs) in software development workflows. It provides deterministic control while CIs provide creative contribution.
+Argo is a minimal C library (<10,000 lines) that coordinates multiple Companion Intelligences (CIs) in software development workflows. Like Jason's ship helped the Argonauts overcome obstacles to reach the Golden Fleece, Argo helps CIs overcome GitHub obstacles - merge conflicts, CI failures, and coordination problems. It provides deterministic control while CIs provide creative contribution.
 
 ## Status: Sprint 1 - Multi-CI Workflows (Complete)
 
