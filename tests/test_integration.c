@@ -381,6 +381,111 @@ static void test_multi_phase_workflow(void) {
     PASS();
 }
 
+/* Test multi-CI coordination */
+static void test_multi_ci_coordination(void) {
+    TEST("Multi-CI coordination");
+
+    argo_orchestrator_t* orch = orchestrator_create("coord-test", "main");
+    if (!orch) {
+        FAIL("Failed to create orchestrator");
+        return;
+    }
+
+    /* Create multiple CIs with different roles */
+    orchestrator_add_ci(orch, "Argo", "requirements", "claude");
+    orchestrator_add_ci(orch, "Maia", "builder", "llama3:70b");
+    orchestrator_add_ci(orch, "Atlas", "analysis", "gpt-4");
+    orchestrator_add_ci(orch, "Titan", "coordinator", "claude");
+
+    /* Start all CIs */
+    orchestrator_start_ci(orch, "Argo");
+    orchestrator_start_ci(orch, "Maia");
+    orchestrator_start_ci(orch, "Atlas");
+    orchestrator_start_ci(orch, "Titan");
+
+    /* Verify all CIs are ready */
+    assert(orch->registry->count == 4);
+
+    /* Start workflow */
+    orchestrator_start_workflow(orch);
+    assert(orch->running == 1);
+
+    /* Create tasks for different phases requiring different roles */
+    orchestrator_create_task(orch, "Analyze requirements", WORKFLOW_PLAN);
+    orchestrator_create_task(orch, "Design architecture", WORKFLOW_PLAN);
+    orchestrator_create_task(orch, "Implement feature A", WORKFLOW_DEVELOP);
+    orchestrator_create_task(orch, "Implement feature B", WORKFLOW_DEVELOP);
+    orchestrator_create_task(orch, "Review code quality", WORKFLOW_REVIEW);
+    orchestrator_create_task(orch, "Review security", WORKFLOW_REVIEW);
+
+    assert(orch->workflow->total_tasks == 6);
+    assert(orch->workflow->completed_tasks == 0);
+
+    /* Auto-assign tasks based on CI roles */
+    int result = orchestrator_assign_all_tasks(orch);
+    assert(result == ARGO_SUCCESS);
+
+    /* Verify tasks were assigned to appropriate CIs */
+    int requirements_tasks = 0;
+    int builder_tasks = 0;
+    int analysis_tasks = 0;
+
+    ci_task_t* task = orch->workflow->tasks;
+    while (task) {
+        if (task->assigned_to[0] != '\0') {
+            ci_registry_entry_t* ci = registry_find_ci(orch->registry, task->assigned_to);
+            if (ci) {
+                if (strcmp(ci->role, "requirements") == 0) requirements_tasks++;
+                else if (strcmp(ci->role, "builder") == 0) builder_tasks++;
+                else if (strcmp(ci->role, "analysis") == 0) analysis_tasks++;
+            }
+        }
+        task = task->next;
+    }
+
+    /* Should have tasks distributed across CIs */
+    assert(requirements_tasks >= 1);
+    assert(builder_tasks >= 1);
+    assert(analysis_tasks >= 1);
+
+    /* Simulate CI-to-CI coordination messages */
+    /* These may fail without actual socket connections - that's OK for this test */
+    (void)orchestrator_send_message(orch, "Argo", "Maia",
+                                    "requirements_ready",
+                                    "Requirements analysis complete");
+
+    (void)orchestrator_send_message(orch, "Maia", "Atlas",
+                                    "code_ready_for_review",
+                                    "Feature implementation complete");
+
+    /* Simulate completing tasks in order */
+    task = orch->workflow->tasks;
+    int completed = 0;
+    while (task && completed < 3) {
+        if (task->assigned_to[0] != '\0' && !task->completed) {
+            orchestrator_complete_task(orch, task->id, task->assigned_to);
+            completed++;
+        }
+        task = task->next;
+    }
+
+    assert(orch->workflow->completed_tasks >= 3);
+
+    /* Broadcast coordination message to all CIs */
+    result = orchestrator_broadcast_message(orch, "Titan", NULL,
+                                            "status_update",
+                                            "Phase progress: 50% complete");
+    /* Broadcast may fail if sockets not connected - that's OK for this test */
+    (void)result;
+
+    /* Verify workflow is progressing */
+    assert(orch->workflow->state == WORKFLOW_STATE_RUNNING);
+    assert(orch->workflow->total_tasks == 6);
+
+    orchestrator_destroy(orch);
+    PASS();
+}
+
 int main(void) {
     printf("========================================\n");
     printf("ARGO INTEGRATION TESTS\n");
@@ -396,6 +501,7 @@ int main(void) {
     test_workflow_pause_resume();
     test_status_reporting();
     test_multi_phase_workflow();
+    test_multi_ci_coordination();
 
     /* Print summary */
     printf("\n========================================\n");

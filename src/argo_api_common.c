@@ -9,7 +9,9 @@
 #include "argo_api_common.h"
 #include "argo_api_providers.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
+#include "argo_memory.h"
 
 /* Execute HTTP POST with JSON and authentication */
 int api_http_post_json(const char* base_url, const char* json_body,
@@ -126,5 +128,130 @@ int api_allocate_response_buffer(char** buffer, size_t* capacity, size_t size) {
     }
 
     *capacity = size;
+    return ARGO_SUCCESS;
+}
+
+/* Augment prompt with memory context */
+int api_augment_prompt_with_memory(ci_memory_digest_t* memory_digest,
+                                   const char* prompt,
+                                   char** out_augmented) {
+    ARGO_CHECK_NULL(prompt);
+    ARGO_CHECK_NULL(out_augmented);
+
+    /* If no memory digest, just return a copy of the prompt */
+    if (!memory_digest) {
+        *out_augmented = strdup(prompt);
+        return *out_augmented ? ARGO_SUCCESS : E_SYSTEM_MEMORY;
+    }
+
+    /* Calculate size needed for augmented prompt */
+    size_t memory_context_size = 0;
+    size_t prompt_size = strlen(prompt);
+
+    /* Add space for sunset notes if present */
+    if (memory_digest->sunset_notes) {
+        memory_context_size += strlen(memory_digest->sunset_notes) + 50;
+    }
+
+    /* Add space for sunrise brief if present */
+    if (memory_digest->sunrise_brief) {
+        memory_context_size += strlen(memory_digest->sunrise_brief) + 50;
+    }
+
+    /* Add space for breadcrumbs (estimate) */
+    if (memory_digest->breadcrumb_count > 0) {
+        memory_context_size += memory_digest->breadcrumb_count * 100;
+    }
+
+    /* Add space for selected memories (estimate) */
+    if (memory_digest->selected_count > 0) {
+        memory_context_size += memory_digest->selected_count * 200;
+    }
+
+    /* Allocate buffer with overhead */
+    size_t total_size = prompt_size + memory_context_size + 500;
+    char* augmented = malloc(total_size);
+    if (!augmented) {
+        argo_report_error(E_SYSTEM_MEMORY, "api_augment_prompt_with_memory",
+                         ERR_MSG_MEMORY_ALLOC_FAILED);
+        return E_SYSTEM_MEMORY;
+    }
+
+    /* Build augmented prompt */
+    char* pos = augmented;
+    size_t remaining = total_size;
+    int written = 0;
+
+    /* Add sunset/sunrise context if available */
+    if (memory_digest->sunset_notes) {
+        written = snprintf(pos, remaining,
+                          "## Previous Session Summary\n%s\n\n",
+                          memory_digest->sunset_notes);
+        pos += written;
+        remaining -= written;
+    }
+
+    if (memory_digest->sunrise_brief) {
+        written = snprintf(pos, remaining,
+                          "## Session Context\n%s\n\n",
+                          memory_digest->sunrise_brief);
+        pos += written;
+        remaining -= written;
+    }
+
+    /* Add breadcrumbs if present */
+    if (memory_digest->breadcrumb_count > 0) {
+        written = snprintf(pos, remaining, "## Progress Breadcrumbs\n");
+        pos += written;
+        remaining -= written;
+
+        for (int i = 0; i < memory_digest->breadcrumb_count && remaining > 0; i++) {
+            written = snprintf(pos, remaining, "- %s\n",
+                             memory_digest->breadcrumbs[i]);
+            pos += written;
+            remaining -= written;
+        }
+        written = snprintf(pos, remaining, "\n");
+        pos += written;
+        remaining -= written;
+    }
+
+    /* Add selected memories if present */
+    if (memory_digest->selected_count > 0) {
+        written = snprintf(pos, remaining, "## Relevant Context\n");
+        pos += written;
+        remaining -= written;
+
+        for (int i = 0; i < memory_digest->selected_count && remaining > 0; i++) {
+            memory_item_t* item = memory_digest->selected[i];
+            if (item && item->content) {
+                const char* type_name = "Unknown";
+                switch (item->type) {
+                    case MEMORY_TYPE_DECISION: type_name = "Decision"; break;
+                    case MEMORY_TYPE_APPROACH: type_name = "Approach"; break;
+                    case MEMORY_TYPE_ERROR: type_name = "Error"; break;
+                    case MEMORY_TYPE_SUCCESS: type_name = "Success"; break;
+                    case MEMORY_TYPE_FACT: type_name = "Fact"; break;
+                    case MEMORY_TYPE_RELATIONSHIP: type_name = "Relationship"; break;
+                    case MEMORY_TYPE_BREADCRUMB: type_name = "Breadcrumb"; break;
+                }
+                written = snprintf(pos, remaining, "- [%s] %s\n",
+                                 type_name, item->content);
+                pos += written;
+                remaining -= written;
+            }
+        }
+        written = snprintf(pos, remaining, "\n");
+        pos += written;
+        remaining -= written;
+    }
+
+    /* Add the actual prompt */
+    written = snprintf(pos, remaining, "## Current Task\n%s", prompt);
+
+    *out_augmented = augmented;
+    LOG_DEBUG("Augmented prompt with memory context (%zu bytes added)",
+              total_size - prompt_size);
+
     return ARGO_SUCCESS;
 }

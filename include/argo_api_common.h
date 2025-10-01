@@ -56,6 +56,26 @@ int api_http_post_json(const char* base_url, const char* json_body,
  */
 int api_allocate_response_buffer(char** buffer, size_t* capacity, size_t size);
 
+/* Augment prompt with memory context
+ *
+ * Builds a new prompt string that includes memory digest context
+ * prepended to the original prompt. Memory context includes relevant
+ * memories, breadcrumbs, and sunset/sunrise notes if available.
+ *
+ * Parameters:
+ *   memory_digest - Memory digest to extract context from (NULL OK, returns prompt copy)
+ *   prompt - Original prompt string
+ *   out_augmented - Pointer to receive allocated augmented prompt (caller must free)
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_INPUT_NULL if prompt or out_augmented is NULL
+ *   E_SYSTEM_MEMORY on allocation failure
+ */
+int api_augment_prompt_with_memory(ci_memory_digest_t* memory_digest,
+                                   const char* prompt,
+                                   char** out_augmented);
+
 /* JSON request builder function pointer type
  * Returns: Number of bytes written to json_body, or negative on error
  */
