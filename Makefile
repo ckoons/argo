@@ -24,6 +24,7 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_lifecycle.c \
                $(SRC_DIR)/argo_provider.c \
                $(SRC_DIR)/argo_workflow.c \
+               $(SRC_DIR)/argo_workflow_loader.c \
                $(SRC_DIR)/argo_merge.c \
                $(SRC_DIR)/argo_orchestrator.c \
                $(SRC_DIR)/argo_json.c
@@ -82,9 +83,10 @@ MESSAGING_TEST_TARGET = $(BUILD_DIR)/test_messaging
 WORKFLOW_TEST_TARGET = $(BUILD_DIR)/test_workflow
 INTEGRATION_TEST_TARGET = $(BUILD_DIR)/test_integration
 PERSISTENCE_TEST_TARGET = $(BUILD_DIR)/test_persistence
+WORKFLOW_LOADER_TEST_TARGET = $(BUILD_DIR)/test_workflow_loader
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -230,8 +232,12 @@ $(INTEGRATION_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_integration.o $(STUB_OB
 $(PERSISTENCE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_persistence.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build workflow loader test executable
+$(WORKFLOW_LOADER_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow_loader.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -307,6 +313,13 @@ test-persistence: $(PERSISTENCE_TEST_TARGET)
 	@echo "Persistence Tests"
 	@echo "=========================================="
 	@./$(PERSISTENCE_TEST_TARGET)
+
+test-workflow-loader: $(WORKFLOW_LOADER_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Workflow Loader Tests"
+	@echo "=========================================="
+	@./$(WORKFLOW_LOADER_TEST_TARGET)
 
 test-api: $(API_TEST_TARGET)
 	@echo ""

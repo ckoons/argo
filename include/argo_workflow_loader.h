@@ -5,6 +5,9 @@
 
 #include "argo_workflow.h"
 
+/* Forward declarations */
+typedef struct argo_orchestrator argo_orchestrator_t;
+
 /* Workflow definition paths */
 #define WORKFLOW_BASE_DIR "argo/workflows"
 #define WORKFLOW_MAX_PATH 512
@@ -13,6 +16,40 @@
 #define ARTIFACT_TEMP "/tmp"              /* Ephemeral - cleaned on session end */
 #define ARTIFACT_WORKFLOW "argo/workflow" /* Persistent - tracked */
 #define ARTIFACT_USER "file"              /* User-specified path */
+
+/* JSON serialization */
+#define WORKFLOW_JSON_BUFFER_SIZE 8192
+
+/* JSON parsing patterns */
+#define JSON_FIELD_NAME "\"name\": \""
+#define JSON_FIELD_NAME_LEN 9
+#define JSON_FIELD_DESCRIPTION "\"description\": \""
+#define JSON_FIELD_DESCRIPTION_LEN 16
+#define JSON_FIELD_CATEGORY "\"category\": \""
+#define JSON_FIELD_CATEGORY_LEN 13
+
+/* Default workflow values */
+#define WORKFLOW_DEFAULT_NAME "default"
+#define WORKFLOW_DEFAULT_PHASE_NAME "Planning"
+#define WORKFLOW_DEFAULT_TASK_DESC "Plan the project"
+#define WORKFLOW_DEFAULT_ROLE "coordinator"
+#define WORKFLOW_DEFAULT_SESSION "none"
+#define WORKFLOW_DEFAULT_PHASE_COUNT 1
+#define WORKFLOW_DEFAULT_TASK_COUNT 1
+#define WORKFLOW_DEFAULT_PERSONNEL_COUNT 1
+#define WORKFLOW_DEFAULT_MIN_COUNT 1
+#define WORKFLOW_DEFAULT_MAX_COUNT 1
+
+/* Error messages */
+#define WORKFLOW_ERR_PATH_NULL "path is NULL"
+#define WORKFLOW_ERR_FILE_EMPTY "File is empty"
+#define WORKFLOW_ERR_JSON_PARSE_FAILED "JSON parse failed"
+#define WORKFLOW_ERR_PARAMS_NULL "category, event, or name is NULL"
+#define WORKFLOW_ERR_PATH_TOO_LONG "Path too long"
+#define WORKFLOW_ERR_NAME_EMPTY "Workflow name is empty"
+#define WORKFLOW_ERR_NO_PHASES "No phases defined"
+#define WORKFLOW_ERR_NO_PERSONNEL "No personnel requirements defined"
+#define WORKFLOW_ERR_FMT_PHASE_NO_TASKS "Phase %d has no tasks"
 
 /* Workflow definition from JSON */
 typedef struct workflow_definition {
