@@ -16,6 +16,7 @@
 /* Project includes */
 #include "argo_ci.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_socket.h"
 #include "jsmn.h"  /* Single-header JSON parser */
@@ -125,7 +126,7 @@ int socket_server_run(int timeout_ms) {
         if (errno == EINTR) {
             return ARGO_SUCCESS;  /* Interrupted by signal */
         }
-        argo_report_error(E_SYSTEM_SOCKET, "socket_server_run", "poll() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "socket_server_run", ERR_FMT_SYSCALL_ERROR, ERR_MSG_SOCKET_POLL_FAILED, strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -146,7 +147,7 @@ int socket_server_run(int timeout_ms) {
         /* Check for errors */
         if (g_socket_ctx->pollfds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
             if (i == 0) {
-                argo_report_error(E_SYSTEM_SOCKET, "socket_server_run", "server socket error");
+                argo_report_error(E_SYSTEM_SOCKET, "socket_server_run", ERR_MSG_SOCKET_ERROR);
                 return E_SYSTEM_SOCKET;
             }
             LOG_DEBUG("Client %d disconnected", i);
@@ -182,7 +183,7 @@ int socket_send_message(const ci_message_t* msg, socket_callback_fn callback, vo
     ARGO_CHECK_NULL(g_socket_ctx);
 
     if (g_socket_ctx->request_count >= MAX_PENDING_REQUESTS) {
-        argo_report_error(E_PROTOCOL_QUEUE, "socket_send_message", "");
+        argo_report_error(E_PROTOCOL_QUEUE, "socket_send_message", ERR_MSG_QUEUE_FULL);
         return E_PROTOCOL_QUEUE;
     }
 
@@ -196,7 +197,7 @@ int socket_send_message(const ci_message_t* msg, socket_callback_fn callback, vo
     }
 
     if (target_fd < 0) {
-        argo_report_error(E_CI_DISCONNECTED, "socket_send_message", "target CI %s", msg->to);
+        argo_report_error(E_CI_DISCONNECTED, "socket_send_message", ERR_FMT_TARGET_CI, msg->to);
         return E_CI_DISCONNECTED;
     }
 
@@ -214,7 +215,7 @@ int socket_send_message(const ci_message_t* msg, socket_callback_fn callback, vo
     /* Send message */
     ssize_t sent = send(target_fd, json_buffer, len, MSG_NOSIGNAL);
     if (sent != len) {
-        argo_report_error(E_SYSTEM_SOCKET, "socket_send_message", "send failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "socket_send_message", ERR_FMT_SYSCALL_ERROR, ERR_MSG_SOCKET_SEND_FAILED, strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -270,7 +271,7 @@ static int setup_server_socket(const char* ci_name) {
     /* Create socket */
     g_socket_ctx->listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (g_socket_ctx->listen_fd < 0) {
-        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", "socket() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", ERR_FMT_SYSCALL_ERROR, ERR_MSG_SOCKET_CREATE_FAILED, strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -290,14 +291,14 @@ static int setup_server_socket(const char* ci_name) {
     strncpy(addr.sun_path, g_socket_ctx->socket_path, sizeof(addr.sun_path) - 1);
 
     if (bind(g_socket_ctx->listen_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", "bind() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", ERR_FMT_SYSCALL_ERROR, ERR_MSG_SOCKET_BIND_FAILED, strerror(errno));
         close(g_socket_ctx->listen_fd);
         return E_SYSTEM_SOCKET;
     }
 
     /* Listen for connections */
     if (listen(g_socket_ctx->listen_fd, SOCKET_BACKLOG) < 0) {
-        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", "listen() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "setup_server_socket", ERR_FMT_SYSCALL_ERROR, ERR_MSG_SOCKET_LISTEN_FAILED, strerror(errno));
         close(g_socket_ctx->listen_fd);
         unlink(g_socket_ctx->socket_path);
         return E_SYSTEM_SOCKET;
@@ -309,12 +310,12 @@ static int setup_server_socket(const char* ci_name) {
 static int make_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0) {
-        argo_report_error(E_SYSTEM_SOCKET, "make_nonblocking", "fcntl(F_GETFL) failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "make_nonblocking", ERR_FMT_SYSCALL_ERROR, ERR_MSG_FCNTL_GETFL_FAILED, strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
     if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-        argo_report_error(E_SYSTEM_SOCKET, "make_nonblocking", "fcntl(F_SETFL) failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "make_nonblocking", ERR_FMT_SYSCALL_ERROR, ERR_MSG_FCNTL_SETFL_FAILED, strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -330,7 +331,7 @@ static int accept_client(void) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return ARGO_SUCCESS;  /* No pending connections */
         }
-        argo_report_error(E_SYSTEM_SOCKET, "accept_client", "accept() failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_SOCKET, "accept_client", ERR_FMT_SYSCALL_ERROR, ERR_MSG_SOCKET_ACCEPT_FAILED, strerror(errno));
         return E_SYSTEM_SOCKET;
     }
 
@@ -343,7 +344,7 @@ static int accept_client(void) {
 
     /* Add to poll array */
     if (g_socket_ctx->nfds >= REGISTRY_MAX_CIS) {
-        argo_report_error(E_PROTOCOL_QUEUE, "accept_client", "");
+        argo_report_error(E_PROTOCOL_QUEUE, "accept_client", ERR_MSG_QUEUE_FULL);
         close(client_fd);
         return E_PROTOCOL_QUEUE;
     }

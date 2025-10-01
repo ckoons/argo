@@ -12,6 +12,7 @@
 #include "argo_json.h"
 #include "argo_socket.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 
 /* Port configuration defaults */
@@ -27,7 +28,7 @@
 ci_registry_t* registry_create(void) {
     ci_registry_t* registry = calloc(1, sizeof(ci_registry_t));
     if (!registry) {
-        argo_report_error(E_SYSTEM_MEMORY, "registry_create", "");
+        argo_report_error(E_SYSTEM_MEMORY, "registry_create", ERR_MSG_REGISTRY_ALLOC_FAILED);
         return NULL;
     }
 
@@ -82,13 +83,13 @@ int registry_add_ci(ci_registry_t* registry,
     ARGO_CHECK_NULL(model);
 
     if (registry->count >= REGISTRY_MAX_CIS) {
-        argo_report_error(E_PROTOCOL_QUEUE, "registry_add_ci", name);
+        argo_report_error(E_PROTOCOL_QUEUE, "registry_add_ci", ERR_MSG_REGISTRY_FULL);
         return E_PROTOCOL_QUEUE;
     }
 
     /* Check if already exists */
     if (registry_find_ci(registry, name)) {
-        argo_report_error(E_INPUT_INVALID, "registry_add_ci", name);
+        argo_report_error(E_INPUT_INVALID, "registry_add_ci", ERR_MSG_CI_ALREADY_EXISTS);
         return E_INPUT_INVALID;
     }
 
@@ -137,7 +138,7 @@ int registry_remove_ci(ci_registry_t* registry, const char* name) {
         pp = &(*pp)->next;
     }
 
-    argo_report_error(E_INPUT_INVALID, "registry_remove_ci", name);
+    argo_report_error(E_INPUT_INVALID, "registry_remove_ci", ERR_MSG_CI_NOT_FOUND);
     return E_INPUT_INVALID;
 }
 
@@ -186,7 +187,7 @@ int registry_allocate_port(ci_registry_t* registry, const char* role) {
         }
     }
 
-    argo_report_error(E_PROTOCOL_QUEUE, "registry_allocate_port", role);
+    argo_report_error(E_PROTOCOL_QUEUE, "registry_allocate_port", ERR_MSG_PORT_ALLOCATION_FAILED);
     return -1;
 }
 
@@ -367,7 +368,7 @@ int registry_send_message(ci_registry_t* registry,
     /* Find recipient CI */
     ci_registry_entry_t* to_entry = registry_find_ci(registry, to_ci);
     if (!to_entry) {
-        argo_report_error(E_CI_NO_PROVIDER, "registry_send_message", to_ci);
+        argo_report_error(E_CI_NO_PROVIDER, "registry_send_message", ERR_MSG_CI_NOT_FOUND);
         return E_CI_NO_PROVIDER;
     }
 
@@ -380,7 +381,7 @@ int registry_send_message(ci_registry_t* registry,
     /* Parse the message to get full structure */
     ci_message_t* msg = message_from_json(message_json);
     if (!msg) {
-        argo_report_error(E_PROTOCOL_FORMAT, "registry_send_message", "");
+        argo_report_error(E_PROTOCOL_FORMAT, "registry_send_message", ERR_MSG_INVALID_MESSAGE);
         return E_PROTOCOL_FORMAT;
     }
 
@@ -397,7 +398,7 @@ int registry_send_message(ci_registry_t* registry,
     message_destroy(msg);
 
     if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "registry_send_message", "from %s to %s", from_ci, to_ci);
+        argo_report_error(result, "registry_send_message", ERR_FMT_FROM_TO, from_ci, to_ci);
         if (to_entry) {
             to_entry->errors_count++;
             to_entry->last_error = time(NULL);

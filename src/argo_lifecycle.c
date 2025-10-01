@@ -9,6 +9,7 @@
 /* Project includes */
 #include "argo_lifecycle.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 
 #define DEFAULT_HEARTBEAT_TIMEOUT 60
@@ -19,7 +20,7 @@
 lifecycle_manager_t* lifecycle_manager_create(ci_registry_t* registry) {
     lifecycle_manager_t* manager = calloc(1, sizeof(lifecycle_manager_t));
     if (!manager) {
-        argo_report_error(E_SYSTEM_MEMORY, "lifecycle_manager_create", "");
+        argo_report_error(E_SYSTEM_MEMORY, "lifecycle_manager_create", ERR_MSG_MEMORY_ALLOC_FAILED);
         return NULL;
     }
 
@@ -106,7 +107,7 @@ int lifecycle_create_ci(lifecycle_manager_t* manager,
     /* Check if already exists */
     ci_lifecycle_t* existing = find_ci_lifecycle(manager, ci_name);
     if (existing) {
-        argo_report_error(E_INPUT_INVALID, "lifecycle_create_ci", ci_name);
+        argo_report_error(E_INPUT_INVALID, "lifecycle_create_ci", ERR_MSG_CI_ALREADY_EXISTS);
         return E_INPUT_INVALID;
     }
 

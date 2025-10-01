@@ -21,6 +21,7 @@
 #include "argo_ci_common.h"
 #include "argo_api_common.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_claude.h"
 
@@ -63,7 +64,7 @@ static void claude_code_cleanup(ci_provider_t* provider);
 ci_provider_t* claude_code_create_provider(const char* ci_name) {
     claude_code_context_t* ctx = calloc(1, sizeof(claude_code_context_t));
     if (!ctx) {
-        argo_report_error(E_SYSTEM_MEMORY, "claude_code_create_provider", "");
+        argo_report_error(E_SYSTEM_MEMORY, "claude_code_create_provider", ERR_MSG_MEMORY_ALLOC_FAILED);
         return NULL;
     }
 
@@ -133,7 +134,7 @@ static int claude_code_connect(ci_provider_t* provider) {
 static int write_prompt_file(claude_code_context_t* ctx, const char* prompt) {
     FILE* fp = fopen(ctx->prompt_file, "w");
     if (!fp) {
-        argo_report_error(E_SYSTEM_FILE, "write_prompt_file", "failed to open %s", ctx->prompt_file);
+        argo_report_error(E_SYSTEM_FILE, "write_prompt_file", ERR_FMT_FAILED_TO_OPEN, ctx->prompt_file);
         return E_SYSTEM_FILE;
     }
 
@@ -222,7 +223,7 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
     }
 
     if (waited >= timeout) {
-        argo_report_error(E_CI_TIMEOUT, "claude_code_query", "");
+        argo_report_error(E_CI_TIMEOUT, "claude_code_query", ERR_MSG_CI_TIMEOUT);
         return E_CI_TIMEOUT;
     }
 

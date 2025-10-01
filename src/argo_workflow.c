@@ -9,6 +9,7 @@
 /* Project includes */
 #include "argo_workflow.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 
 /* Helper: Generate unique task ID */
@@ -22,13 +23,13 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
                                       lifecycle_manager_t* lifecycle,
                                       const char* workflow_id) {
     if (!registry || !lifecycle || !workflow_id) {
-        argo_report_error(E_INPUT_NULL, "workflow_create", "");
+        argo_report_error(E_INPUT_NULL, "workflow_create", ERR_MSG_NULL_POINTER);
         return NULL;
     }
 
     workflow_controller_t* workflow = calloc(1, sizeof(workflow_controller_t));
     if (!workflow) {
-        argo_report_error(E_SYSTEM_MEMORY, "workflow_create", "");
+        argo_report_error(E_SYSTEM_MEMORY, "workflow_create", ERR_MSG_WORKFLOW_ALLOC_FAILED);
         return NULL;
     }
 
@@ -200,13 +201,13 @@ ci_task_t* workflow_create_task(workflow_controller_t* workflow,
                                const char* description,
                                workflow_phase_t phase) {
     if (!workflow || !description) {
-        argo_report_error(E_INPUT_NULL, "workflow_create_task", "");
+        argo_report_error(E_INPUT_NULL, "workflow_create_task", ERR_MSG_NULL_POINTER);
         return NULL;
     }
 
     ci_task_t* task = calloc(1, sizeof(ci_task_t));
     if (!task) {
-        argo_report_error(E_SYSTEM_MEMORY, "workflow_create_task", "");
+        argo_report_error(E_SYSTEM_MEMORY, "workflow_create_task", ERR_MSG_TASK_ALLOC_FAILED);
         return NULL;
     }
 
@@ -240,14 +241,14 @@ int workflow_assign_task(workflow_controller_t* workflow,
     /* Find task */
     ci_task_t* task = workflow_find_task(workflow, task_id);
     if (!task) {
-        argo_report_error(E_NOT_FOUND, "workflow_assign_task", task_id);
+        argo_report_error(E_NOT_FOUND, "workflow_assign_task", ERR_MSG_TASK_NOT_FOUND);
         return E_NOT_FOUND;
     }
 
     /* Verify CI exists and is ready */
     ci_registry_entry_t* ci = registry_find_ci(workflow->registry, ci_name);
     if (!ci) {
-        argo_report_error(E_CI_NO_PROVIDER, "workflow_assign_task", ci_name);
+        argo_report_error(E_CI_NO_PROVIDER, "workflow_assign_task", ERR_MSG_CI_NOT_FOUND);
         return E_CI_NO_PROVIDER;
     }
 
@@ -273,7 +274,7 @@ int workflow_complete_task(workflow_controller_t* workflow,
 
     ci_task_t* task = workflow_find_task(workflow, task_id);
     if (!task) {
-        argo_report_error(E_NOT_FOUND, "workflow_complete_task", task_id);
+        argo_report_error(E_NOT_FOUND, "workflow_complete_task", ERR_MSG_TASK_NOT_FOUND);
         return E_NOT_FOUND;
     }
 
@@ -450,7 +451,7 @@ int workflow_checkpoint_to_file(workflow_controller_t* workflow,
     if (!fp) {
         free(json);
         argo_report_error(E_SYSTEM_FILE, "workflow_checkpoint_to_file",
-                         filepath);
+                         ERR_MSG_CHECKPOINT_FAILED);
         return E_SYSTEM_FILE;
     }
 
@@ -473,7 +474,7 @@ workflow_controller_t* workflow_restore_from_file(ci_registry_t* registry,
     FILE* fp = fopen(filepath, "r");
     if (!fp) {
         argo_report_error(E_SYSTEM_FILE, "workflow_restore_from_file",
-                         filepath);
+                         ERR_MSG_RESTORE_FAILED);
         return NULL;
     }
 

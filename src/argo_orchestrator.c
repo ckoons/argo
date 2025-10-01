@@ -8,19 +8,20 @@
 
 /* Project includes */
 #include "argo_orchestrator.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 
 /* Create orchestrator */
 argo_orchestrator_t* orchestrator_create(const char* session_id,
                                         const char* base_branch) {
     if (!session_id || !base_branch) {
-        argo_report_error(E_INPUT_NULL, "orchestrator_create", "");
+        argo_report_error(E_INPUT_NULL, "orchestrator_create", ERR_MSG_NULL_POINTER);
         return NULL;
     }
 
     argo_orchestrator_t* orch = calloc(1, sizeof(argo_orchestrator_t));
     if (!orch) {
-        argo_report_error(E_SYSTEM_MEMORY, "orchestrator_create", "");
+        argo_report_error(E_SYSTEM_MEMORY, "orchestrator_create", ERR_MSG_MEMORY_ALLOC_FAILED);
         return NULL;
     }
 
@@ -332,7 +333,7 @@ int orchestrator_add_conflict(argo_orchestrator_t* orch,
     }
 
     if (!orch->active_merge) {
-        argo_report_error(E_INVALID_STATE, "orchestrator_add_conflict", "");
+        argo_report_error(E_INVALID_STATE, "orchestrator_add_conflict", ERR_MSG_NO_ACTIVE_MERGE);
         return E_INVALID_STATE;
     }
 
@@ -483,7 +484,7 @@ int run_workflow(const char* session_id,
     /* Create orchestrator */
     argo_orchestrator_t* orch = orchestrator_create(session_id, base_branch);
     if (!orch) {
-        argo_report_error(E_SYSTEM_MEMORY, "run_workflow", "");
+        argo_report_error(E_SYSTEM_MEMORY, "run_workflow", ERR_MSG_MEMORY_ALLOC_FAILED);
         return E_SYSTEM_MEMORY;
     }
 
@@ -497,7 +498,7 @@ int run_workflow(const char* session_id,
     /* Start workflow */
     result = orchestrator_start_workflow(orch);
     if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "run_workflow", "Failed to start workflow");
+        argo_report_error(result, "run_workflow", ERR_MSG_WORKFLOW_START_FAILED);
         goto cleanup;
     }
 

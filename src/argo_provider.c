@@ -9,6 +9,7 @@
 /* Project includes */
 #include "argo_provider.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_ollama.h"
 #include "argo_claude.h"
@@ -18,7 +19,7 @@
 provider_registry_t* provider_registry_create(void) {
     provider_registry_t* registry = calloc(1, sizeof(provider_registry_t));
     if (!registry) {
-        argo_report_error(E_SYSTEM_MEMORY, "provider_registry_create", "Failed to allocate registry");
+        argo_report_error(E_SYSTEM_MEMORY, "provider_registry_create", ERR_MSG_REGISTRY_ALLOC_FAILED);
         return NULL;
     }
 
@@ -214,12 +215,12 @@ int provider_registry_set_default(provider_registry_t* registry,
 
     provider_entry_t* entry = provider_registry_find(registry, provider_name);
     if (!entry) {
-        argo_report_error(E_INPUT_INVALID, "provider_set_default", provider_name);
+        argo_report_error(E_INPUT_INVALID, "provider_set_default", ERR_MSG_PROVIDER_NOT_FOUND);
         return E_INPUT_INVALID;
     }
 
     if (entry->status != PROVIDER_STATUS_AVAILABLE) {
-        argo_report_error(E_CI_NO_PROVIDER, "provider_set_default", provider_name);
+        argo_report_error(E_CI_NO_PROVIDER, "provider_set_default", ERR_MSG_PROVIDER_NOT_AVAILABLE);
         return E_CI_NO_PROVIDER;
     }
 
@@ -308,19 +309,19 @@ int provider_assign_ci(provider_registry_t* provider_reg,
     /* Find CI */
     ci_registry_entry_t* ci = registry_find_ci(ci_reg, ci_name);
     if (!ci) {
-        argo_report_error(E_INPUT_INVALID, "provider_assign_to_ci", ci_name);
+        argo_report_error(E_INPUT_INVALID, "provider_assign_to_ci", ERR_MSG_CI_NOT_FOUND);
         return E_INPUT_INVALID;
     }
 
     /* Find provider */
     provider_entry_t* entry = provider_registry_find(provider_reg, provider_name);
     if (!entry) {
-        argo_report_error(E_INPUT_INVALID, "provider_assign_to_ci", provider_name);
+        argo_report_error(E_INPUT_INVALID, "provider_assign_to_ci", ERR_MSG_PROVIDER_NOT_FOUND);
         return E_INPUT_INVALID;
     }
 
     if (entry->status != PROVIDER_STATUS_AVAILABLE) {
-        argo_report_error(E_CI_NO_PROVIDER, "provider_assign_to_ci", provider_name);
+        argo_report_error(E_CI_NO_PROVIDER, "provider_assign_to_ci", ERR_MSG_PROVIDER_NOT_AVAILABLE);
         return E_CI_NO_PROVIDER;
     }
 

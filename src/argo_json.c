@@ -8,6 +8,7 @@
 /* Project includes */
 #include "argo_json.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 
 /* Extract string field from JSON */
@@ -25,14 +26,14 @@ int json_extract_string_field(const char* json, const char* field_name,
     /* Find the field */
     char* field_start = strstr(json, search_key);
     if (!field_start) {
-        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", field_name);
+        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", ERR_MSG_FIELD_NOT_FOUND);
         return E_PROTOCOL_FORMAT;
     }
 
     /* Find opening quote after the field name and colon */
     char* content_start = strchr(field_start + strlen(search_key), '"');
     if (!content_start) {
-        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", "%s", field_name);
+        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", ERR_MSG_FIELD_NOT_FOUND);
         return E_PROTOCOL_FORMAT;
     }
     content_start++; /* Move past the quote */
@@ -49,7 +50,7 @@ int json_extract_string_field(const char* json, const char* field_name,
     }
 
     if (*content_end != '"') {
-        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", "%s", field_name);
+        argo_report_error(E_PROTOCOL_FORMAT, "json_extract_string", ERR_MSG_FIELD_NOT_FOUND);
         return E_PROTOCOL_FORMAT;
     }
 
@@ -92,7 +93,7 @@ int json_extract_nested_string(const char* json, const char** field_path,
         char* field_pos = strstr(current_pos, search_key);
         if (!field_pos) {
             argo_report_error(E_PROTOCOL_FORMAT, "json_extract_nested_string",
-                             field_path[i]);
+                             ERR_MSG_FIELD_NOT_FOUND);
             return E_PROTOCOL_FORMAT;
         }
 
