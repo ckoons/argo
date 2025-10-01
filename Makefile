@@ -81,9 +81,10 @@ PROVIDER_TEST_TARGET = $(BUILD_DIR)/test_providers
 MESSAGING_TEST_TARGET = $(BUILD_DIR)/test_messaging
 WORKFLOW_TEST_TARGET = $(BUILD_DIR)/test_workflow
 INTEGRATION_TEST_TARGET = $(BUILD_DIR)/test_integration
+PERSISTENCE_TEST_TARGET = $(BUILD_DIR)/test_persistence
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -225,8 +226,12 @@ $(WORKFLOW_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow.o $(STUB_OBJECTS)
 $(INTEGRATION_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_integration.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build persistence test executable
+$(PERSISTENCE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_persistence.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -295,6 +300,13 @@ test-integration: $(INTEGRATION_TEST_TARGET)
 	@echo "Integration Tests"
 	@echo "=========================================="
 	@./$(INTEGRATION_TEST_TARGET)
+
+test-persistence: $(PERSISTENCE_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Persistence Tests"
+	@echo "=========================================="
+	@./$(PERSISTENCE_TEST_TARGET)
 
 test-api: $(API_TEST_TARGET)
 	@echo ""

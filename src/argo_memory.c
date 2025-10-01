@@ -215,9 +215,52 @@ char* memory_digest_to_json(ci_memory_digest_t* digest) {
     int offset = 0;
     offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset,
                       "{\"session_id\":\"%s\",\"ci_name\":\"%s\","
-                      "\"created\":%ld,\"item_count\":%d,\"breadcrumbs\":[",
+                      "\"created\":%ld,\"item_count\":%d,",
                       digest->session_id, digest->ci_name,
                       (long)digest->created, digest->selected_count);
+
+    /* Add sunset notes */
+    offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset,
+                      "\"sunset_notes\":");
+    if (digest->sunset_notes) {
+        json[offset++] = '"';
+        /* Escape the string content - basic escaping */
+        const char* s = digest->sunset_notes;
+        while (*s && offset < MEMORY_JSON_BUFFER_SIZE - 3) {
+            if (*s == '"' || *s == '\\') {
+                json[offset++] = '\\';
+            }
+            json[offset++] = *s++;
+        }
+        json[offset++] = '"';
+        json[offset] = '\0';
+    } else {
+        offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset, "null");
+    }
+    json[offset++] = ',';
+    json[offset] = '\0';
+
+    /* Add sunrise brief */
+    offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset,
+                      "\"sunrise_brief\":");
+    if (digest->sunrise_brief) {
+        json[offset++] = '"';
+        const char* s = digest->sunrise_brief;
+        while (*s && offset < MEMORY_JSON_BUFFER_SIZE - 3) {
+            if (*s == '"' || *s == '\\') {
+                json[offset++] = '\\';
+            }
+            json[offset++] = *s++;
+        }
+        json[offset++] = '"';
+        json[offset] = '\0';
+    } else {
+        offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset, "null");
+    }
+
+    /* Add breadcrumbs */
+    offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset,
+                      ",\"breadcrumbs\":[");
 
     for (int i = 0; i < digest->breadcrumb_count; i++) {
         offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset,
@@ -235,7 +278,81 @@ ci_memory_digest_t* memory_digest_from_json(const char* json,
                                            size_t context_limit) {
     if (!json) return NULL;
 
-    return memory_digest_create(context_limit);
+    ci_memory_digest_t* digest = memory_digest_create(context_limit);
+    if (!digest) return NULL;
+
+    /* Parse session_id */
+    const char* session_start = strstr(json, "\"session_id\":\"");
+    if (session_start) {
+        session_start += 14;
+        const char* session_end = strchr(session_start, '"');
+        if (session_end) {
+            size_t len = session_end - session_start;
+            if (len < sizeof(digest->session_id)) {
+                strncpy(digest->session_id, session_start, len);
+            }
+        }
+    }
+
+    /* Parse ci_name */
+    const char* ci_start = strstr(json, "\"ci_name\":\"");
+    if (ci_start) {
+        ci_start += 11;
+        const char* ci_end = strchr(ci_start, '"');
+        if (ci_end) {
+            size_t len = ci_end - ci_start;
+            if (len < sizeof(digest->ci_name)) {
+                strncpy(digest->ci_name, ci_start, len);
+            }
+        }
+    }
+
+    /* Parse sunset_notes */
+    const char* sunset_start = strstr(json, "\"sunset_notes\":\"");
+    if (sunset_start) {
+        sunset_start += 16;
+        const char* sunset_end = strchr(sunset_start, '"');
+        if (sunset_end) {
+            size_t len = sunset_end - sunset_start;
+            digest->sunset_notes = strndup(sunset_start, len);
+        }
+    }
+
+    /* Parse sunrise_brief */
+    const char* sunrise_start = strstr(json, "\"sunrise_brief\":\"");
+    if (sunrise_start) {
+        sunrise_start += 17;
+        const char* sunrise_end = strchr(sunrise_start, '"');
+        if (sunrise_end) {
+            size_t len = sunrise_end - sunrise_start;
+            digest->sunrise_brief = strndup(sunrise_start, len);
+        }
+    }
+
+    /* Parse breadcrumbs */
+    const char* breadcrumbs_start = strstr(json, "\"breadcrumbs\":[");
+    if (breadcrumbs_start) {
+        const char* ptr = breadcrumbs_start + 15;
+        while (*ptr && *ptr != ']' && digest->breadcrumb_count < MEMORY_BREADCRUMB_MAX) {
+            /* Skip whitespace and commas */
+            while (*ptr && (*ptr == ' ' || *ptr == ',' || *ptr == '\n' || *ptr == '\t')) ptr++;
+            if (*ptr != '"') break;
+            ptr++;
+
+            const char* end = strchr(ptr, '"');
+            if (!end) break;
+
+            size_t len = end - ptr;
+            digest->breadcrumbs[digest->breadcrumb_count] = strndup(ptr, len);
+            if (digest->breadcrumbs[digest->breadcrumb_count]) {
+                digest->breadcrumb_count++;
+            }
+
+            ptr = end + 1;
+        }
+    }
+
+    return digest;
 }
 
 /* Calculate memory size */
@@ -342,10 +459,38 @@ ci_memory_digest_t* memory_load_from_file(const char* filepath,
         return NULL;
     }
 
+    /* Read entire file */
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    if (size <= 0) {
+        fclose(fp);
+        argo_report_error(E_SYSTEM_FILE, "memory_load_from_file", "File is empty");
+        return NULL;
+    }
+
+    char* json = malloc(size + 1);
+    if (!json) {
+        fclose(fp);
+        return NULL;
+    }
+
+    size_t read_size = fread(json, 1, size, fp);
+    json[read_size] = '\0';
     fclose(fp);
 
-    LOG_INFO("Loaded memory digest from %s", filepath);
-    return memory_digest_create(context_limit);
+    /* Parse JSON */
+    ci_memory_digest_t* digest = memory_digest_from_json(json, context_limit);
+    free(json);
+
+    if (digest) {
+        LOG_INFO("Loaded memory digest from %s", filepath);
+    } else {
+        argo_report_error(E_PROTOCOL_FORMAT, "memory_load_from_file", "JSON parse failed");
+    }
+
+    return digest;
 }
 
 /* Print summary */

@@ -670,9 +670,9 @@ int registry_save_state(ci_registry_t* registry, const char* filepath) {
     fprintf(fp, "  \"count\": %d,\n", registry->count);
     fprintf(fp, "  \"entries\": [\n");
 
-    /* Write each CI entry */
-    for (int i = 0; i < registry->count; i++) {
-        ci_registry_entry_t* entry = &registry->entries[i];
+    /* Write each CI entry - walk the linked list */
+    ci_registry_entry_t* entry = registry->entries;
+    while (entry) {
         fprintf(fp, "    {\n");
         fprintf(fp, "      \"name\": \"%s\",\n", entry->name);
         fprintf(fp, "      \"role\": \"%s\",\n", entry->role);
@@ -681,7 +681,8 @@ int registry_save_state(ci_registry_t* registry, const char* filepath) {
         fprintf(fp, "      \"port\": %d,\n", entry->port);
         fprintf(fp, "      \"status\": %d,\n", entry->status);
         fprintf(fp, "      \"registered_at\": %ld\n", (long)entry->registered_at);
-        fprintf(fp, "    }%s\n", i < registry->count - 1 ? "," : "");
+        fprintf(fp, "    }%s\n", entry->next ? "," : "");
+        entry = entry->next;
     }
 
     /* Write JSON footer */
@@ -724,17 +725,118 @@ int registry_load_state(ci_registry_t* registry, const char* filepath) {
     json[read_size] = '\0';
     fclose(fp);
 
-    /* Simple parsing - extract count and entries
-     * This is a basic implementation. Production would use proper JSON parser. */
-    int count = 0;
-    const char* count_field = strstr(json, "\"count\":");
-    if (count_field) {
-        sscanf(count_field + 8, "%d", &count);
+    /* Parse JSON to extract CI entries */
+    const char* entries_start = strstr(json, "\"entries\":");
+    if (!entries_start) {
+        free(json);
+        LOG_WARN("No entries field in registry file");
+        return ARGO_SUCCESS;
     }
 
-    /* For now, just log that we loaded it
-     * Full implementation would parse each entry and call registry_add_ci() */
-    LOG_INFO("Loaded registry state from %s (%d CIs in file)", filepath, count);
+    /* Find start of entries array */
+    const char* ptr = strchr(entries_start, '[');
+    if (!ptr) {
+        free(json);
+        return ARGO_SUCCESS;
+    }
+    ptr++;
+
+    /* Parse each entry */
+    int loaded_count = 0;
+    while (*ptr && *ptr != ']') {
+        /* Skip whitespace */
+        while (*ptr && (*ptr == ' ' || *ptr == '\n' || *ptr == '\t' || *ptr == ',')) ptr++;
+        if (*ptr != '{') break;
+
+        /* Find entry end */
+        const char* entry_end = strchr(ptr, '}');
+        if (!entry_end) break;
+
+        /* Extract fields within this entry bounds */
+        char name[CI_NAME_MAX] = {0};
+        char role[CI_ROLE_MAX] = {0};
+        char model[CI_MODEL_MAX] = {0};
+        int port = 0;
+        int status = 0;
+
+        /* Find name */
+        const char* name_start = strstr(ptr, "\"name\":");
+        if (name_start && name_start < entry_end) {
+            name_start = strchr(name_start + 7, '"');
+            if (name_start && name_start < entry_end) {
+                name_start++;
+                const char* name_end = strchr(name_start, '"');
+                if (name_end && name_end < entry_end) {
+                    size_t len = name_end - name_start;
+                    if (len < CI_NAME_MAX) {
+                        strncpy(name, name_start, len);
+                    }
+                }
+            }
+        }
+
+        /* Find role */
+        const char* role_start = strstr(ptr, "\"role\":");
+        if (role_start && role_start < entry_end) {
+            role_start = strchr(role_start + 7, '"');
+            if (role_start && role_start < entry_end) {
+                role_start++;
+                const char* role_end = strchr(role_start, '"');
+                if (role_end && role_end < entry_end) {
+                    size_t len = role_end - role_start;
+                    if (len < CI_ROLE_MAX) {
+                        strncpy(role, role_start, len);
+                    }
+                }
+            }
+        }
+
+        /* Find model */
+        const char* model_start = strstr(ptr, "\"model\":");
+        if (model_start && model_start < entry_end) {
+            model_start = strchr(model_start + 8, '"');
+            if (model_start && model_start < entry_end) {
+                model_start++;
+                const char* model_end = strchr(model_start, '"');
+                if (model_end && model_end < entry_end) {
+                    size_t len = model_end - model_start;
+                    if (len < CI_MODEL_MAX) {
+                        strncpy(model, model_start, len);
+                    }
+                }
+            }
+        }
+
+        /* Find port */
+        const char* port_field = strstr(ptr, "\"port\":");
+        if (port_field && port_field < entry_end) {
+            sscanf(port_field + 7, "%d", &port);
+        }
+
+        /* Find status */
+        const char* status_field = strstr(ptr, "\"status\":");
+        if (status_field && status_field < entry_end) {
+            sscanf(status_field + 9, "%d", &status);
+        }
+
+        /* Add CI to registry */
+        if (name[0] && role[0] && model[0] && port > 0) {
+            int result = registry_add_ci(registry, name, role, model, port);
+            if (result == ARGO_SUCCESS) {
+                /* Restore status */
+                ci_registry_entry_t* entry = registry_find_ci(registry, name);
+                if (entry) {
+                    entry->status = (ci_status_t)status;
+                }
+                loaded_count++;
+            }
+        }
+
+        /* Move to next entry */
+        ptr = entry_end + 1;
+    }
+
+    LOG_INFO("Loaded registry state from %s (%d CIs)", filepath, loaded_count);
 
     free(json);
     return ARGO_SUCCESS;
