@@ -24,11 +24,44 @@
         } \
     } while(0)
 
-/* Update statistics */
+/* Provider statistics structure */
+typedef struct {
+    uint64_t total_queries;
+    uint64_t total_tokens;      /* Optional - 0 if not tracked */
+    time_t last_query;
+    time_t first_query;
+} provider_stats_t;
+
+/* Initialize provider statistics */
+static inline void provider_stats_init(provider_stats_t* stats) {
+    if (stats) {
+        memset(stats, 0, sizeof(*stats));
+        stats->first_query = time(NULL);
+    }
+}
+
+/* Update provider statistics after query */
+static inline void provider_stats_update(provider_stats_t* stats, uint64_t tokens) {
+    if (stats) {
+        stats->total_queries++;
+        stats->total_tokens += tokens;
+        stats->last_query = time(NULL);
+    }
+}
+
+/* Legacy macro for backward compatibility */
 #define ARGO_UPDATE_STATS(ctx) \
     do { \
         ctx->total_queries++; \
         ctx->last_query = time(NULL); \
+    } while(0)
+
+/* Allocate buffer with capacity tracking */
+#define ARGO_ALLOC_BUFFER(ctx_ptr, buffer_field, capacity_field, size) \
+    do { \
+        (ctx_ptr)->buffer_field = malloc(size); \
+        if (!(ctx_ptr)->buffer_field) return E_SYSTEM_MEMORY; \
+        (ctx_ptr)->capacity_field = (size); \
     } while(0)
 
 /* Ensure buffer capacity */

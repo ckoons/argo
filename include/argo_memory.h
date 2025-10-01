@@ -130,8 +130,6 @@ ci_memory_digest_t* memory_digest_from_json(const char* json,
 /* Utility functions */
 size_t memory_calculate_size(ci_memory_digest_t* digest);
 bool memory_check_size_limit(ci_memory_digest_t* digest);
-int memory_compact(ci_memory_digest_t* digest);
-int memory_build_index(ci_memory_digest_t* digest);
 
 /* Relevance scoring */
 float memory_calculate_relevance(memory_item_t* item,

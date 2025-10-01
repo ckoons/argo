@@ -26,6 +26,9 @@ typedef struct socket_context {
     int listen_fd;
     char socket_path[256];
 
+    /* Registry for CI lookup */
+    ci_registry_t* registry;
+
     /* Poll infrastructure */
     struct pollfd pollfds[REGISTRY_MAX_CIS];
     int client_fds[REGISTRY_MAX_CIS];  /* fd -> index mapping */
@@ -102,6 +105,13 @@ int socket_server_init(const char* ci_name) {
     return ARGO_SUCCESS;
 }
 
+/* Set registry for CI lookup */
+void socket_set_registry(ci_registry_t* registry) {
+    if (g_socket_ctx) {
+        g_socket_ctx->registry = registry;
+    }
+}
+
 /* Run socket server event loop */
 int socket_server_run(int timeout_ms) {
     if (!g_socket_ctx) {
@@ -176,9 +186,14 @@ int socket_send_message(const ci_message_t* msg, socket_callback_fn callback, vo
         return E_PROTOCOL_QUEUE;
     }
 
-    /* Find target socket */
+    /* Find target socket from registry */
     int target_fd = -1;
-    /* TODO: Look up target CI from registry by msg->to field */
+    if (g_socket_ctx->registry) {
+        ci_registry_entry_t* target_ci = registry_find_ci(g_socket_ctx->registry, msg->to);
+        if (target_ci) {
+            target_fd = target_ci->socket_fd;
+        }
+    }
 
     if (target_fd < 0) {
         argo_report_error(E_CI_DISCONNECTED, "socket_send_message", "target CI %s", msg->to);
@@ -372,8 +387,22 @@ static int handle_client_data(int fd, int index) {
 
     g_socket_ctx->messages_received++;
 
-    /* TODO: Route message to appropriate handler */
-    LOG_DEBUG("Received message from %s to %s: %s", msg.from, msg.to, msg.content);
+    /* Route message through registry */
+    if (g_socket_ctx->registry) {
+        /* Convert to JSON for registry_send_message */
+        char json_msg[CI_MAX_MESSAGE];
+        snprintf(json_msg, sizeof(json_msg), MSG_JSON_FORMAT,
+                msg.from, msg.to, msg.type, msg.content ? msg.content : "");
+
+        int result = registry_send_message(g_socket_ctx->registry,
+                                          msg.from, msg.to, json_msg);
+        if (result != ARGO_SUCCESS) {
+            LOG_WARN("Failed to route message: %d", result);
+            return result;
+        }
+    } else {
+        LOG_DEBUG("Received message from %s to %s (no registry): %s", msg.from, msg.to, msg.content);
+    }
 
     return ARGO_SUCCESS;
 }

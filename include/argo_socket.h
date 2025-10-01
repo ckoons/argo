@@ -46,6 +46,7 @@ typedef struct socket_request {
 
 /* Socket server API */
 int socket_server_init(const char* ci_name);
+void socket_set_registry(ci_registry_t* registry);
 int socket_server_run(int timeout_ms);
 int socket_send_message(const ci_message_t* msg, socket_callback_fn callback, void* userdata);
 void socket_server_cleanup(void);

@@ -269,22 +269,6 @@ bool memory_check_size_limit(ci_memory_digest_t* digest) {
     return current_size <= digest->max_allowed_size;
 }
 
-/* Compact memory (stub) */
-int memory_compact(ci_memory_digest_t* digest) {
-    ARGO_CHECK_NULL(digest);
-
-    LOG_DEBUG("Memory compaction requested");
-    return ARGO_SUCCESS;
-}
-
-/* Build index (stub) */
-int memory_build_index(ci_memory_digest_t* digest) {
-    ARGO_CHECK_NULL(digest);
-
-    LOG_DEBUG("Building memory index");
-    return ARGO_SUCCESS;
-}
-
 /* Calculate relevance (stub) */
 float memory_calculate_relevance(memory_item_t* item,
                                 const char* current_task) {
