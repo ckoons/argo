@@ -388,23 +388,26 @@ static int handle_client_data(int fd, int index) {
     g_socket_ctx->messages_received++;
 
     /* Route message through registry */
+    int route_result = ARGO_SUCCESS;
     if (g_socket_ctx->registry) {
         /* Convert to JSON for registry_send_message */
         char json_msg[CI_MAX_MESSAGE];
         snprintf(json_msg, sizeof(json_msg), MSG_JSON_FORMAT,
                 msg.from, msg.to, msg.type, msg.content ? msg.content : "");
 
-        int result = registry_send_message(g_socket_ctx->registry,
-                                          msg.from, msg.to, json_msg);
-        if (result != ARGO_SUCCESS) {
-            LOG_WARN("Failed to route message: %d", result);
-            return result;
+        route_result = registry_send_message(g_socket_ctx->registry,
+                                            msg.from, msg.to, json_msg);
+        if (route_result != ARGO_SUCCESS) {
+            LOG_WARN("Failed to route message: %d", route_result);
         }
     } else {
         LOG_DEBUG("Received message from %s to %s (no registry): %s", msg.from, msg.to, msg.content);
     }
 
-    return ARGO_SUCCESS;
+    /* Free message memory to prevent leaks */
+    message_free(&msg);
+
+    return route_result;
 }
 
 static int parse_json_message(const char* json, ci_message_t* msg) {

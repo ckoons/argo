@@ -54,6 +54,12 @@ for file in "$SRC_DIR"/*.c; do
     [ -f "$file" ] || continue
 
     basename=$(basename "$file")
+
+    # Skip third-party files
+    if echo "$basename" | grep -qE "(jsmn|cJSON)"; then
+        continue
+    fi
+
     meaningful=$(count_meaningful_lines "$file")
     actual=$(wc -l < "$file" | tr -d ' ')
     savings=$((actual - meaningful))

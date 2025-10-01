@@ -127,6 +127,9 @@ int registry_update_status(ci_registry_t* registry,
 int registry_heartbeat(ci_registry_t* registry, const char* name);
 int registry_check_health(ci_registry_t* registry);
 
+/* Message lifecycle */
+void message_free(ci_message_t* msg);
+
 /* Message passing */
 int registry_send_message(ci_registry_t* registry,
                          const char* from_ci,

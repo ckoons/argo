@@ -105,7 +105,7 @@ int memory_add_breadcrumb(ci_memory_digest_t* digest,
     return ARGO_SUCCESS;
 }
 
-/* Suggest relevant memories (stub - basic implementation) */
+/* Suggest relevant memories (basic implementation) */
 int memory_suggest_relevant(ci_memory_digest_t* digest,
                            const char* task_context,
                            int max_suggestions) {
@@ -205,7 +205,7 @@ int memory_set_sunrise_brief(ci_memory_digest_t* digest,
     return ARGO_SUCCESS;
 }
 
-/* JSON serialization (stub) */
+/* JSON serialization  */
 char* memory_digest_to_json(ci_memory_digest_t* digest) {
     if (!digest) return NULL;
 
@@ -230,7 +230,7 @@ char* memory_digest_to_json(ci_memory_digest_t* digest) {
     return json;
 }
 
-/* Deserialize from JSON (stub) */
+/* Deserialize from JSON  */
 ci_memory_digest_t* memory_digest_from_json(const char* json,
                                            size_t context_limit) {
     if (!json) return NULL;
@@ -269,7 +269,7 @@ bool memory_check_size_limit(ci_memory_digest_t* digest) {
     return current_size <= digest->max_allowed_size;
 }
 
-/* Calculate relevance (stub) */
+/* Calculate relevance  */
 float memory_calculate_relevance(memory_item_t* item,
                                 const char* current_task) {
     if (!item) return 0.0f;
@@ -306,7 +306,7 @@ int memory_decay_relevance(ci_memory_digest_t* digest,
     return ARGO_SUCCESS;
 }
 
-/* Save to file (stub) */
+/* Save to file  */
 int memory_save_to_file(ci_memory_digest_t* digest,
                        const char* filepath) {
     ARGO_CHECK_NULL(digest);
@@ -331,7 +331,7 @@ int memory_save_to_file(ci_memory_digest_t* digest,
     return ARGO_SUCCESS;
 }
 
-/* Load from file (stub) */
+/* Load from file  */
 ci_memory_digest_t* memory_load_from_file(const char* filepath,
                                          size_t context_limit) {
     if (!filepath) return NULL;

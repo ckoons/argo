@@ -340,6 +340,20 @@ int registry_check_health(ci_registry_t* registry) {
     return stale_count;
 }
 
+/* Free message memory */
+void message_free(ci_message_t* msg) {
+    if (!msg) return;
+
+    free(msg->type);
+    free(msg->thread_id);
+    free(msg->content);
+
+    /* Clear pointers to prevent double-free */
+    msg->type = NULL;
+    msg->thread_id = NULL;
+    msg->content = NULL;
+}
+
 /* Send message */
 int registry_send_message(ci_registry_t* registry,
                          const char* from_ci,

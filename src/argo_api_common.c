@@ -71,10 +71,27 @@ int api_http_post_json(const char* base_url, const char* json_body,
         return result;
     }
 
-    /* Check HTTP status */
-    if ((*response)->status_code != API_HTTP_OK) {
-        argo_report_error(E_PROTOCOL_HTTP, "api_http_post_json", "status %d", (*response)->status_code);
-        return E_PROTOCOL_HTTP;
+    /* Check HTTP status and map to specific error codes */
+    int status = (*response)->status_code;
+    if (status != API_HTTP_OK) {
+        int error_code = E_PROTOCOL_HTTP;  /* Default */
+
+        /* Map HTTP status codes to specific errors */
+        switch (status) {
+            case 400: error_code = E_HTTP_BAD_REQUEST; break;
+            case 401: error_code = E_HTTP_UNAUTHORIZED; break;
+            case 403: error_code = E_HTTP_FORBIDDEN; break;
+            case 404: error_code = E_HTTP_NOT_FOUND; break;
+            case 429: error_code = E_HTTP_RATE_LIMIT; break;
+            default:
+                if (status >= 500) {
+                    error_code = E_HTTP_SERVER_ERROR;
+                }
+                break;
+        }
+
+        argo_report_error(error_code, "api_http_post_json", "HTTP status %d", status);
+        return error_code;
     }
 
     return ARGO_SUCCESS;

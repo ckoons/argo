@@ -42,6 +42,12 @@
 #define ERR_MSG_HTTP_RESPONSE_INVALID   "invalid HTTP response"
 #define ERR_MSG_CONNECTION_FAILED       "connection failed"
 #define ERR_MSG_CONNECTION_TIMEOUT      "connection timeout"
+#define ERR_MSG_HTTP_BAD_REQUEST        "HTTP 400: bad request"
+#define ERR_MSG_HTTP_UNAUTHORIZED       "HTTP 401: unauthorized"
+#define ERR_MSG_HTTP_FORBIDDEN          "HTTP 403: forbidden"
+#define ERR_MSG_HTTP_NOT_FOUND          "HTTP 404: not found"
+#define ERR_MSG_HTTP_RATE_LIMIT         "HTTP 429: rate limit exceeded"
+#define ERR_MSG_HTTP_SERVER_ERROR       "HTTP 500+: server error"
 
 /* CI provider error messages */
 #define ERR_MSG_PROVIDER_CREATE_FAILED  "provider creation failed"
