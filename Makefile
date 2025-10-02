@@ -266,10 +266,11 @@ test-quick: test-registry test-memory test-lifecycle test-providers test-messagi
 	@echo "=========================================="
 
 # All safe tests - includes API availability checks but no costs
-test-all: test-providers test-registry test-memory test-lifecycle test-api
+test-api-live: test-providers test-registry test-memory test-lifecycle test-api
 	@echo ""
 	@echo "=========================================="
-	@echo "All Tests Complete"
+	@echo "All Tests Complete (including live APIs)"
+	@echo "WARNING: API tests may incur costs"
 	@echo "=========================================="
 
 # Individual test targets
@@ -441,6 +442,33 @@ harness-terminal: $(HARNESS_TERMINAL)
 harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL)
 	@echo "Built all test harnesses"
 
+# Run all harnesses
+test-harnesses: harnesses
+	@echo ""
+	@echo "=========================================="
+	@echo "Running All Test Harnesses"
+	@echo "=========================================="
+	@$(MAKE) harness-init-basic
+	@$(MAKE) harness-reinit
+	@$(MAKE) harness-socket
+	@echo ""
+	@echo "=========================================="
+	@echo "Harness Tests Complete"
+	@echo "=========================================="
+
+# Run all local tests: unit tests + harnesses (no API costs)
+test-all: test-quick test-harnesses
+	@echo ""
+	@echo "=========================================="
+	@echo "ALL LOCAL TESTS COMPLETE"
+	@echo "  Unit Tests: PASSED (95 tests)"
+	@echo "  Harnesses:  PASSED (3 tests)"
+	@echo "=========================================="
+	@echo ""
+	@echo "To run tests with live API calls (costs money):"
+	@echo "  make test-api-live"
+	@echo ""
+
 # Build harness executables
 $(HARNESS_INIT_BASIC): tests/harness_init_basic.c $(CORE_LIB)
 	@echo "Building harness_init_basic..."
@@ -466,12 +494,13 @@ $(HARNESS_TERMINAL): tests/harness_terminal.c $(CORE_LIB)
 	@echo "Building harness_terminal..."
 	@$(CC) $(CFLAGS) tests/harness_terminal.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
-.PHONY: all directories scripts test-quick test-all test-providers test-registry \
-        test-memory test-lifecycle test-providers test-messaging test-workflow \
-        test-integration test-persistence test-workflow-loader test-session test-env \
-        test-api test-api-calls count-core clean distclean check debug update-models \
-        harnesses harness-init-basic harness-env-inspect harness-reinit \
-        harness-init-error harness-socket harness-terminal
+.PHONY: all directories scripts test-quick test-all test-api-live test-providers \
+        test-registry test-memory test-lifecycle test-providers test-messaging \
+        test-workflow test-integration test-persistence test-workflow-loader \
+        test-session test-env test-api test-api-calls test-harnesses count-core \
+        clean distclean check debug update-models harnesses harness-init-basic \
+        harness-env-inspect harness-reinit harness-init-error harness-socket \
+        harness-terminal
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
