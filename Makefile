@@ -34,7 +34,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_json.c \
                $(SRC_DIR)/argo_string_utils.c \
                $(SRC_DIR)/argo_print_utils.c \
-               $(SRC_DIR)/argo_env_utils.c
+               $(SRC_DIR)/argo_env_utils.c \
+               $(SRC_DIR)/argo_env_load.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \

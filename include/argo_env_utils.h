@@ -11,6 +11,7 @@
 #define ARGO_ENV_LINE_MAX 4096
 #define ARGO_ENV_VAR_NAME_MAX 256
 #define ARGO_ENV_MAX_EXPANSION_DEPTH 10
+#define ARGO_ENV_EXPORT_PREFIX "export "
 
 /* Environment file names */
 #define ARGO_ENV_HOME_FILE ".env"
