@@ -81,8 +81,8 @@ for file in "$SRC_DIR"/*.c; do
 
     basename=$(basename "$file")
 
-    # Skip third-party files
-    if echo "$basename" | grep -qE "(jsmn|cJSON)"; then
+    # Skip third-party files and utility files
+    if echo "$basename" | grep -qE "(jsmn|cJSON|_utils\.c$)"; then
         continue
     fi
 
@@ -215,9 +215,15 @@ printf "  Duplicate provider impls:       ~%d lines\n" "$duplicate_lines"
 
 # Utility files
 utils_total=0
-if [ -f "$SRC_DIR"/argo_string_utils.c ]; then
-    utils_total=$(wc -l < "$SRC_DIR"/argo_string_utils.c | tr -d ' ')
-    printf "  Utility files (*_utils.c):       %3d lines\n" "$utils_total"
+for util_file in "$SRC_DIR"/*_utils.c; do
+    if [ -f "$util_file" ]; then
+        lines=$(wc -l < "$util_file" | tr -d ' ')
+        utils_total=$((utils_total + lines))
+    fi
+done
+if [ "$utils_total" -gt 0 ]; then
+    utils_count=$(find "$SRC_DIR" -name "*_utils.c" | wc -l | tr -d ' ')
+    printf "  Utility files (*_utils.c):       %3d lines (%d files)\n" "$utils_total" "$utils_count"
 fi
 
 echo ""

@@ -86,6 +86,58 @@ void http_request_free(http_request_t* req) {
     free(req);
 }
 
+/* Read HTTP response from curl pipe and parse status code */
+static int read_http_response(FILE* fp, http_response_t** resp) {
+    if (!fp || !resp) return E_INPUT_NULL;
+
+    /* Read response */
+    char* response_buf = malloc(HTTP_RESPONSE_BUFFER_SIZE);
+    if (!response_buf) {
+        return E_SYSTEM_MEMORY;
+    }
+    size_t response_size = 0;
+    size_t response_capacity = HTTP_RESPONSE_BUFFER_SIZE;
+
+    while (!feof(fp)) {
+        if (response_size + HTTP_CHUNK_SIZE > response_capacity) {
+            response_capacity *= 2;
+            char* new_buf = realloc(response_buf, response_capacity);
+            if (!new_buf) {
+                free(response_buf);
+                return E_SYSTEM_MEMORY;
+            }
+            response_buf = new_buf;
+        }
+
+        size_t bytes = fread(response_buf + response_size, 1,
+                           response_capacity - response_size - 1, fp);
+        response_size += bytes;
+    }
+    response_buf[response_size] = '\0';
+
+    /* Extract HTTP status code from last line */
+    int status_code = HTTP_STATUS_OK;
+    char* last_newline = strrchr(response_buf, '\n');
+    if (last_newline && last_newline > response_buf) {
+        status_code = atoi(last_newline + 1);
+        *last_newline = '\0';
+        response_size = last_newline - response_buf;
+    }
+
+    /* Create response */
+    *resp = calloc(1, sizeof(http_response_t));
+    if (!*resp) {
+        free(response_buf);
+        return E_SYSTEM_MEMORY;
+    }
+
+    (*resp)->status_code = status_code;
+    (*resp)->body = response_buf;
+    (*resp)->body_len = response_size;
+
+    return ARGO_SUCCESS;
+}
+
 /* Execute HTTP request using curl */
 int http_execute(const http_request_t* req, http_response_t** resp) {
     if (!req || !resp) return E_INPUT_NULL;
@@ -128,47 +180,10 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
             return E_SYSTEM_PROCESS;
         }
 
-        /* Read response */
-        char* response_buf = malloc(HTTP_RESPONSE_BUFFER_SIZE);
-        size_t response_size = 0;
-        size_t response_capacity = HTTP_RESPONSE_BUFFER_SIZE;
-
-        while (!feof(fp)) {
-            if (response_size + HTTP_CHUNK_SIZE > response_capacity) {
-                response_capacity *= 2;
-                response_buf = realloc(response_buf, response_capacity);
-            }
-
-            size_t bytes = fread(response_buf + response_size, 1,
-                               response_capacity - response_size - 1, fp);
-            response_size += bytes;
-        }
-        response_buf[response_size] = '\0';
-
+        int result = read_http_response(fp, resp);
         pclose(fp);
         unlink(temp_file);
-
-        /* Extract HTTP status code from last line */
-        int status_code = HTTP_STATUS_OK;  /* Default */
-        char* last_newline = strrchr(response_buf, '\n');
-        if (last_newline && last_newline > response_buf) {
-            /* Parse status code from last line */
-            status_code = atoi(last_newline + 1);
-            /* Remove status code line from body */
-            *last_newline = '\0';
-            response_size = last_newline - response_buf;
-        }
-
-        /* Create response */
-        *resp = calloc(1, sizeof(http_response_t));
-        if (!*resp) {
-            free(response_buf);
-            return E_SYSTEM_MEMORY;
-        }
-
-        (*resp)->status_code = status_code;
-        (*resp)->body = response_buf;
-        (*resp)->body_len = response_size;
+        return result;
 
     } else {
         /* GET request */
@@ -180,49 +195,10 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
             return E_SYSTEM_PROCESS;
         }
 
-        /* Read response */
-        char* response_buf = malloc(HTTP_RESPONSE_BUFFER_SIZE);
-        size_t response_size = 0;
-        size_t response_capacity = HTTP_RESPONSE_BUFFER_SIZE;
-
-        while (!feof(fp)) {
-            if (response_size + HTTP_CHUNK_SIZE > response_capacity) {
-                response_capacity *= 2;
-                response_buf = realloc(response_buf, response_capacity);
-            }
-
-            size_t bytes = fread(response_buf + response_size, 1,
-                               response_capacity - response_size - 1, fp);
-            response_size += bytes;
-        }
-        response_buf[response_size] = '\0';
-
+        int result = read_http_response(fp, resp);
         pclose(fp);
-
-        /* Extract HTTP status code from last line */
-        int status_code = HTTP_STATUS_OK;  /* Default */
-        char* last_newline = strrchr(response_buf, '\n');
-        if (last_newline && last_newline > response_buf) {
-            /* Parse status code from last line */
-            status_code = atoi(last_newline + 1);
-            /* Remove status code line from body */
-            *last_newline = '\0';
-            response_size = last_newline - response_buf;
-        }
-
-        /* Create response */
-        *resp = calloc(1, sizeof(http_response_t));
-        if (!*resp) {
-            free(response_buf);
-            return E_SYSTEM_MEMORY;
-        }
-
-        (*resp)->status_code = status_code;
-        (*resp)->body = response_buf;
-        (*resp)->body_len = response_size;
+        return result;
     }
-
-    return ARGO_SUCCESS;
 }
 
 /* Execute streaming request */

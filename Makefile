@@ -30,7 +30,9 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_merge.c \
                $(SRC_DIR)/argo_orchestrator.c \
                $(SRC_DIR)/argo_session.c \
-               $(SRC_DIR)/argo_json.c
+               $(SRC_DIR)/argo_json.c \
+               $(SRC_DIR)/argo_string_utils.c \
+               $(SRC_DIR)/argo_print_utils.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
