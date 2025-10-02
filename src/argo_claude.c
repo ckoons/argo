@@ -88,6 +88,9 @@ typedef struct working_memory {
 #define WORKING_MEMORY_VERSION 1
 #define WORKING_MEMORY_SIZE (533 * 1024)  /* 533KB limit */
 
+/* Error message for exec failure in child process */
+#define CLAUDE_EXEC_FAILED_MSG "Failed to execute claude: "
+
 /* Static function declarations */
 static int claude_init(ci_provider_t* provider);
 static int claude_connect(ci_provider_t* provider);
@@ -328,16 +331,13 @@ static void claude_cleanup(ci_provider_t* provider) {
 
     claude_context_t* ctx = (claude_context_t*)provider->context;
     if (!ctx) return;
-
     /* Kill Claude process if running */
     if (ctx->claude_pid > 0) {
         kill_claude_process(ctx);
     }
-
     /* Save and cleanup working memory */
     save_working_memory(ctx);
     cleanup_working_memory(ctx);
-
     /* Free buffers */
     if (ctx->response_buffer) {
         free(ctx->response_buffer);
@@ -345,13 +345,10 @@ static void claude_cleanup(ci_provider_t* provider) {
     if (ctx->sunset_notes) {
         free(ctx->sunset_notes);
     }
-
     LOG_INFO("Claude provider cleanup: queries=%llu tokens=%zu",
              ctx->total_queries, ctx->tokens_used);
-
     free(ctx);
 }
-
 /* Spawn Claude subprocess */
 static int spawn_claude_process(claude_context_t* ctx) {
     /* Create pipes */
@@ -385,22 +382,22 @@ static int spawn_claude_process(claude_context_t* ctx) {
         /* Execute Claude */
         execlp("claude", "claude", NULL);
 
-        /* If we get here, exec failed */
-        fprintf(stderr, "Failed to execute claude: %s\n", strerror(errno));
+        /* If we get here, exec failed
+         * NOTE: This fprintf to stderr is acceptable because we are in a forked
+         * child process after dup2 has redirected stderr to a pipe (line 378).
+         * The stderr output goes to ctx->stderr_pipe[1] which the parent reads,
+         * not to the terminal. This is the standard pattern for capturing child
+         * process errors in fork/exec scenarios. */
+        fprintf(stderr, CLAUDE_EXEC_FAILED_MSG "%s\n", strerror(errno));
         exit(1);
     }
-
-    /* Parent process */
-
-    /* Close unused pipe ends */
+    /* Parent process - close unused pipe ends */
     close(ctx->stdin_pipe[0]);
     close(ctx->stdout_pipe[1]);
     close(ctx->stderr_pipe[1]);
-
     /* Make pipes non-blocking */
     fcntl(ctx->stdout_pipe[0], F_SETFL, O_NONBLOCK);
     fcntl(ctx->stderr_pipe[0], F_SETFL, O_NONBLOCK);
-
     LOG_INFO("Spawned Claude process with PID %d", ctx->claude_pid);
     return ARGO_SUCCESS;
 }
