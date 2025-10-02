@@ -38,6 +38,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
                    $(SRC_DIR)/argo_claude.c \
+                   $(SRC_DIR)/argo_claude_process.c \
+                   $(SRC_DIR)/argo_claude_memory.c \
                    $(SRC_DIR)/argo_claude_code.c \
                    $(SRC_DIR)/argo_claude_api.c \
                    $(SRC_DIR)/argo_openai_api.c \
