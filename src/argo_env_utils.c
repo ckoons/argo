@@ -177,15 +177,17 @@ static int parse_env_line(const char* line, char** key, char** value) {
     *key = NULL;
     *value = NULL;
 
-    /* Make working copy */
-    char buffer[ARGO_ENV_LINE_MAX];
-    strncpy(buffer, line, sizeof(buffer) - 1);
-    buffer[sizeof(buffer) - 1] = '\0';
+    /* Make working copy - allocate dynamically for large lines */
+    char* buffer = strdup(line);
+    if (!buffer) {
+        return E_SYSTEM_MEMORY;
+    }
 
     trim_whitespace(buffer);
 
     /* Skip empty lines and comments */
     if (buffer[0] == '\0' || buffer[0] == '#') {
+        free(buffer);
         return ARGO_SUCCESS;
     }
 
@@ -200,12 +202,20 @@ static int parse_env_line(const char* line, char** key, char** value) {
     char* eq = strchr(parse_start, '=');
     if (!eq) {
         /* Not a valid KEY=VALUE line */
+        free(buffer);
         return ARGO_SUCCESS;
     }
 
     /* Extract key */
     *eq = '\0';
     trim_whitespace(parse_start);
+
+    /* Validate non-empty key */
+    if (parse_start[0] == '\0') {
+        free(buffer);
+        return ARGO_SUCCESS;
+    }
+
     *key = strdup(parse_start);
 
     /* Extract value */
@@ -257,7 +267,7 @@ static int load_env_file(const char* filepath, bool required) {
         int result = parse_env_line(line, &key, &value);
 
         if (result != ARGO_SUCCESS) {
-            LOG_WARN("Malformed line in %s:%d", filepath, line_num);
+            LOG_WARN("Malformed line in %s:%d: %s", filepath, line_num, line);
             continue;
         }
 
@@ -332,7 +342,7 @@ static char* expand_value(const char* value, int depth) {
         return strdup(value);
     }
 
-    char buffer[ARGO_ENV_LINE_MAX];
+    char var_name[256];
     char result[ARGO_ENV_LINE_MAX];
     result[0] = '\0';
 
@@ -348,12 +358,12 @@ static char* expand_value(const char* value, int depth) {
             if (var_end) {
                 /* Extract variable name */
                 size_t var_len = var_end - var_start;
-                if (var_len < sizeof(buffer)) {
-                    strncpy(buffer, var_start, var_len);
-                    buffer[var_len] = '\0';
+                if (var_len < sizeof(var_name)) {
+                    strncpy(var_name, var_start, var_len);
+                    var_name[var_len] = '\0';
 
                     /* Look up variable */
-                    int idx = find_env_index(buffer);
+                    int idx = find_env_index(var_name);
                     if (idx >= 0) {
                         /* Found - get value after '=' */
                         char* eq = strchr(argo_env[idx], '=');
@@ -403,6 +413,9 @@ static int expand_all_variables(void) {
         /* Extract name */
         size_t name_len = eq - argo_env[i];
         char* name = strndup(argo_env[i], name_len);
+        if (!name) {
+            return E_SYSTEM_MEMORY;
+        }
 
         /* Expand value */
         char* expanded = expand_value(value, 0);
@@ -498,10 +511,18 @@ int argo_loadenv(void) {
 
         strncpy(project_env, found, sizeof(project_env) - 1);
 
-        /* Extract directory for local file */
+        /* Extract directory for ARGO_ROOT and local file */
         char* last_slash = strrchr(project_env, '/');
         if (last_slash) {
             size_t dir_len = last_slash - project_env;
+            char root_dir[PATH_MAX];
+            strncpy(root_dir, project_env, dir_len);
+            root_dir[dir_len] = '\0';
+
+            /* Set ARGO_ROOT to discovered directory */
+            set_env_internal(ARGO_ROOT_VAR, root_dir);
+
+            /* Build local file path */
             strncpy(local_env, project_env, dir_len);
             local_env[dir_len] = '\0';
             snprintf(local_env + dir_len, sizeof(local_env) - dir_len,
