@@ -80,4 +80,37 @@ extern bool argo_env_initialized;
 /* Logging subsystem - TBD */
 /* Registry subsystem - TBD */
 
+
+/* ============================================================================
+ * CLEANUP FUNCTIONS
+ *
+ * All subsystem cleanup functions are declared here for argo_exit().
+ * These functions are also declared in their respective public headers.
+ * This section provides a centralized cleanup contract.
+ *
+ * CLEANUP ORDER (reverse of initialization):
+ * 1. socket_server_cleanup() - if socket server was started
+ * 2. argo_config_cleanup() - config subsystem
+ * 3. argo_freeenv() - environment subsystem
+ * ========================================================================= */
+
+/* Environment subsystem cleanup
+ * Declared in: argo_env_utils.h
+ * Frees: argo_env, resets argo_env_count, argo_env_capacity, argo_env_initialized
+ * Safe to call multiple times */
+extern void argo_freeenv(void);
+
+/* Configuration subsystem cleanup
+ * Declared in: argo_config.h
+ * Frees: config structures (future)
+ * Safe to call multiple times */
+extern void argo_config_cleanup(void);
+
+/* Socket server cleanup (if started by application)
+ * Declared in: argo_socket.h
+ * Frees: g_socket_ctx, closes sockets, removes socket file
+ * Safe to call multiple times
+ * NOTE: Application-managed, not called by argo_exit() */
+extern void socket_server_cleanup(void);
+
 #endif /* ARGO_GLOBALS_H */

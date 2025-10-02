@@ -412,10 +412,66 @@ update-models:
 	@echo "Updating model defaults from API providers..."
 	@./scripts/update_models.sh
 
+# Test Harnesses (not counted in diet)
+HARNESS_INIT_BASIC = $(BUILD_DIR)/harness_init_basic
+HARNESS_ENV_INSPECT = $(BUILD_DIR)/harness_env_inspect
+HARNESS_REINIT = $(BUILD_DIR)/harness_reinit
+HARNESS_INIT_ERROR = $(BUILD_DIR)/harness_init_error
+HARNESS_SOCKET = $(BUILD_DIR)/harness_socket
+HARNESS_TERMINAL = $(BUILD_DIR)/harness_terminal
+
+harness-init-basic: $(HARNESS_INIT_BASIC)
+	@./$(HARNESS_INIT_BASIC)
+
+harness-env-inspect: $(HARNESS_ENV_INSPECT)
+	@./$(HARNESS_ENV_INSPECT)
+
+harness-reinit: $(HARNESS_REINIT)
+	@./$(HARNESS_REINIT)
+
+harness-init-error: $(HARNESS_INIT_ERROR)
+	@./$(HARNESS_INIT_ERROR)
+
+harness-socket: $(HARNESS_SOCKET)
+	@./$(HARNESS_SOCKET)
+
+harness-terminal: $(HARNESS_TERMINAL)
+	@./$(HARNESS_TERMINAL)
+
+harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL)
+	@echo "Built all test harnesses"
+
+# Build harness executables
+$(HARNESS_INIT_BASIC): tests/harness_init_basic.c $(CORE_LIB)
+	@echo "Building harness_init_basic..."
+	@$(CC) $(CFLAGS) tests/harness_init_basic.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
+$(HARNESS_ENV_INSPECT): tests/harness_env_inspect.c $(CORE_LIB)
+	@echo "Building harness_env_inspect..."
+	@$(CC) $(CFLAGS) tests/harness_env_inspect.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
+$(HARNESS_REINIT): tests/harness_reinit.c $(CORE_LIB)
+	@echo "Building harness_reinit..."
+	@$(CC) $(CFLAGS) tests/harness_reinit.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
+$(HARNESS_INIT_ERROR): tests/harness_init_error.c $(CORE_LIB)
+	@echo "Building harness_init_error..."
+	@$(CC) $(CFLAGS) tests/harness_init_error.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
+$(HARNESS_SOCKET): tests/harness_socket.c $(CORE_LIB)
+	@echo "Building harness_socket..."
+	@$(CC) $(CFLAGS) tests/harness_socket.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
+$(HARNESS_TERMINAL): tests/harness_terminal.c $(CORE_LIB)
+	@echo "Building harness_terminal..."
+	@$(CC) $(CFLAGS) tests/harness_terminal.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
 .PHONY: all directories scripts test-quick test-all test-providers test-registry \
         test-memory test-lifecycle test-providers test-messaging test-workflow \
         test-integration test-persistence test-workflow-loader test-session test-env \
-        test-api test-api-calls count-core clean distclean check debug update-models
+        test-api test-api-calls count-core clean distclean check debug update-models \
+        harnesses harness-init-basic harness-env-inspect harness-reinit \
+        harness-init-error harness-socket harness-terminal
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)

@@ -8,6 +8,7 @@
 #include "argo_init.h"
 #include "argo_env_utils.h"
 #include "argo_config.h"
+#include "argo_globals.h"  /* Cleanup function declarations */
 #include "argo_error.h"
 #include "argo_log.h"
 
