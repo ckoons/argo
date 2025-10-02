@@ -236,22 +236,26 @@ static int parse_env_line(const char* line, char** key, char** value) {
 
 /* Load environment file */
 static int load_env_file(const char* filepath, bool required) {
-    FILE* fp = fopen(filepath, "r");
+    int result = ARGO_SUCCESS;
+    FILE* fp = NULL;
+    int vars_loaded = 0;
+
+    fp = fopen(filepath, "r");
     if (!fp) {
         if (required) {
             LOG_ERROR("Required environment file not found: %s", filepath);
-            return E_SYSTEM_FILE;
+            result = E_SYSTEM_FILE;
         } else {
             LOG_INFO("Optional environment file not found: %s", filepath);
-            return ARGO_SUCCESS;
+            result = ARGO_SUCCESS;
         }
+        goto cleanup;
     }
 
     LOG_INFO("Loading environment from: %s", filepath);
 
     char line[ARGO_ENV_LINE_MAX];
     int line_num = 0;
-    int vars_loaded = 0;
 
     while (fgets(line, sizeof(line), fp)) {
         line_num++;
@@ -264,16 +268,16 @@ static int load_env_file(const char* filepath, bool required) {
 
         char* key = NULL;
         char* value = NULL;
-        int result = parse_env_line(line, &key, &value);
+        int parse_result = parse_env_line(line, &key, &value);
 
-        if (result != ARGO_SUCCESS) {
+        if (parse_result != ARGO_SUCCESS) {
             LOG_WARN("Malformed line in %s:%d: %s", filepath, line_num, line);
             continue;
         }
 
         if (key && value) {
-            result = set_env_internal(key, value);
-            if (result == ARGO_SUCCESS) {
+            parse_result = set_env_internal(key, value);
+            if (parse_result == ARGO_SUCCESS) {
                 vars_loaded++;
             }
             free(key);
@@ -281,9 +285,14 @@ static int load_env_file(const char* filepath, bool required) {
         }
     }
 
-    fclose(fp);
     LOG_INFO("Loaded %d variables from %s", vars_loaded, filepath);
-    return ARGO_SUCCESS;
+
+cleanup:
+    /* All paths pass through here to ensure file is closed */
+    if (fp) {
+        fclose(fp);
+    }
+    return result;
 }
 
 /* Get home directory */
@@ -342,7 +351,7 @@ static char* expand_value(const char* value, int depth) {
         return strdup(value);
     }
 
-    char var_name[256];
+    char var_name[ARGO_ENV_VAR_NAME_MAX];
     char result[ARGO_ENV_LINE_MAX];
     result[0] = '\0';
 
@@ -399,6 +408,8 @@ static char* expand_value(const char* value, int depth) {
 
 /* Expand all variables in environment */
 static int expand_all_variables(void) {
+    int result = ARGO_SUCCESS;
+
     for (int i = 0; i < argo_env_count; i++) {
         char* eq = strchr(argo_env[i], '=');
         if (!eq) continue;
@@ -414,34 +425,51 @@ static int expand_all_variables(void) {
         size_t name_len = eq - argo_env[i];
         char* name = strndup(argo_env[i], name_len);
         if (!name) {
-            return E_SYSTEM_MEMORY;
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
         }
 
         /* Expand value */
         char* expanded = expand_value(value, 0);
-
-        /* Replace */
-        free(argo_env[i]);
-        size_t total_len = name_len + strlen(expanded) + 2;
-        argo_env[i] = malloc(total_len);
-
-        if (!argo_env[i]) {
+        if (!expanded) {
             free(name);
-            free(expanded);
-            return E_SYSTEM_MEMORY;
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
         }
 
-        snprintf(argo_env[i], total_len, "%s=%s", name, expanded);
+        /* Allocate new entry BEFORE freeing old (preserve data on failure) */
+        size_t total_len = name_len + strlen(expanded) + 2;
+        char* new_entry = malloc(total_len);
+        if (!new_entry) {
+            free(name);
+            free(expanded);
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
+        }
+
+        snprintf(new_entry, total_len, "%s=%s", name, expanded);
+
+        /* Now safe to replace */
+        free(argo_env[i]);
+        argo_env[i] = new_entry;
 
         free(name);
         free(expanded);
     }
 
-    return ARGO_SUCCESS;
+cleanup:
+    /* All error paths and success pass through here */
+    return result;
 }
 
 /* Load Argo environment */
 int argo_loadenv(void) {
+    int result = ARGO_SUCCESS;
+    char* home = NULL;
+    char* project_env = NULL;
+    char* local_env = NULL;
+    char* root_dir = NULL;
+
     pthread_mutex_lock(&argo_env_mutex);
 
     /* Free existing environment if reloading */
@@ -457,27 +485,27 @@ int argo_loadenv(void) {
         argo_env_capacity = ARGO_ENV_INITIAL_CAPACITY;
         argo_env = calloc(argo_env_capacity + 1, sizeof(char*));
         if (!argo_env) {
-            pthread_mutex_unlock(&argo_env_mutex);
-            return E_SYSTEM_MEMORY;
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
         }
     }
 
     LOG_INFO("Loading Argo environment");
 
     /* 1. Load system environment */
-    int result = load_system_environ();
+    result = load_system_environ();
     if (result != ARGO_SUCCESS) {
-        pthread_mutex_unlock(&argo_env_mutex);
-        return result;
+        goto cleanup;
     }
 
     /* 2. Load ~/.env (optional) */
-    char* home = get_home_dir();
+    home = get_home_dir();
     if (home) {
         char home_env[PATH_MAX];
         snprintf(home_env, sizeof(home_env), "%s/%s", home, ARGO_ENV_HOME_FILE);
         load_env_file(home_env, false);
         free(home);
+        home = NULL;
     }
 
     /* 3. Find .env.argo (check ARGO_ROOT or search upward) */
@@ -490,14 +518,19 @@ int argo_loadenv(void) {
         }
     }
 
-    char project_env[PATH_MAX];
-    char local_env[PATH_MAX];
+    /* Allocate path buffers */
+    project_env = malloc(PATH_MAX);
+    local_env = malloc(PATH_MAX);
+    if (!project_env || !local_env) {
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
+    }
 
     if (argo_root && argo_root[0]) {
         /* Use ARGO_ROOT */
-        snprintf(project_env, sizeof(project_env), "%s/%s",
+        snprintf(project_env, PATH_MAX, "%s/%s",
                 argo_root, ARGO_ENV_PROJECT_FILE);
-        snprintf(local_env, sizeof(local_env), "%s/%s",
+        snprintf(local_env, PATH_MAX, "%s/%s",
                 argo_root, ARGO_ENV_LOCAL_FILE);
     } else {
         /* Search upward */
@@ -505,17 +538,23 @@ int argo_loadenv(void) {
         if (!found) {
             LOG_ERROR("Cannot find %s (searched upward from cwd, no ARGO_ROOT set)",
                      ARGO_ENV_PROJECT_FILE);
-            pthread_mutex_unlock(&argo_env_mutex);
-            return E_SYSTEM_FILE;
+            result = E_SYSTEM_FILE;
+            goto cleanup;
         }
 
-        strncpy(project_env, found, sizeof(project_env) - 1);
+        strncpy(project_env, found, PATH_MAX - 1);
+        project_env[PATH_MAX - 1] = '\0';
 
         /* Extract directory for ARGO_ROOT and local file */
         char* last_slash = strrchr(project_env, '/');
         if (last_slash) {
             size_t dir_len = last_slash - project_env;
-            char root_dir[PATH_MAX];
+            root_dir = malloc(PATH_MAX);
+            if (!root_dir) {
+                result = E_SYSTEM_MEMORY;
+                goto cleanup;
+            }
+
             strncpy(root_dir, project_env, dir_len);
             root_dir[dir_len] = '\0';
 
@@ -525,7 +564,7 @@ int argo_loadenv(void) {
             /* Build local file path */
             strncpy(local_env, project_env, dir_len);
             local_env[dir_len] = '\0';
-            snprintf(local_env + dir_len, sizeof(local_env) - dir_len,
+            snprintf(local_env + dir_len, PATH_MAX - dir_len,
                     "/%s", ARGO_ENV_LOCAL_FILE);
         }
     }
@@ -533,8 +572,7 @@ int argo_loadenv(void) {
     /* 4. Load .env.argo (required) */
     result = load_env_file(project_env, true);
     if (result != ARGO_SUCCESS) {
-        pthread_mutex_unlock(&argo_env_mutex);
-        return result;
+        goto cleanup;
     }
 
     /* 5. Load .env.argo.local (optional) */
@@ -543,15 +581,20 @@ int argo_loadenv(void) {
     /* 6. Expand all ${VAR} references */
     result = expand_all_variables();
     if (result != ARGO_SUCCESS) {
-        pthread_mutex_unlock(&argo_env_mutex);
-        return result;
+        goto cleanup;
     }
 
     argo_env_initialized = true;
     LOG_INFO("Argo environment loaded: %d variables", argo_env_count);
 
+cleanup:
+    /* All error paths and success pass through here */
+    free(home);
+    free(project_env);
+    free(local_env);
+    free(root_dir);
     pthread_mutex_unlock(&argo_env_mutex);
-    return ARGO_SUCCESS;
+    return result;
 }
 
 /* Get environment variable */
@@ -576,9 +619,8 @@ const char* argo_getenv(const char* name) {
 
 /* Set environment variable */
 int argo_setenv(const char* name, const char* value) {
-    if (!name || !value) {
-        return E_INPUT_NULL;
-    }
+    ARGO_CHECK_NULL(name);
+    ARGO_CHECK_NULL(value);
 
     pthread_mutex_lock(&argo_env_mutex);
     int result = set_env_internal(name, value);
@@ -589,9 +631,7 @@ int argo_setenv(const char* name, const char* value) {
 
 /* Unset environment variable */
 int argo_unsetenv(const char* name) {
-    if (!name) {
-        return E_INPUT_NULL;
-    }
+    ARGO_CHECK_NULL(name);
 
     pthread_mutex_lock(&argo_env_mutex);
 
@@ -646,9 +686,8 @@ void argo_freeenv(void) {
 
 /* Get integer environment variable */
 int argo_getenvint(const char* name, int* value) {
-    if (!name || !value) {
-        return E_INPUT_NULL;
-    }
+    ARGO_CHECK_NULL(name);
+    ARGO_CHECK_NULL(value);
 
     const char* str_value = argo_getenv(name);
     if (!str_value) {
@@ -687,9 +726,7 @@ void argo_env_print(void) {
 
 /* Dump environment to file */
 int argo_env_dump(const char* filepath) {
-    if (!filepath) {
-        return E_INPUT_NULL;
-    }
+    ARGO_CHECK_NULL(filepath);
 
     pthread_mutex_lock(&argo_env_mutex);
 
