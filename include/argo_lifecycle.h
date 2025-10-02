@@ -11,6 +11,11 @@
 /* Lifecycle buffer sizes */
 #define LIFECYCLE_TIME_BUFFER_SIZE 32
 
+/* Lifecycle configuration */
+#define DEFAULT_HEARTBEAT_TIMEOUT 60
+#define DEFAULT_MAX_MISSED 3
+#define INITIAL_CAPACITY 16
+
 /* Lifecycle events */
 typedef enum {
     LIFECYCLE_EVENT_CREATED,       /* CI instance created */

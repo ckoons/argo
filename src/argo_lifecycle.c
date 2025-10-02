@@ -12,10 +12,6 @@
 #include "argo_error_messages.h"
 #include "argo_log.h"
 
-#define DEFAULT_HEARTBEAT_TIMEOUT 60
-#define DEFAULT_MAX_MISSED 3
-#define INITIAL_CAPACITY 16
-
 /* Status name strings for display */
 static const char* STATUS_NAMES[] = {
     "OFFLINE", "STARTING", "READY", "BUSY", "ERROR", "SHUTDOWN"

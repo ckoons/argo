@@ -7,7 +7,7 @@ Argo is a minimal C library (<10,000 lines) that coordinates multiple Companion 
 
 ## Status: Sprint 1 - Multi-CI Workflows (Complete)
 
-Current: 2,950 meaningful lines (29% of budget)
+Current: 4,307 meaningful lines (43% of budget)
 
 ### What Works Now
 - ✅ **8 CI Providers**: Ollama, Claude (socket/code/API), OpenAI, Gemini, Grok, DeepSeek, OpenRouter
@@ -25,7 +25,9 @@ Current: 2,950 meaningful lines (29% of budget)
 - ✅ **Workflow JSON**: Reusable workflow definitions in `argo/workflows/{category}/{event}/`
 - ✅ **Session Lifecycle**: `run_workflow()` - complete create→execute→destroy
 - ✅ **Checkpoints**: Workflow pause/resume with state save/restore
-- ✅ **Testing**: 62/62 tests passing (100% pass rate)
+- ✅ **Testing**: 95/95 tests passing (100% pass rate)
+- ✅ **Initialization**: `argo_init()`/`argo_exit()` lifecycle management
+- ✅ **Test Harnesses**: 6 interactive test programs (terminal, socket, reinit, etc.)
 
 ### Core Principles
 1. **"What you don't build, you don't debug"** - Reuse over rewrite
@@ -80,9 +82,11 @@ Argo follows a strict **deterministic/creative separation**:
 - Design decisions within assigned tasks
 
 ## Documentation
-- [Architecture](docs/plans/architecture.md) - System design and protocols
-- [Sprint 0 Plan](docs/plans/sprint-0-ci-foundation.md) - Provider infrastructure
-- [CLAUDE.md](CLAUDE.md) - Development collaboration guide
+- [INITIALIZATION.md](docs/INITIALIZATION.md) - Library lifecycle and init/exit patterns
+- [WORKFLOW.md](docs/WORKFLOW.md) - Development workflow and phases
+- [TERMINOLOGY.md](docs/TERMINOLOGY.md) - Tekton→Argo name mappings
+- [ONBOARDING.md](docs/ONBOARDING.md) - New developer onboarding guide
+- [CLAUDE.md](CLAUDE.md) - Coding standards and patterns
 
 ## Next: Sprint 2 - Real CI Integration
 - Load and execute workflow JSON definitions
