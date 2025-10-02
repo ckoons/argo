@@ -10,6 +10,7 @@
 #include "argo_merge.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Generate session ID */
 static void generate_session_id(char* id_out, size_t len) {
@@ -123,9 +124,9 @@ int merge_propose_resolution(merge_negotiation_t* negotiation,
         return E_INVALID_PARAMS;
     }
 
-    if (confidence < 0 || confidence > 100) {
+    if (confidence < MERGE_MIN_CONFIDENCE || confidence > MERGE_MAX_CONFIDENCE) {
         LOG_WARN("Invalid confidence value: %d", confidence);
-        confidence = 50;  /* Default to medium confidence */
+        confidence = MERGE_DEFAULT_CONFIDENCE;
     }
 
     merge_proposal_t* proposal = calloc(1, sizeof(merge_proposal_t));
@@ -198,7 +199,7 @@ char* merge_conflict_to_json(merge_conflict_t* conflict) {
     if (!conflict) return NULL;
 
     /* Allocate buffer for JSON */
-    size_t max_size = 4096;
+    size_t max_size = MERGE_CONFLICT_BUFFER_SIZE;
     char* json = malloc(max_size);
     if (!json) {
         argo_report_error(E_SYSTEM_MEMORY, "merge_conflict_to_json", ERR_MSG_MEMORY_ALLOC_FAILED);
@@ -228,7 +229,7 @@ char* merge_negotiation_to_json(merge_negotiation_t* negotiation) {
     if (!negotiation) return NULL;
 
     /* Allocate buffer */
-    size_t max_size = 16384;
+    size_t max_size = MERGE_RESULT_BUFFER_SIZE;
     char* json = malloc(max_size);
     if (!json) {
         argo_report_error(E_SYSTEM_MEMORY, "merge_negotiation_to_json", ERR_MSG_MEMORY_ALLOC_FAILED);

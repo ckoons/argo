@@ -20,6 +20,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_http.c \
                $(SRC_DIR)/argo_error.c \
                $(SRC_DIR)/argo_registry.c \
+               $(SRC_DIR)/argo_registry_messaging.c \
+               $(SRC_DIR)/argo_registry_persistence.c \
                $(SRC_DIR)/argo_memory.c \
                $(SRC_DIR)/argo_lifecycle.c \
                $(SRC_DIR)/argo_provider.c \

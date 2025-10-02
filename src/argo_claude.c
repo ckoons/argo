@@ -20,6 +20,8 @@
 #include "argo_log.h"
 #include "argo_memory.h"
 #include "argo_claude.h"
+#include "argo_limits.h"
+#include "argo_filesystem.h"
 
 /* Claude context structure */
 typedef struct claude_context {
@@ -33,7 +35,7 @@ typedef struct claude_context {
     void* working_memory;
     size_t memory_size;
     int memory_fd;
-    char session_path[256];
+    char session_path[ARGO_BUFFER_MEDIUM];
 
     /* Sunset/sunrise state */
     bool approaching_limit;
@@ -63,8 +65,8 @@ typedef struct working_memory {
     time_t last_update;       /* Last modification */
 
     /* Session continuity */
-    char session_id[64];
-    char ci_name[32];
+    char session_id[ARGO_BUFFER_SMALL];
+    char ci_name[ARGO_BUFFER_TINY];
     uint32_t turn_count;
 
     /* Sunset/sunrise data */
@@ -100,13 +102,11 @@ static int spawn_claude_process(claude_context_t* ctx);
 static int kill_claude_process(claude_context_t* ctx);
 static int write_to_claude(claude_context_t* ctx, const char* input);
 static int read_from_claude(claude_context_t* ctx, char** output, int timeout_ms);
-
 /* Working memory management */
 static int setup_working_memory(claude_context_t* ctx, const char* ci_name);
 static int load_working_memory(claude_context_t* ctx);
 static int save_working_memory(claude_context_t* ctx);
 static void cleanup_working_memory(claude_context_t* ctx);
-
 /* Sunset/sunrise handling */
 static bool check_context_limit(claude_context_t* ctx, size_t new_tokens);
 static int trigger_sunset(claude_context_t* ctx);
@@ -157,7 +157,6 @@ ci_provider_t* claude_create_provider(const char* ci_name) {
     LOG_INFO("Created Claude provider for %s", ci_name ? ci_name : "default");
     return &ctx->provider;
 }
-
 /* Initialize Claude provider */
 static int claude_init(ci_provider_t* provider) {
     ARGO_CHECK_NULL(provider);
@@ -165,7 +164,7 @@ static int claude_init(ci_provider_t* provider) {
     ARGO_CHECK_NULL(ctx);
 
     /* Allocate response buffer */
-    ctx->response_capacity = 16384;
+    ctx->response_capacity = ARGO_BUFFER_LARGE;
     ctx->response_buffer = malloc(ctx->response_capacity);
     if (!ctx->response_buffer) {
         return E_SYSTEM_MEMORY;
@@ -187,7 +186,6 @@ static int claude_init(ci_provider_t* provider) {
     LOG_DEBUG("Claude provider initialized");
     return ARGO_SUCCESS;
 }
-
 /* Connect (spawn Claude process) */
 static int claude_connect(ci_provider_t* provider) {
     ARGO_CHECK_NULL(provider);
@@ -433,7 +431,7 @@ static int kill_claude_process(claude_context_t* ctx) {
 /* Setup working memory with mmap */
 static int setup_working_memory(claude_context_t* ctx, const char* ci_name) {
     /* Open or create session file */
-    ctx->memory_fd = open(ctx->session_path, O_RDWR | O_CREAT, 0600);
+    ctx->memory_fd = open(ctx->session_path, O_RDWR | O_CREAT, ARGO_FILE_MODE_PRIVATE);
     if (ctx->memory_fd < 0) {
         argo_report_error(E_SYSTEM_FILE, "setup_working_memory", ERR_FMT_SYSCALL_ERROR, ERR_MSG_FILE_OPEN_FAILED, strerror(errno));
         return E_SYSTEM_FILE;
@@ -486,10 +484,10 @@ static char* build_context_with_memory(claude_context_t* ctx, const char* prompt
     size_t total_size = strlen(prompt) + 1;
 
     if (mem->has_sunset && mem->sunset_offset > 0) {
-        total_size += strlen(mem->content + mem->sunset_offset) + 50;
+        total_size += strlen(mem->content + mem->sunset_offset) + MEMORY_NOTES_PADDING;
     }
     if (mem->has_apollo && mem->apollo_offset > 0) {
-        total_size += strlen(mem->content + mem->apollo_offset) + 50;
+        total_size += strlen(mem->content + mem->apollo_offset) + MEMORY_NOTES_PADDING;
     }
 
     /* Allocate buffer */
@@ -546,7 +544,7 @@ static int read_from_claude(claude_context_t* ctx, char** output, int timeout_ms
     }
 
     ctx->response_size = 0;
-    char buffer[4096];
+    char buffer[ARGO_BUFFER_STANDARD];
     ssize_t bytes;
 
     while ((bytes = read(ctx->stdout_pipe[0], buffer, sizeof(buffer) - 1)) > 0) {

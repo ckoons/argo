@@ -23,6 +23,7 @@
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
+#include "argo_filesystem.h"
 #include "argo_claude.h"
 
 /* Claude Code context structure */
@@ -102,8 +103,8 @@ static int claude_code_init(ci_provider_t* provider) {
     ARGO_GET_CONTEXT(provider, claude_code_context_t, ctx);
 
     /* Create directories if needed */
-    mkdir(".argo", 0755);
-    mkdir(".argo/prompts", 0755);
+    mkdir(".argo", ARGO_DIR_MODE_STANDARD);
+    mkdir(".argo/prompts", ARGO_DIR_MODE_STANDARD);
 
     /* Allocate response buffer using common utility */
     int result = api_allocate_response_buffer(&ctx->response_content,

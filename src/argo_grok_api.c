@@ -13,6 +13,7 @@
 #include "argo_api_common.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Grok API Configuration */
 #define GROK_API_URL "https://api.x.ai/v1/chat/completions"
@@ -20,7 +21,7 @@
 
 /* Get API key from environment */
 static const char* grok_get_api_key(void) {
-    static char api_key[256] = {0};
+    static char api_key[ARGO_BUFFER_MEDIUM] = {0};
     if (api_key[0] == '\0') {
         const char* key = getenv(GROK_API_KEY_ENV);
         if (key) {

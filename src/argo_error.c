@@ -10,6 +10,7 @@
 /* Project includes */
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Error descriptions - human readable messages */
 static const char* get_error_description(int code) {
@@ -62,7 +63,7 @@ static const char* get_error_description(int code) {
 
 /* Format error as human-readable string */
 const char* argo_error_string(int code) {
-    static char buffer[256];
+    static char buffer[ARGO_BUFFER_MEDIUM];
 
     if (code == ARGO_SUCCESS) {
         return "Success";
@@ -218,7 +219,7 @@ void argo_report_error(int code, const char* context, const char* fmt, ...) {
     if (fmt && fmt[0] != '\0') {
         va_list args;
         va_start(args, fmt);
-        char details[256];
+        char details[ARGO_BUFFER_MEDIUM];
         vsnprintf(details, sizeof(details), fmt, args);
         va_end(args);
         pos += snprintf(error_line + pos, sizeof(error_line) - pos, " (%s)", details);

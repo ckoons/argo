@@ -12,6 +12,7 @@
 #include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_memory.h"
+#include "argo_limits.h"
 
 /* Execute HTTP POST with JSON and authentication */
 int api_http_post_json(const char* base_url, const char* json_body,
@@ -150,26 +151,26 @@ int api_augment_prompt_with_memory(ci_memory_digest_t* memory_digest,
 
     /* Add space for sunset notes if present */
     if (memory_digest->sunset_notes) {
-        memory_context_size += strlen(memory_digest->sunset_notes) + 50;
+        memory_context_size += strlen(memory_digest->sunset_notes) + MEMORY_NOTES_PADDING;
     }
 
     /* Add space for sunrise brief if present */
     if (memory_digest->sunrise_brief) {
-        memory_context_size += strlen(memory_digest->sunrise_brief) + 50;
+        memory_context_size += strlen(memory_digest->sunrise_brief) + MEMORY_NOTES_PADDING;
     }
 
     /* Add space for breadcrumbs (estimate) */
     if (memory_digest->breadcrumb_count > 0) {
-        memory_context_size += memory_digest->breadcrumb_count * 100;
+        memory_context_size += memory_digest->breadcrumb_count * MEMORY_BREADCRUMB_SIZE;
     }
 
     /* Add space for selected memories (estimate) */
     if (memory_digest->selected_count > 0) {
-        memory_context_size += memory_digest->selected_count * 200;
+        memory_context_size += memory_digest->selected_count * MEMORY_SELECTED_SIZE;
     }
 
     /* Allocate buffer with overhead */
-    size_t total_size = prompt_size + memory_context_size + 500;
+    size_t total_size = prompt_size + memory_context_size + MEMORY_BUFFER_OVERHEAD;
     char* augmented = malloc(total_size);
     if (!augmented) {
         argo_report_error(E_SYSTEM_MEMORY, "api_augment_prompt_with_memory",

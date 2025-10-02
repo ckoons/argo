@@ -10,6 +10,7 @@
 #include "argo_orchestrator.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Create orchestrator */
 argo_orchestrator_t* orchestrator_create(const char* session_id,
@@ -448,10 +449,10 @@ void orchestrator_print_status(argo_orchestrator_t* orch) {
 char* orchestrator_get_status_json(argo_orchestrator_t* orch) {
     if (!orch) return NULL;
 
-    char* json = malloc(4096);
+    char* json = malloc(ARGO_BUFFER_STANDARD);
     if (!json) return NULL;
 
-    snprintf(json, 4096,
+    snprintf(json, ARGO_BUFFER_STANDARD,
              "{\n"
              "  \"session_id\": \"%s\",\n"
              "  \"running\": %s,\n"
