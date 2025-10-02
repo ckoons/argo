@@ -33,7 +33,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_session.c \
                $(SRC_DIR)/argo_json.c \
                $(SRC_DIR)/argo_string_utils.c \
-               $(SRC_DIR)/argo_print_utils.c
+               $(SRC_DIR)/argo_print_utils.c \
+               $(SRC_DIR)/argo_env_utils.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -93,9 +94,10 @@ INTEGRATION_TEST_TARGET = $(BUILD_DIR)/test_integration
 PERSISTENCE_TEST_TARGET = $(BUILD_DIR)/test_persistence
 WORKFLOW_LOADER_TEST_TARGET = $(BUILD_DIR)/test_workflow_loader
 SESSION_TEST_TARGET = $(BUILD_DIR)/test_session
+ENV_TEST_TARGET = $(BUILD_DIR)/test_env
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -249,8 +251,12 @@ $(WORKFLOW_LOADER_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow_loader.o $
 $(SESSION_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_session.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build env test executable
+$(ENV_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_env.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -341,6 +347,13 @@ test-session: $(SESSION_TEST_TARGET)
 	@echo "=========================================="
 	@./$(SESSION_TEST_TARGET)
 
+test-env: $(ENV_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Environment Utilities Tests"
+	@echo "=========================================="
+	@./$(ENV_TEST_TARGET)
+
 test-api: $(API_TEST_TARGET)
 	@echo ""
 	@echo "=========================================="
@@ -398,7 +411,7 @@ update-models:
 
 .PHONY: all directories scripts test-quick test-all test-providers test-registry \
         test-memory test-lifecycle test-providers test-messaging test-workflow \
-        test-integration test-persistence test-workflow-loader test-session \
+        test-integration test-persistence test-workflow-loader test-session test-env \
         test-api test-api-calls count-core clean distclean check debug update-models
 
 # Build just the scripts
