@@ -16,6 +16,11 @@
 #define DEFAULT_MAX_MISSED 3
 #define INITIAL_CAPACITY 16
 
+/* Status name strings for display */
+static const char* STATUS_NAMES[] = {
+    "OFFLINE", "STARTING", "READY", "BUSY", "ERROR", "SHUTDOWN"
+};
+
 /* Create lifecycle manager */
 lifecycle_manager_t* lifecycle_manager_create(ci_registry_t* registry) {
     lifecycle_manager_t* manager = calloc(1, sizeof(lifecycle_manager_t));
@@ -458,11 +463,7 @@ void lifecycle_print_status(lifecycle_manager_t* manager) {
 void lifecycle_print_ci(ci_lifecycle_t* ci) {
     if (!ci) return;
 
-    const char* status_names[] = {
-        "OFFLINE", "STARTING", "READY", "BUSY", "ERROR", "SHUTDOWN"
-    };
-
-    printf("  %s: %s\n", ci->ci_name, status_names[ci->current_status]);
+    printf("  %s: %s\n", ci->ci_name, STATUS_NAMES[ci->current_status]);
     printf("    Transitions: %d\n", ci->transition_count);
     printf("    Errors: %d\n", ci->error_count);
 
@@ -491,14 +492,10 @@ void lifecycle_print_timeline(ci_lifecycle_t* ci) {
         struct tm* tm_info = localtime(&trans->timestamp);
         strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
 
-        const char* status_names[] = {
-            "OFFLINE", "STARTING", "READY", "BUSY", "ERROR", "SHUTDOWN"
-        };
-
         printf("  %s  %s → %s",
                time_str,
-               status_names[trans->from_status],
-               status_names[trans->to_status]);
+               STATUS_NAMES[trans->from_status],
+               STATUS_NAMES[trans->to_status]);
 
         if (trans->reason) {
             printf("  (%s)", trans->reason);
