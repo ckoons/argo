@@ -26,6 +26,7 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_lifecycle.c \
                $(SRC_DIR)/argo_provider.c \
                $(SRC_DIR)/argo_workflow.c \
+               $(SRC_DIR)/argo_workflow_checkpoint.c \
                $(SRC_DIR)/argo_workflow_loader.c \
                $(SRC_DIR)/argo_merge.c \
                $(SRC_DIR)/argo_orchestrator.c \

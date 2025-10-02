@@ -74,7 +74,7 @@ Before writing code:
 ### After Coding
 1. **Compile clean** - Zero warnings, zero errors with `-Wall -Werror -Wextra`
 2. **Run tests** - `make test-quick` must pass 100%
-3. **Check stubs** - Remove TODO comments or convert to clear future work notes
+3. **Check TODOs** - Remove TODO comments or convert to clear future work notes
 4. **Verify constants** - Grep for `[0-9]{2,}` in your .c file - should find nothing (except line numbers)
 5. **Check line count** - `./scripts/count_core.sh` - stay under budget
 
@@ -285,16 +285,23 @@ When uncertain:
 - Simple solution over clever solution
 - Working code over perfect code
 
-## Known Stubs & Future Work
+## Incomplete Features & Future Work
 
-Current intentional stubs in `argo_registry.c`:
-- `registry_load_config()` - Config file loading (not yet needed)
-- `registry_connect_ci()` - CI socket connection (handled at higher level)
-- `registry_disconnect_ci()` - CI socket disconnection (handled at higher level)
-- `registry_save_state()` - State persistence (not yet needed)
-- `registry_load_state()` - State restoration (not yet needed)
+**No-op Implementations** (complete but minimal):
+- `argo_registry.c`:
+  - `registry_load_config()` - Returns success (config loading not yet needed)
+  - `registry_connect_ci()` - Returns success (socket handled at higher level)
+  - `registry_disconnect_ci()` - Returns success (socket handled at higher level)
 
-These are documented placeholders for future functionality. They return success safely and won't break anything.
+These functions are intentionally minimal. They perform null checks and return success, which is correct for optional functionality that isn't currently required.
+
+**Incomplete Implementations** (return E_INTERNAL_NOTIMPL):
+- `argo_claude.c`:
+  - `claude_stream()` - Streaming not supported by CLI (intentional limitation)
+- `argo_ollama.c`:
+  - `ollama_query_default()` - Has fallback to streaming (never actually called)
+
+These represent actual limitations or unreachable code paths, not future work.
 
 ## JSON Builder Pattern (Future)
 

@@ -10,6 +10,7 @@
 #include "argo_memory.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_json.h"
 
 /* Static ID counter */
 static uint32_t g_next_memory_id = 1;
@@ -224,16 +225,10 @@ char* memory_digest_to_json(ci_memory_digest_t* digest) {
                       "\"sunset_notes\":");
     if (digest->sunset_notes) {
         json[offset++] = '"';
-        /* Escape the string content - basic escaping */
-        const char* s = digest->sunset_notes;
-        while (*s && offset < MEMORY_JSON_BUFFER_SIZE - 3) {
-            if (*s == '"' || *s == '\\') {
-                json[offset++] = '\\';
-            }
-            json[offset++] = *s++;
-        }
+        size_t temp_offset = offset;
+        json_escape_string(json, MEMORY_JSON_BUFFER_SIZE, &temp_offset, digest->sunset_notes);
+        offset = temp_offset;
         json[offset++] = '"';
-        json[offset] = '\0';
     } else {
         offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset, "null");
     }
@@ -245,15 +240,10 @@ char* memory_digest_to_json(ci_memory_digest_t* digest) {
                       "\"sunrise_brief\":");
     if (digest->sunrise_brief) {
         json[offset++] = '"';
-        const char* s = digest->sunrise_brief;
-        while (*s && offset < MEMORY_JSON_BUFFER_SIZE - 3) {
-            if (*s == '"' || *s == '\\') {
-                json[offset++] = '\\';
-            }
-            json[offset++] = *s++;
-        }
+        size_t temp_offset = offset;
+        json_escape_string(json, MEMORY_JSON_BUFFER_SIZE, &temp_offset, digest->sunrise_brief);
+        offset = temp_offset;
         json[offset++] = '"';
-        json[offset] = '\0';
     } else {
         offset += snprintf(json + offset, MEMORY_JSON_BUFFER_SIZE - offset, "null");
     }

@@ -105,3 +105,31 @@ int json_extract_nested_string(const char* json, const char** field_path,
     return json_extract_string_field(current_pos, field_path[path_depth - 1],
                                      out_value, out_len);
 }
+
+/* Escape string and append to JSON buffer */
+int json_escape_string(char* dest, size_t dest_size, size_t* dest_offset,
+                       const char* src) {
+    if (!dest || !dest_offset || !src) {
+        return E_INPUT_NULL;
+    }
+
+    size_t offset = *dest_offset;
+    const char* s = src;
+
+    while (*s && offset < dest_size - 3) {
+        /* Escape quotes and backslashes */
+        if (*s == '"' || *s == '\\') {
+            dest[offset++] = '\\';
+        }
+        dest[offset++] = *s++;
+    }
+
+    /* Check if we ran out of space */
+    if (*s != '\0') {
+        return E_SYSTEM_MEMORY;
+    }
+
+    dest[offset] = '\0';
+    *dest_offset = offset;
+    return ARGO_SUCCESS;
+}

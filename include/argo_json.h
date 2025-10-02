@@ -48,4 +48,22 @@ int json_extract_string_field(const char* json, const char* field_name,
 int json_extract_nested_string(const char* json, const char** field_path,
                                int path_depth, char** out_value, size_t* out_len);
 
+/* Escape a string and append to JSON buffer
+ *
+ * Escapes special characters (quotes, backslashes) and writes the result
+ * to the destination buffer. Does NOT add surrounding quotes.
+ *
+ * Parameters:
+ *   dest - Destination buffer
+ *   dest_size - Size of destination buffer
+ *   dest_offset - Current offset in buffer (updated on success)
+ *   src - Source string to escape
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_SYSTEM_MEMORY if buffer too small
+ */
+int json_escape_string(char* dest, size_t dest_size, size_t* dest_offset,
+                       const char* src);
+
 #endif /* ARGO_JSON_H */
