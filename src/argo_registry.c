@@ -133,19 +133,50 @@ int registry_remove_ci(ci_registry_t* registry, const char* name) {
     return E_INPUT_INVALID;
 }
 
-/* Find CI by name */
-ci_registry_entry_t* registry_find_ci(ci_registry_t* registry,
-                                      const char* name) {
-    if (!registry || !name) return NULL;
+/* Generic find helper with predicate */
+typedef bool (*registry_match_fn)(ci_registry_entry_t* entry, const void* criteria);
 
+static ci_registry_entry_t* registry_find_generic(ci_registry_t* registry,
+                                                  registry_match_fn match,
+                                                  const void* criteria) {
+    if (!registry || !match) return NULL;
     ci_registry_entry_t* entry = registry->entries;
     while (entry) {
-        if (strcmp(entry->name, name) == 0) {
+        if (match(entry, criteria)) {
             return entry;
         }
         entry = entry->next;
     }
     return NULL;
+}
+
+/* Match by name */
+static bool match_by_name(ci_registry_entry_t* entry, const void* criteria) {
+    const char* name = (const char*)criteria;
+    return strcmp(entry->name, name) == 0;
+}
+
+/* Match by role */
+static bool match_by_role(ci_registry_entry_t* entry, const void* criteria) {
+    const char* role = (const char*)criteria;
+    return strcmp(entry->role, role) == 0;
+}
+
+/* Match by role and ready status */
+typedef struct {
+    const char* role;
+    ci_status_t status;
+} role_status_criteria_t;
+
+static bool match_by_role_status(ci_registry_entry_t* entry, const void* criteria) {
+    const role_status_criteria_t* rs = (const role_status_criteria_t*)criteria;
+    return strcmp(entry->role, rs->role) == 0 && entry->status == rs->status;
+}
+
+/* Find CI by name */
+ci_registry_entry_t* registry_find_ci(ci_registry_t* registry, const char* name) {
+    if (!name) return NULL;
+    return registry_find_generic(registry, match_by_name, name);
 }
 
 /* Get port offset for role */
@@ -209,18 +240,9 @@ bool registry_is_port_available(ci_registry_t* registry, int port) {
 }
 
 /* Find CI by role (first match) */
-ci_registry_entry_t* registry_find_by_role(ci_registry_t* registry,
-                                          const char* role) {
-    if (!registry || !role) return NULL;
-
-    ci_registry_entry_t* entry = registry->entries;
-    while (entry) {
-        if (strcmp(entry->role, role) == 0) {
-            return entry;
-        }
-        entry = entry->next;
-    }
-    return NULL;
+ci_registry_entry_t* registry_find_by_role(ci_registry_t* registry, const char* role) {
+    if (!role) return NULL;
+    return registry_find_generic(registry, match_by_role, role);
 }
 
 /* Find all CIs by role */
@@ -228,57 +250,41 @@ ci_registry_entry_t** registry_find_all_by_role(ci_registry_t* registry,
                                                const char* role,
                                                int* count) {
     if (!registry || !role || !count) return NULL;
-
-    /* Count matches */
+    /* Count matches using the same predicate */
     int match_count = 0;
     ci_registry_entry_t* entry = registry->entries;
     while (entry) {
-        if (strcmp(entry->role, role) == 0) {
-            match_count++;
-        }
+        if (match_by_role(entry, role)) match_count++;
         entry = entry->next;
     }
-
     if (match_count == 0) {
         *count = 0;
         return NULL;
     }
-
     /* Allocate result array */
     ci_registry_entry_t** results = malloc(match_count * sizeof(ci_registry_entry_t*));
     if (!results) {
         *count = 0;
         return NULL;
     }
-
-    /* Fill array */
+    /* Fill array using the same predicate */
     int idx = 0;
     entry = registry->entries;
     while (entry && idx < match_count) {
-        if (strcmp(entry->role, role) == 0) {
+        if (match_by_role(entry, role)) {
             results[idx++] = entry;
         }
         entry = entry->next;
     }
-
     *count = match_count;
     return results;
 }
 
 /* Find available CI for role */
-ci_registry_entry_t* registry_find_available(ci_registry_t* registry,
-                                            const char* role) {
-    if (!registry || !role) return NULL;
-
-    ci_registry_entry_t* entry = registry->entries;
-    while (entry) {
-        if (strcmp(entry->role, role) == 0 &&
-            entry->status == CI_STATUS_READY) {
-            return entry;
-        }
-        entry = entry->next;
-    }
-    return NULL;
+ci_registry_entry_t* registry_find_available(ci_registry_t* registry, const char* role) {
+    if (!role) return NULL;
+    role_status_criteria_t criteria = { role, CI_STATUS_READY };
+    return registry_find_generic(registry, match_by_role_status, &criteria);
 }
 
 /* Update CI status */
