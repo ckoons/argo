@@ -14,6 +14,13 @@
 #define REGISTRY_MODEL_MAX 64
 #define REGISTRY_HOST_MAX 128
 
+/* Registry message buffer sizes */
+#define MESSAGE_JSON_BUFFER_SIZE 8192
+
+/* Registry message JSON field names */
+#define REGISTRY_JSON_TIMESTAMP "\"timestamp\":"
+#define REGISTRY_JSON_TIMEOUT "\"timeout_ms\":"
+
 /* CI status */
 typedef enum ci_status {
     CI_STATUS_OFFLINE,          /* Not running */

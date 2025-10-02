@@ -204,7 +204,7 @@ void argo_report_error(int code, const char* context, const char* fmt, ...) {
     const char* message = argo_error_message(code);
 
     /* Format: [ARGO ERROR] context: message (details) [TYPE:NUM] */
-    char error_line[512];
+    char error_line[ERROR_LINE_BUFFER_SIZE];
     int pos = 0;
 
     pos += snprintf(error_line + pos, sizeof(error_line) - pos, "[ARGO ERROR]");

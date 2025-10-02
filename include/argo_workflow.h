@@ -7,6 +7,10 @@
 #include "argo_lifecycle.h"
 #include "argo_error.h"
 
+/* Workflow buffer sizes */
+#define CHECKPOINT_PATTERN_SIZE 128
+#define CHECKPOINT_INITIAL_CAPACITY 8192
+
 /* Workflow phases */
 typedef enum {
     WORKFLOW_INIT,        /* Initialize workflow and assign CIs */

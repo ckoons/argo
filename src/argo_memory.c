@@ -272,9 +272,9 @@ ci_memory_digest_t* memory_digest_from_json(const char* json,
     if (!digest) return NULL;
 
     /* Parse session_id */
-    const char* session_start = strstr(json, "\"session_id\":\"");
+    const char* session_start = strstr(json, MEMORY_JSON_SESSION_ID);
     if (session_start) {
-        session_start += 14;
+        session_start += strlen(MEMORY_JSON_SESSION_ID);
         const char* session_end = strchr(session_start, '"');
         if (session_end) {
             size_t len = session_end - session_start;
@@ -285,9 +285,9 @@ ci_memory_digest_t* memory_digest_from_json(const char* json,
     }
 
     /* Parse ci_name */
-    const char* ci_start = strstr(json, "\"ci_name\":\"");
+    const char* ci_start = strstr(json, MEMORY_JSON_CI_NAME);
     if (ci_start) {
-        ci_start += 11;
+        ci_start += strlen(MEMORY_JSON_CI_NAME);
         const char* ci_end = strchr(ci_start, '"');
         if (ci_end) {
             size_t len = ci_end - ci_start;
@@ -298,9 +298,9 @@ ci_memory_digest_t* memory_digest_from_json(const char* json,
     }
 
     /* Parse sunset_notes */
-    const char* sunset_start = strstr(json, "\"sunset_notes\":\"");
+    const char* sunset_start = strstr(json, MEMORY_JSON_SUNSET_NOTES);
     if (sunset_start) {
-        sunset_start += 16;
+        sunset_start += strlen(MEMORY_JSON_SUNSET_NOTES);
         const char* sunset_end = strchr(sunset_start, '"');
         if (sunset_end) {
             size_t len = sunset_end - sunset_start;
@@ -309,9 +309,9 @@ ci_memory_digest_t* memory_digest_from_json(const char* json,
     }
 
     /* Parse sunrise_brief */
-    const char* sunrise_start = strstr(json, "\"sunrise_brief\":\"");
+    const char* sunrise_start = strstr(json, MEMORY_JSON_SUNRISE_BRIEF);
     if (sunrise_start) {
-        sunrise_start += 17;
+        sunrise_start += strlen(MEMORY_JSON_SUNRISE_BRIEF);
         const char* sunrise_end = strchr(sunrise_start, '"');
         if (sunrise_end) {
             size_t len = sunrise_end - sunrise_start;
@@ -320,9 +320,9 @@ ci_memory_digest_t* memory_digest_from_json(const char* json,
     }
 
     /* Parse breadcrumbs */
-    const char* breadcrumbs_start = strstr(json, "\"breadcrumbs\":[");
+    const char* breadcrumbs_start = strstr(json, MEMORY_JSON_BREADCRUMBS);
     if (breadcrumbs_start) {
-        const char* ptr = breadcrumbs_start + 15;
+        const char* ptr = breadcrumbs_start + strlen(MEMORY_JSON_BREADCRUMBS);
         while (*ptr && *ptr != ']' && digest->breadcrumb_count < MEMORY_BREADCRUMB_MAX) {
             /* Skip whitespace and commas */
             while (*ptr && (*ptr == ' ' || *ptr == ',' || *ptr == '\n' || *ptr == '\t')) ptr++;

@@ -68,7 +68,7 @@ static api_provider_config_t deepseek_config = {
     .response_path_depth = 3,
     .build_request = deepseek_build_request,
     .supports_streaming = true,
-    .max_context = 64000  /* DeepSeek context window */
+    .max_context = DEEPSEEK_CONTEXT_WINDOW
 };
 
 /* Create DeepSeek API provider */

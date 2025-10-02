@@ -254,7 +254,7 @@ char* merge_negotiation_to_json(merge_negotiation_t* negotiation) {
     /* Add conflicts */
     merge_conflict_t* conflict = negotiation->conflicts;
     int first = 1;
-    while (conflict && len < (int)max_size - 1024) {
+    while (conflict && len < (int)max_size - MERGE_BUFFER_MARGIN) {
         if (!first) {
             len += snprintf(json + len, max_size - len, ",\n");
         }

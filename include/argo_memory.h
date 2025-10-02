@@ -17,6 +17,13 @@
 /* Memory JSON buffer size */
 #define MEMORY_JSON_BUFFER_SIZE 8192
 
+/* Memory JSON field names for parsing */
+#define MEMORY_JSON_SESSION_ID "\"session_id\":\""
+#define MEMORY_JSON_CI_NAME "\"ci_name\":\""
+#define MEMORY_JSON_SUNSET_NOTES "\"sunset_notes\":\""
+#define MEMORY_JSON_SUNRISE_BRIEF "\"sunrise_brief\":\""
+#define MEMORY_JSON_BREADCRUMBS "\"breadcrumbs\":["
+
 /* Memory item types */
 typedef enum memory_type {
     MEMORY_TYPE_FACT,           /* Facts about the project */

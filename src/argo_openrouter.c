@@ -68,7 +68,7 @@ static api_provider_config_t openrouter_config = {
     .response_path_depth = 3,
     .build_request = openrouter_build_request,
     .supports_streaming = true,
-    .max_context = 200000  /* Depends on selected model */
+    .max_context = OPENROUTER_DEFAULT_CONTEXT
 };
 
 /* Create OpenRouter provider */

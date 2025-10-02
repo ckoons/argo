@@ -17,7 +17,7 @@
 
 /* Helper: Extract integer field from JSON */
 static int extract_int_field(const char* json, const char* field_name, int* out_value) {
-    char search_pattern[128];
+    char search_pattern[CHECKPOINT_PATTERN_SIZE];
     snprintf(search_pattern, sizeof(search_pattern), "\"%s\": %%d", field_name);
 
     const char* field = strstr(json, field_name);
@@ -54,7 +54,7 @@ char* workflow_save_checkpoint(workflow_controller_t* workflow) {
     if (!workflow) return NULL;
 
     /* Allocate buffer for JSON */
-    size_t capacity = 8192;
+    size_t capacity = CHECKPOINT_INITIAL_CAPACITY;
     char* json = malloc(capacity);
     if (!json) return NULL;
 

@@ -68,7 +68,7 @@ static api_provider_config_t grok_config = {
     .response_path_depth = 3,
     .build_request = grok_build_request,
     .supports_streaming = true,
-    .max_context = 128000  /* Grok-3 context window */
+    .max_context = GROK_CONTEXT_WINDOW
 };
 
 /* Create Grok API provider */

@@ -21,14 +21,14 @@ int argo_init(void) {
     /* Step 1: Load environment */
     result = argo_loadenv();
     if (result != ARGO_SUCCESS) {
-        argo_exit();  /* Cleanup anything that was initialized */
+        argo_exit();  /* Cleanup previously initialized subsystems */
         return result;
     }
 
     /* Step 2: Load configuration */
     result = argo_config();
     if (result != ARGO_SUCCESS) {
-        argo_exit();  /* Cleanup environment */
+        argo_exit();  /* Cleanup previously initialized subsystems */
         return result;
     }
 

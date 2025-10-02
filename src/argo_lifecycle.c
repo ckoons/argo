@@ -488,7 +488,7 @@ void lifecycle_print_timeline(ci_lifecycle_t* ci) {
 
     lifecycle_transition_t* trans = ci->transitions;
     while (trans) {
-        char time_str[32];
+        char time_str[LIFECYCLE_TIME_BUFFER_SIZE];
         struct tm* tm_info = localtime(&trans->timestamp);
         strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", tm_info);
 

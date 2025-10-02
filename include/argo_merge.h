@@ -6,6 +6,9 @@
 #include "argo_registry.h"
 #include "argo_error.h"
 
+/* Merge buffer sizes */
+#define MERGE_BUFFER_MARGIN 1024
+
 /* Merge conflict structure */
 typedef struct merge_conflict {
     char file[256];

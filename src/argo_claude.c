@@ -72,7 +72,7 @@ ci_provider_t* claude_create_provider(const char* ci_name) {
         ctx->provider.max_context = config->max_context;
         ctx->context_limit = config->max_context;
     } else {
-        ctx->context_limit = 200000;  /* Default 200K tokens */
+        ctx->context_limit = CLAUDE_DEFAULT_CONTEXT_LIMIT;
     }
 
     /* Initialize pipes to invalid */

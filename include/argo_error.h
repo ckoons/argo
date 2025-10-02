@@ -6,6 +6,9 @@
 /* Success */
 #define ARGO_SUCCESS 0
 
+/* Error reporting buffer size */
+#define ERROR_LINE_BUFFER_SIZE 512
+
 /* Error type definitions */
 #define ERR_SYSTEM   0x01
 #define ERR_CI       0x02

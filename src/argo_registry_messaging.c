@@ -172,11 +172,11 @@ void message_destroy(ci_message_t* message) {
 char* message_to_json(ci_message_t* message) {
     if (!message) return NULL;
 
-    char* json = malloc(8192);
+    char* json = malloc(MESSAGE_JSON_BUFFER_SIZE);
     if (!json) return NULL;
 
     /* Build base message */
-    int len = snprintf(json, 8192,
+    int len = snprintf(json, MESSAGE_JSON_BUFFER_SIZE,
             "{\"from\":\"%s\",\"to\":\"%s\",\"timestamp\":%ld,"
             "\"type\":\"%s\",\"content\":\"%s\"",
             message->from, message->to, (long)message->timestamp,
@@ -184,34 +184,34 @@ char* message_to_json(ci_message_t* message) {
 
     /* Add optional thread_id */
     if (message->thread_id) {
-        len += snprintf(json + len, 8192 - len,
+        len += snprintf(json + len, MESSAGE_JSON_BUFFER_SIZE - len,
                        ",\"thread_id\":\"%s\"", message->thread_id);
     }
 
     /* Add metadata if present */
     if (message->metadata.priority || message->metadata.timeout_ms > 0) {
-        len += snprintf(json + len, 8192 - len, ",\"metadata\":{");
+        len += snprintf(json + len, MESSAGE_JSON_BUFFER_SIZE - len, ",\"metadata\":{");
 
         int metadata_added = 0;
         if (message->metadata.priority) {
-            len += snprintf(json + len, 8192 - len,
+            len += snprintf(json + len, MESSAGE_JSON_BUFFER_SIZE - len,
                            "\"priority\":\"%s\"", message->metadata.priority);
             metadata_added = 1;
         }
 
         if (message->metadata.timeout_ms > 0) {
             if (metadata_added) {
-                len += snprintf(json + len, 8192 - len, ",");
+                len += snprintf(json + len, MESSAGE_JSON_BUFFER_SIZE - len, ",");
             }
-            len += snprintf(json + len, 8192 - len,
+            len += snprintf(json + len, MESSAGE_JSON_BUFFER_SIZE - len,
                            "\"timeout_ms\":%d", message->metadata.timeout_ms);
         }
 
-        len += snprintf(json + len, 8192 - len, "}");
+        len += snprintf(json + len, MESSAGE_JSON_BUFFER_SIZE - len, "}");
     }
 
     /* Close JSON object */
-    snprintf(json + len, 8192 - len, "}");
+    snprintf(json + len, MESSAGE_JSON_BUFFER_SIZE - len, "}");
 
     return json;
 }
@@ -269,17 +269,17 @@ ci_message_t* message_from_json(const char* json) {
     }
 
     /* Extract timestamp (simple - just look for the number) */
-    char* ts_start = strstr(json, "\"timestamp\":");
+    char* ts_start = strstr(json, REGISTRY_JSON_TIMESTAMP);
     if (ts_start) {
-        msg->timestamp = atol(ts_start + 12);
+        msg->timestamp = atol(ts_start + strlen(REGISTRY_JSON_TIMESTAMP));
     } else {
         msg->timestamp = time(NULL);
     }
 
     /* Extract timeout_ms */
-    char* timeout_start = strstr(json, "\"timeout_ms\":");
+    char* timeout_start = strstr(json, REGISTRY_JSON_TIMEOUT);
     if (timeout_start) {
-        msg->metadata.timeout_ms = atoi(timeout_start + 13);
+        msg->metadata.timeout_ms = atoi(timeout_start + strlen(REGISTRY_JSON_TIMEOUT));
     }
 
     return msg;

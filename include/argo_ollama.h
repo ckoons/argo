@@ -16,6 +16,9 @@
 /* Request format for Ollama API */
 #define OLLAMA_REQUEST_FORMAT "{\"model\":\"%s\",\"prompt\":\"%s\",\"stream\":%s}"
 
+/* Ollama JSON field names */
+#define OLLAMA_JSON_RESPONSE "\"response\":\""
+
 /* Ollama buffer sizes */
 #define OLLAMA_ENDPOINT_SIZE 256
 #define OLLAMA_MODEL_SIZE 64

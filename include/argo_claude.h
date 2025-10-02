@@ -10,6 +10,7 @@
 #define CLAUDE_TIMEOUT_MS 60000
 #define CLAUDE_SESSION_DIR ".argo/sessions"
 #define CLAUDE_SESSION_PATH ".argo/sessions/%s.mmap"
+#define CLAUDE_DEFAULT_CONTEXT_LIMIT 200000
 
 /* Claude Code configuration */
 #define CLAUDE_CODE_SESSION_ID_SIZE 64

@@ -8,6 +8,9 @@
 #include <time.h>
 #include "argo_registry.h"
 
+/* Lifecycle buffer sizes */
+#define LIFECYCLE_TIME_BUFFER_SIZE 32
+
 /* Lifecycle events */
 typedef enum {
     LIFECYCLE_EVENT_CREATED,       /* CI instance created */

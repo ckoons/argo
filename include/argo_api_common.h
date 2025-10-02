@@ -9,6 +9,11 @@
 #include "argo_ci.h"
 #include "argo_http.h"
 
+/* API provider context window sizes */
+#define DEEPSEEK_CONTEXT_WINDOW 64000
+#define GROK_CONTEXT_WINDOW 128000
+#define OPENROUTER_DEFAULT_CONTEXT 200000
+
 /* API authentication types */
 typedef enum {
     API_AUTH_BEARER,        /* Authorization: Bearer <token> */

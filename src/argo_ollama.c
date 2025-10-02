@@ -354,9 +354,9 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
                             line_buffer[line_len] = '\0';
 
                             /* Parse JSON line and extract response */
-                            char* response_field = strstr(line_buffer, "\"response\":\"");
+                            char* response_field = strstr(line_buffer, OLLAMA_JSON_RESPONSE);
                             if (response_field) {
-                                response_field += 12;
+                                response_field += strlen(OLLAMA_JSON_RESPONSE);
                                 char* end = response_field;
                                 while (*end && !(*end == '"' && *(end-1) != '\\')) end++;
 
@@ -529,7 +529,7 @@ static int connect_to_ollama(const char* host, int port) {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    addr.sin_addr.s_addr = inet_addr(LOCALHOST_IP);
 
     /* Connect */
     if (connect(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {

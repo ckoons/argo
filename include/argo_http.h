@@ -21,6 +21,9 @@
 #define HTTP_STATUS_RATE_LIMIT 429
 #define HTTP_STATUS_SERVER_ERROR 500
 
+/* Network addresses */
+#define LOCALHOST_IP "127.0.0.1"
+
 /* HTTP methods */
 typedef enum {
     HTTP_GET,
