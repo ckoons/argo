@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 /* External library - header only for struct definitions */
 #define JSMN_HEADER
@@ -19,10 +20,16 @@
 #include "argo_log.h"
 #include "argo_json.h"
 
-/* Helper: Generate unique task ID */
+/* Helper: Generate unique task ID (thread-safe) */
 static void generate_task_id(char* id_out, size_t len) {
     static int task_counter = 0;
-    snprintf(id_out, len, "task-%ld-%d", (long)time(NULL), task_counter++);
+    static pthread_mutex_t counter_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    pthread_mutex_lock(&counter_mutex);
+    int counter = task_counter++;
+    pthread_mutex_unlock(&counter_mutex);
+
+    snprintf(id_out, len, "task-%ld-%d", (long)time(NULL), counter);
 }
 
 /* Create workflow controller */

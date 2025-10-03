@@ -21,7 +21,10 @@
 /* Helper: Extract retry configuration from step JSON */
 int step_extract_retry_config(const char* json, jsmntok_t* tokens,
                                int step_index, retry_config_t* config) {
-    if (!json || !tokens || !config) return (argo_report_error(E_INPUT_NULL, "step_extract_retry_config", "parameter is NULL"), E_INPUT_NULL);
+    if (!json || !tokens || !config) {
+        argo_report_error(E_INPUT_NULL, "step_extract_retry_config", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
 
     /* Set defaults */
     config->max_retries = STEP_DEFAULT_MAX_RETRIES;
@@ -104,7 +107,10 @@ int step_calculate_retry_delay(const retry_config_t* config, int attempt) {
 int step_execute_with_retry(workflow_controller_t* workflow,
                             const char* json, jsmntok_t* tokens,
                             int step_index, step_execute_fn execute_fn) {
-    if (!workflow || !json || !tokens || !execute_fn) return (argo_report_error(E_INPUT_NULL, "step_execute_with_retry", "parameter is NULL"), E_INPUT_NULL);
+    if (!workflow || !json || !tokens || !execute_fn) {
+        argo_report_error(E_INPUT_NULL, "step_execute_with_retry", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
 
     /* Extract retry configuration */
     retry_config_t config;
@@ -158,7 +164,10 @@ int step_handle_error(workflow_controller_t* workflow,
                       const char* json, jsmntok_t* tokens,
                       int step_index, int error_code,
                       char* next_step, size_t next_step_size) {
-    if (!workflow || !json || !tokens || !next_step) return (argo_report_error(E_INPUT_NULL, "step_handle_error", "parameter is NULL"), E_INPUT_NULL);
+    if (!workflow || !json || !tokens || !next_step) {
+        argo_report_error(E_INPUT_NULL, "step_handle_error", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
 
     /* Check for on_error field */
     int on_error_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_ON_ERROR);
@@ -326,9 +335,10 @@ int step_workflow_call(workflow_controller_t* workflow,
         return result;
     }
 
-    /* Save entire child context to parent under save_to */
-    /* For now, save a simple success indicator */
-    /* TODO: Implement context serialization for full result capture */
+    /* Save child workflow result to parent context */
+    /* Future enhancement: Full context serialization would allow child workflows
+     * to return complex data structures back to parent. Currently saves simple
+     * success indicator which is sufficient for workflow chaining without data flow. */
     result = workflow_context_set(parent_ctx, save_to, "{\"status\": \"success\"}");
 
     /* Cleanup child workflow */
@@ -338,10 +348,26 @@ int step_workflow_call(workflow_controller_t* workflow,
     return result;
 }
 
-/* Step: parallel */
+/* Step: parallel
+ *
+ * IMPORTANT: This is currently a SIMULATION ONLY implementation.
+ * Steps are not actually executed - only validated and logged.
+ *
+ * Real parallel execution requires:
+ * 1. Thread pool or async task queue
+ * 2. Step lookup and execution infrastructure
+ * 3. Result collection and synchronization
+ * 4. Error aggregation from parallel failures
+ *
+ * Current behavior: Validates parallel_steps array exists and contains
+ * valid step IDs, then returns success. Use for workflow structure testing.
+ */
 int step_parallel(workflow_controller_t* workflow,
                   const char* json, jsmntok_t* tokens, int step_index) {
-    if (!workflow || !json || !tokens) return (argo_report_error(E_INPUT_NULL, "step_parallel", "parameter is NULL"), E_INPUT_NULL);
+    if (!workflow || !json || !tokens) {
+        argo_report_error(E_INPUT_NULL, "step_parallel", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
 
     /* Find parallel_steps array */
     int steps_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PARALLEL_STEPS);
@@ -356,16 +382,16 @@ int step_parallel(workflow_controller_t* workflow,
         return ARGO_SUCCESS;
     }
 
-    LOG_INFO("Executing %d steps in parallel (sequential simulation)", step_count);
+    LOG_INFO("SIMULATION: Validating %d parallel steps (not executing)", step_count);
 
-    /* Execute each step sequentially (simulated parallelism) */
+    /* Validate parallel_steps array (simulation only - no actual execution) */
     int step_token = steps_idx + 1;
     int first_error = ARGO_SUCCESS;
     int success_count = 0;
     int error_count = 0;
 
     for (int i = 0; i < step_count; i++) {
-        /* Get step ID */
+        /* Validate step ID format */
         char step_id[STEP_ID_BUFFER_SIZE];
         int result = workflow_json_extract_string(json, &tokens[step_token], step_id, sizeof(step_id));
         if (result != ARGO_SUCCESS) {
@@ -378,26 +404,19 @@ int step_parallel(workflow_controller_t* workflow,
             continue;
         }
 
-        LOG_INFO("Executing parallel step %d/%d: %s", i + 1, step_count, step_id);
+        LOG_DEBUG("SIMULATION: Validated parallel step %d/%d: %s", i + 1, step_count, step_id);
 
-        /* Simulated parallel execution - in a real implementation, this would:
-         * 1. Look up the step by ID in the workflow
-         * 2. Execute it in a separate thread or async context
-         * 3. Collect results when all parallel steps complete
-         *
-         * For now, we just log and count as success (proof of concept)
-         */
-        LOG_INFO("Parallel step '%s' simulated execution complete", step_id);
+        /* SIMULATION ONLY: Real implementation would execute step here */
         success_count++;
 
         step_token++;
     }
 
-    LOG_INFO("Parallel execution complete: %d succeeded, %d failed", success_count, error_count);
+    LOG_INFO("SIMULATION: Parallel validation complete: %d valid, %d invalid", success_count, error_count);
 
     /* Return first error if any occurred, otherwise success */
     if (first_error != ARGO_SUCCESS) {
-        LOG_ERROR("Parallel execution had errors, returning first error: %d", first_error);
+        LOG_ERROR("SIMULATION: Parallel validation had errors, returning first error: %d", first_error);
     }
 
     return first_error;

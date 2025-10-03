@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 /* Project includes */
 #include "argo_merge.h"
@@ -12,9 +13,16 @@
 #include "argo_log.h"
 #include "argo_limits.h"
 
-/* Generate session ID */
+/* Generate unique session ID (thread-safe) */
 static void generate_session_id(char* id_out, size_t len) {
-    snprintf(id_out, len, "merge-%ld", (long)time(NULL));
+    static int session_counter = 0;
+    static pthread_mutex_t counter_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    pthread_mutex_lock(&counter_mutex);
+    int counter = session_counter++;
+    pthread_mutex_unlock(&counter_mutex);
+
+    snprintf(id_out, len, "merge-%ld-%d", (long)time(NULL), counter);
 }
 
 /* Create merge negotiation session */

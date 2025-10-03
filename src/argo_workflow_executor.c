@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdbool.h>
 
 /* External library - header only for struct definitions */
 #define JSMN_HEADER
@@ -18,61 +19,122 @@
 #include "argo_log.h"
 #include "argo_json.h"
 
+/* Step handler function types */
+typedef int (*basic_step_fn)(const char* json, jsmntok_t* tokens, int step_idx, workflow_context_t* ctx);
+typedef int (*branching_step_fn)(const char* json, jsmntok_t* tokens, int step_idx, workflow_context_t* ctx, char* next_step, size_t next_step_size);
+typedef int (*ci_step_fn)(workflow_controller_t* workflow, const char* json, jsmntok_t* tokens, int step_idx);
+
+/* Step dispatch table entry */
+typedef struct {
+    const char* type_name;
+    enum { BASIC_STEP, BRANCHING_STEP, CI_STEP } handler_type;
+    union {
+        basic_step_fn basic;
+        branching_step_fn branching;
+        ci_step_fn ci;
+    } handler;
+} step_dispatch_entry_t;
+
+/* Step dispatch table - maps step type names to handler functions */
+static const step_dispatch_entry_t step_dispatch_table[] = {
+    { STEP_TYPE_USER_ASK,      BASIC_STEP,     { .basic = step_user_ask } },
+    { STEP_TYPE_DISPLAY,       BASIC_STEP,     { .basic = step_display } },
+    { STEP_TYPE_SAVE_FILE,     BASIC_STEP,     { .basic = step_save_file } },
+    { STEP_TYPE_DECIDE,        BRANCHING_STEP, { .branching = step_decide } },
+    { STEP_TYPE_USER_CHOOSE,   BRANCHING_STEP, { .branching = step_user_choose } },
+    { STEP_TYPE_CI_ASK,        CI_STEP,        { .ci = step_ci_ask } },
+    { STEP_TYPE_CI_ANALYZE,    CI_STEP,        { .ci = step_ci_analyze } },
+    { STEP_TYPE_CI_ASK_SERIES, CI_STEP,        { .ci = step_ci_ask_series } },
+    { STEP_TYPE_CI_PRESENT,    CI_STEP,        { .ci = step_ci_present } },
+    { STEP_TYPE_WORKFLOW_CALL, CI_STEP,        { .ci = step_workflow_call } },
+    { STEP_TYPE_PARALLEL,      CI_STEP,        { .ci = step_parallel } },
+    { NULL, BASIC_STEP, { .basic = NULL } }  /* Sentinel */
+};
+
+/* Helper: Detect if next_step is backwards (loop detected) */
+static bool detect_loop_backwards(const char* current_step_id, const char* next_step) {
+    /* Convert step IDs to numbers for comparison (if possible) */
+    char* endptr;
+    long current_num = strtol(current_step_id, &endptr, 10);
+    bool current_is_num = (*endptr == '\0');
+
+    long next_num = strtol(next_step, &endptr, 10);
+    bool next_is_num = (*endptr == '\0');
+
+    /* Loop detected if next step number is less than or equal to current */
+    return (current_is_num && next_is_num && next_num <= current_num);
+}
+
+/* Helper: Update loop tracking and validate max iterations */
+static int update_loop_tracking(workflow_controller_t* workflow,
+                               const char* json, jsmntok_t* tokens,
+                               int step_idx, const char* next_step) {
+    /* Check if this is the same loop or a new loop */
+    if (workflow->loop_start_step_id[0] == '\0' ||
+        strcmp(next_step, workflow->loop_start_step_id) == 0) {
+        /* Same loop - increment iteration count */
+        workflow->loop_iteration_count++;
+
+        /* Set loop start if not set */
+        if (workflow->loop_start_step_id[0] == '\0') {
+            strncpy(workflow->loop_start_step_id, next_step,
+                   sizeof(workflow->loop_start_step_id) - 1);
+        }
+
+        /* Check max_iterations from step definition */
+        int max_iterations = EXECUTOR_MAX_LOOP_ITERATIONS;
+        int max_iter_idx = workflow_json_find_field(json, tokens, step_idx,
+                                                    STEP_FIELD_MAX_ITERATIONS);
+        if (max_iter_idx >= 0) {
+            int step_max_iter;
+            if (workflow_json_extract_int(json, &tokens[max_iter_idx],
+                                        &step_max_iter) == ARGO_SUCCESS) {
+                max_iterations = step_max_iter;
+            }
+        }
+
+        /* Check if we've exceeded max iterations */
+        if (workflow->loop_iteration_count > max_iterations) {
+            argo_report_error(E_INPUT_INVALID, "update_loop_tracking",
+                            "max_iterations exceeded");
+            return E_INPUT_INVALID;
+        }
+
+        LOG_DEBUG("Loop iteration %d/%d (back to step %s)",
+                 workflow->loop_iteration_count, max_iterations, next_step);
+    } else {
+        /* New loop - reset tracking */
+        strncpy(workflow->loop_start_step_id, next_step,
+               sizeof(workflow->loop_start_step_id) - 1);
+        workflow->loop_iteration_count = 1;
+        LOG_DEBUG("Starting new loop at step %s", next_step);
+    }
+
+    return ARGO_SUCCESS;
+}
+
+/* Helper: Update workflow step tracking */
+static void update_step_tracking(workflow_controller_t* workflow, const char* next_step) {
+    /* Save previous step before updating */
+    strncpy(workflow->previous_step_id, workflow->current_step_id,
+           sizeof(workflow->previous_step_id) - 1);
+
+    /* Update current step */
+    strncpy(workflow->current_step_id, next_step,
+           sizeof(workflow->current_step_id) - 1);
+    workflow->step_count++;
+}
+
 /* Helper: Check loop and update workflow step tracking */
 static int check_and_update_loop(workflow_controller_t* workflow,
                                  const char* json, jsmntok_t* tokens,
                                  int step_idx, const char* next_step) {
-    /* Detect loop: check if next_step points to a previous step */
-    int is_looping_back = 0;
-
-    /* Convert step IDs to numbers for comparison (if possible) */
-    char* endptr;
-    long current_num = strtol(workflow->current_step_id, &endptr, 10);
-    int current_is_num = (*endptr == '\0');
-
-    long next_num = strtol(next_step, &endptr, 10);
-    int next_is_num = (*endptr == '\0');
-
-    /* Loop detected if next step number is less than or equal to current */
-    if (current_is_num && next_is_num && next_num <= current_num) {
-        is_looping_back = 1;
-    }
+    bool is_looping_back = detect_loop_backwards(workflow->current_step_id, next_step);
 
     if (is_looping_back) {
-        /* Check if this is the same loop or a new loop */
-        if (workflow->loop_start_step_id[0] == '\0' ||
-            strcmp(next_step, workflow->loop_start_step_id) == 0) {
-            /* Same loop - increment iteration count */
-            workflow->loop_iteration_count++;
-
-            /* Set loop start if not set */
-            if (workflow->loop_start_step_id[0] == '\0') {
-                strncpy(workflow->loop_start_step_id, next_step, sizeof(workflow->loop_start_step_id) - 1);
-            }
-
-            /* Check max_iterations from step definition */
-            int max_iterations = EXECUTOR_MAX_LOOP_ITERATIONS;
-            int max_iter_idx = workflow_json_find_field(json, tokens, step_idx, STEP_FIELD_MAX_ITERATIONS);
-            if (max_iter_idx >= 0) {
-                int step_max_iter;
-                if (workflow_json_extract_int(json, &tokens[max_iter_idx], &step_max_iter) == ARGO_SUCCESS) {
-                    max_iterations = step_max_iter;
-                }
-            }
-
-            /* Check if we've exceeded max iterations */
-            if (workflow->loop_iteration_count > max_iterations) {
-                argo_report_error(E_INPUT_INVALID, "check_and_update_loop", "max_iterations exceeded");
-                return E_INPUT_INVALID;
-            }
-
-            LOG_DEBUG("Loop iteration %d/%d (back to step %s)",
-                     workflow->loop_iteration_count, max_iterations, next_step);
-        } else {
-            /* New loop - reset tracking */
-            strncpy(workflow->loop_start_step_id, next_step, sizeof(workflow->loop_start_step_id) - 1);
-            workflow->loop_iteration_count = 1;
-            LOG_DEBUG("Starting new loop at step %s", next_step);
+        int result = update_loop_tracking(workflow, json, tokens, step_idx, next_step);
+        if (result != ARGO_SUCCESS) {
+            return result;
         }
     } else {
         /* Not looping - reset loop tracking */
@@ -80,13 +142,7 @@ static int check_and_update_loop(workflow_controller_t* workflow,
         workflow->loop_iteration_count = 0;
     }
 
-    /* Save previous step before updating */
-    strncpy(workflow->previous_step_id, workflow->current_step_id, sizeof(workflow->previous_step_id) - 1);
-
-    /* Update current step */
-    strncpy(workflow->current_step_id, next_step, sizeof(workflow->current_step_id) - 1);
-    workflow->step_count++;
-
+    update_step_tracking(workflow, next_step);
     return ARGO_SUCCESS;
 }
 
@@ -264,44 +320,42 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
 
     char next_step[WORKFLOW_STEP_ID_MAX];
 
-    /* Execute step based on type */
-    if (strcmp(type, STEP_TYPE_USER_ASK) == 0) {
-        result = step_user_ask(json, tokens, step_idx, workflow->context);
-    } else if (strcmp(type, STEP_TYPE_DISPLAY) == 0) {
-        result = step_display(json, tokens, step_idx, workflow->context);
-    } else if (strcmp(type, STEP_TYPE_SAVE_FILE) == 0) {
-        result = step_save_file(json, tokens, step_idx, workflow->context);
-    } else if (strcmp(type, STEP_TYPE_DECIDE) == 0) {
-        /* decide step determines next_step based on condition */
-        result = step_decide(json, tokens, step_idx, workflow->context, next_step, sizeof(next_step));
-        if (result == ARGO_SUCCESS) {
-            /* Check loop and update step tracking */
-            return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
+    /* Find step handler in dispatch table */
+    const step_dispatch_entry_t* entry = NULL;
+    for (int i = 0; step_dispatch_table[i].type_name != NULL; i++) {
+        if (strcmp(type, step_dispatch_table[i].type_name) == 0) {
+            entry = &step_dispatch_table[i];
+            break;
         }
-        return result;
-    } else if (strcmp(type, STEP_TYPE_USER_CHOOSE) == 0) {
-        /* user_choose step determines next_step based on selection */
-        result = step_user_choose(json, tokens, step_idx, workflow->context, next_step, sizeof(next_step));
-        if (result == ARGO_SUCCESS) {
-            /* Check loop and update step tracking */
-            return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
-        }
-        return result;
-    } else if (strcmp(type, STEP_TYPE_CI_ASK) == 0) {
-        result = step_ci_ask(workflow, json, tokens, step_idx);
-    } else if (strcmp(type, STEP_TYPE_CI_ANALYZE) == 0) {
-        result = step_ci_analyze(workflow, json, tokens, step_idx);
-    } else if (strcmp(type, STEP_TYPE_CI_ASK_SERIES) == 0) {
-        result = step_ci_ask_series(workflow, json, tokens, step_idx);
-    } else if (strcmp(type, STEP_TYPE_CI_PRESENT) == 0) {
-        result = step_ci_present(workflow, json, tokens, step_idx);
-    } else if (strcmp(type, STEP_TYPE_WORKFLOW_CALL) == 0) {
-        result = step_workflow_call(workflow, json, tokens, step_idx);
-    } else if (strcmp(type, STEP_TYPE_PARALLEL) == 0) {
-        result = step_parallel(workflow, json, tokens, step_idx);
-    } else {
+    }
+
+    if (!entry) {
         argo_report_error(E_INPUT_INVALID, "workflow_execute_current_step", type);
         return E_INPUT_INVALID;
+    }
+
+    /* Execute step based on handler type */
+    switch (entry->handler_type) {
+        case BASIC_STEP:
+            result = entry->handler.basic(json, tokens, step_idx, workflow->context);
+            break;
+
+        case BRANCHING_STEP:
+            /* Branching steps determine their own next_step */
+            result = entry->handler.branching(json, tokens, step_idx, workflow->context,
+                                             next_step, sizeof(next_step));
+            if (result == ARGO_SUCCESS) {
+                return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
+            }
+            return result;
+
+        case CI_STEP:
+            result = entry->handler.ci(workflow, json, tokens, step_idx);
+            break;
+
+        default:
+            argo_report_error(E_INTERNAL_LOGIC, "workflow_execute_current_step", "invalid handler type");
+            return E_INTERNAL_LOGIC;
     }
 
     if (result != ARGO_SUCCESS) {
