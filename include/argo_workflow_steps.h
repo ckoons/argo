@@ -18,6 +18,7 @@ typedef struct jsmntok jsmntok_t;
 #define STEP_TYPE_CI_ANALYZE "ci_analyze"
 #define STEP_TYPE_CI_ASK_SERIES "ci_ask_series"
 #define STEP_TYPE_CI_PRESENT "ci_present"
+#define STEP_TYPE_WORKFLOW_CALL "workflow_call"
 
 /* Step JSON field names */
 #define STEP_FIELD_PROMPT "prompt"
