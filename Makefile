@@ -6,6 +6,16 @@ CC = gcc
 CFLAGS = -Wall -Werror -Wextra -std=c11 -g -I./include
 LDFLAGS = -lpthread
 
+# Optional features (enable with make ENABLE_DRYRUN=1 ENABLE_METRICS=1)
+ifdef ENABLE_DRYRUN
+  CFLAGS += -DARGO_ENABLE_DRYRUN
+endif
+
+ifdef ENABLE_METRICS
+  CFLAGS += -DARGO_ENABLE_METRICS
+  CORE_SOURCES += $(SRC_DIR)/argo_metrics.c
+endif
+
 # Directories
 SRC_DIR = src
 INC_DIR = include
@@ -79,7 +89,8 @@ CORE_LIB = $(BUILD_DIR)/libargo_core.a
 SCRIPT_SOURCES = $(SCRIPT_DIR)/argo_monitor.c \
                  $(SCRIPT_DIR)/argo_memory_inspect.c \
                  $(SCRIPT_DIR)/argo_update_models.c \
-                 $(SCRIPT_DIR)/argo_ci_assign.c
+                 $(SCRIPT_DIR)/argo_ci_assign.c \
+                 $(SCRIPT_DIR)/argo_workflow_tracer.c
 
 # Script executables
 SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
@@ -108,6 +119,9 @@ WORKFLOW_LOADER_TEST_TARGET = $(BUILD_DIR)/test_workflow_loader
 SESSION_TEST_TARGET = $(BUILD_DIR)/test_session
 ENV_TEST_TARGET = $(BUILD_DIR)/test_env
 THREAD_SAFETY_TEST_TARGET = $(BUILD_DIR)/test_thread_safety
+SHUTDOWN_SIGNALS_TEST_TARGET = $(BUILD_DIR)/test_shutdown_signals
+CONCURRENT_WORKFLOWS_TEST_TARGET = $(BUILD_DIR)/test_concurrent_workflows
+ENV_PRECEDENCE_TEST_TARGET = $(BUILD_DIR)/test_env_precedence
 
 # Default target
 all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SCRIPT_TARGETS)
@@ -270,6 +284,18 @@ $(ENV_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_env.o $(STUB_OBJECTS)
 
 # Build thread safety test executable
 $(THREAD_SAFETY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_thread_safety.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build shutdown signals test executable
+$(SHUTDOWN_SIGNALS_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_shutdown_signals.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build concurrent workflows test executable
+$(CONCURRENT_WORKFLOWS_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_concurrent_workflows.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build environment precedence test executable
+$(ENV_PRECEDENCE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_env_precedence.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Quick tests - fast, no external dependencies
@@ -440,6 +466,23 @@ test-asan: build-asan
 	@echo ""
 	@echo "=========================================="
 	@echo "ASAN Complete - Rebuild normally with 'make'"
+	@echo "=========================================="
+
+test-asan-full: build-asan
+	@echo ""
+	@echo "=========================================="
+	@echo "Full AddressSanitizer Test Suite"
+	@echo "=========================================="
+	@./$(WORKFLOW_TEST_TARGET) && echo "  ✓ Workflow" || echo "  ✗ Workflow"
+	@./$(INTEGRATION_TEST_TARGET) && echo "  ✓ Integration" || echo "  ✗ Integration"
+	@./$(LIFECYCLE_TEST_TARGET) && echo "  ✓ Lifecycle" || echo "  ✗ Lifecycle"
+	@./$(MEMORY_TEST_TARGET) && echo "  ✓ Memory" || echo "  ✗ Memory"
+	@./$(THREAD_SAFETY_TEST_TARGET) && echo "  ✓ Thread Safety" || echo "  ✗ Thread Safety"
+	@./$(SESSION_TEST_TARGET) && echo "  ✓ Session" || echo "  ✗ Session"
+	@./$(PERSISTENCE_TEST_TARGET) && echo "  ✓ Persistence" || echo "  ✗ Persistence"
+	@echo ""
+	@echo "=========================================="
+	@echo "Full ASAN Complete - Rebuild normally with 'make'"
 	@echo "=========================================="
 
 # Line counting

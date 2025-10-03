@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 /* External library - header only for struct definitions */
 #define JSMN_HEADER
@@ -111,6 +112,15 @@ static int update_loop_tracking(workflow_controller_t* workflow,
     }
 
     return ARGO_SUCCESS;
+}
+
+/* Helper: Sleep for retry delay with exponential backoff */
+static void retry_sleep(int attempt, int base_delay_ms, int multiplier) {
+    int delay_ms = base_delay_ms;
+    for (int i = 0; i < attempt; i++) {
+        delay_ms *= multiplier;
+    }
+    usleep(delay_ms * 1000);  /* Convert ms to microseconds */
 }
 
 /* Helper: Update workflow step tracking */
@@ -334,28 +344,75 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         return E_INPUT_INVALID;
     }
 
-    /* Execute step based on handler type */
-    switch (entry->handler_type) {
-        case BASIC_STEP:
-            result = entry->handler.basic(json, tokens, step_idx, workflow->context);
-            break;
-
-        case BRANCHING_STEP:
-            /* Branching steps determine their own next_step */
-            result = entry->handler.branching(json, tokens, step_idx, workflow->context,
-                                             next_step, sizeof(next_step));
-            if (result == ARGO_SUCCESS) {
+#if ARGO_HAS_DRYRUN
+    /* Dry-run mode: validate but don't execute */
+    if (workflow->dry_run) {
+        LOG_INFO("[DRY-RUN] Step %s: %s (would execute)", workflow->current_step_id, type);
+        /* For branching steps, use default next_step from JSON */
+        if (entry->handler_type != BRANCHING_STEP) {
+            int next_idx = workflow_json_find_field(json, tokens, step_idx, WORKFLOW_JSON_FIELD_NEXT_STEP);
+            if (next_idx >= 0) {
+                if (tokens[next_idx].type == JSMN_STRING) {
+                    workflow_json_extract_string(json, &tokens[next_idx], next_step, sizeof(next_step));
+                } else {
+                    int next_num;
+                    if (workflow_json_extract_int(json, &tokens[next_idx], &next_num) == ARGO_SUCCESS) {
+                        snprintf(next_step, sizeof(next_step), "%d", next_num);
+                    }
+                }
                 return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
             }
-            return result;
+        }
+        strncpy(next_step, EXECUTOR_STEP_EXIT, sizeof(next_step) - 1);
+        return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
+    }
+#endif
 
-        case CI_STEP:
-            result = entry->handler.ci(workflow, json, tokens, step_idx);
+    /* Execute step with retry logic */
+    int retry_attempt = 0;
+    while (retry_attempt <= workflow->retry_config.max_retries) {
+        /* Execute step based on handler type */
+        switch (entry->handler_type) {
+            case BASIC_STEP:
+                result = entry->handler.basic(json, tokens, step_idx, workflow->context);
+                break;
+
+            case BRANCHING_STEP:
+                /* Branching steps determine their own next_step */
+                result = entry->handler.branching(json, tokens, step_idx, workflow->context,
+                                                 next_step, sizeof(next_step));
+                if (result == ARGO_SUCCESS) {
+                    return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
+                }
+                break;
+
+            case CI_STEP:
+                result = entry->handler.ci(workflow, json, tokens, step_idx);
+                break;
+
+            default:
+                argo_report_error(E_INTERNAL_LOGIC, "workflow_execute_current_step", "invalid handler type");
+                return E_INTERNAL_LOGIC;
+        }
+
+        /* Success - break out of retry loop */
+        if (result == ARGO_SUCCESS) {
             break;
+        }
 
-        default:
-            argo_report_error(E_INTERNAL_LOGIC, "workflow_execute_current_step", "invalid handler type");
-            return E_INTERNAL_LOGIC;
+        /* Failure - check if we should retry */
+        if (retry_attempt < workflow->retry_config.max_retries) {
+            retry_attempt++;
+            LOG_WARN("Step %s failed (attempt %d/%d), retrying after backoff",
+                    workflow->current_step_id, retry_attempt,
+                    workflow->retry_config.max_retries + 1);
+            retry_sleep(retry_attempt,
+                       workflow->retry_config.retry_delay_ms,
+                       workflow->retry_config.backoff_multiplier);
+        } else {
+            LOG_ERROR("Step %s failed after %d attempts", workflow->current_step_id, retry_attempt + 1);
+            return result;
+        }
     }
 
     if (result != ARGO_SUCCESS) {

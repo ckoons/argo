@@ -78,6 +78,16 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
     /* Initialize workflow chaining */
     workflow->recursion_depth = 0;
 
+    /* Initialize retry configuration with defaults */
+    workflow->retry_config.max_retries = EXECUTOR_DEFAULT_MAX_RETRIES;
+    workflow->retry_config.retry_delay_ms = EXECUTOR_DEFAULT_RETRY_DELAY_MS;
+    workflow->retry_config.backoff_multiplier = EXECUTOR_DEFAULT_BACKOFF_MULTIPLIER;
+
+#if ARGO_HAS_DRYRUN
+    /* Initialize dry-run mode (disabled by default) */
+    workflow->dry_run = 0;
+#endif
+
     /* Register for graceful shutdown tracking */
     argo_register_workflow(workflow);
 
@@ -418,3 +428,20 @@ int workflow_auto_assign_tasks(workflow_controller_t* workflow) {
     LOG_INFO("Auto-assigned %d tasks", assigned_count);
     return ARGO_SUCCESS;
 }
+
+#if ARGO_HAS_DRYRUN
+/* Enable/disable dry-run mode */
+void workflow_set_dryrun(workflow_controller_t* workflow, int enable) {
+    if (!workflow) return;
+    workflow->dry_run = enable ? 1 : 0;
+    LOG_INFO("Workflow %s: dry-run mode %s",
+             workflow->workflow_id,
+             workflow->dry_run ? "enabled" : "disabled");
+}
+
+/* Check if dry-run mode is enabled */
+int workflow_is_dryrun(workflow_controller_t* workflow) {
+    if (!workflow) return 0;
+    return workflow->dry_run;
+}
+#endif

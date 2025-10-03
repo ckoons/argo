@@ -200,6 +200,32 @@ static int get_role_offset(ci_registry_t* registry, const char* role) {
     return registry->port_config.reserved_offset;
 }
 
+/* Helper: Reclaim port from offline CI in role's range */
+static int reclaim_port_from_offline_ci(ci_registry_t* registry, const char* role) {
+    int offset = get_role_offset(registry, role);
+    int base = registry->port_config.base_port + offset;
+    int range_end = base + REGISTRY_PORTS_PER_ROLE;
+
+    ci_registry_entry_t* entry = registry->entries;
+    while (entry) {
+        /* Check if CI is offline and has port in this role's range */
+        if (entry->status == CI_STATUS_OFFLINE &&
+            entry->port >= base &&
+            entry->port < range_end) {
+            int reclaimed_port = entry->port;
+            LOG_INFO("Reclaiming port %d from offline CI: %s", reclaimed_port, entry->name);
+
+            /* Remove the offline CI from registry */
+            registry_remove_ci(registry, entry->name);
+
+            return reclaimed_port;
+        }
+        entry = entry->next;
+    }
+
+    return -1;  /* No offline CI found */
+}
+
 /* Allocate port for role */
 int registry_allocate_port(ci_registry_t* registry, const char* role) {
     ARGO_CHECK_NULL(registry);
@@ -214,6 +240,12 @@ int registry_allocate_port(ci_registry_t* registry, const char* role) {
         if (registry_is_port_available(registry, port)) {
             return port;
         }
+    }
+
+    /* No free port - try to reclaim from offline CI */
+    int reclaimed_port = reclaim_port_from_offline_ci(registry, role);
+    if (reclaimed_port >= 0) {
+        return reclaimed_port;
     }
 
     argo_report_error(E_PROTOCOL_QUEUE, "registry_allocate_port", ERR_MSG_PORT_ALLOCATION_FAILED);

@@ -8,6 +8,7 @@
 #include "argo_error.h"
 #include "argo_workflow_context.h"
 #include "argo_workflow_json.h"
+#include "argo_optional.h"
 
 /* Forward declaration */
 typedef struct jsmntok jsmntok_t;
@@ -22,6 +23,11 @@ typedef struct jsmntok jsmntok_t;
 #define EXECUTOR_TYPE_BUFFER_SIZE 64
 #define EXECUTOR_STEP_EXIT "EXIT"
 #define EXECUTOR_MAX_LOOP_ITERATIONS 10
+
+/* Retry configuration constants */
+#define EXECUTOR_DEFAULT_MAX_RETRIES 3
+#define EXECUTOR_DEFAULT_RETRY_DELAY_MS 1000
+#define EXECUTOR_DEFAULT_BACKOFF_MULTIPLIER 2
 
 /* Workflow phases */
 typedef enum {
@@ -42,6 +48,13 @@ typedef enum {
     WORKFLOW_STATE_FAILED,
     WORKFLOW_STATE_DONE
 } workflow_state_t;
+
+/* Step retry configuration */
+typedef struct {
+    int max_retries;           /* Maximum retry attempts per step */
+    int retry_delay_ms;        /* Initial retry delay in milliseconds */
+    int backoff_multiplier;    /* Delay multiplier for exponential backoff */
+} step_retry_config_t;
 
 /* Task structure */
 typedef struct ci_task {
@@ -103,6 +116,14 @@ typedef struct workflow_controller {
     /* Workflow chaining */
     int recursion_depth;           /* Current workflow call depth (prevent infinite recursion) */
 
+    /* Step retry configuration */
+    step_retry_config_t retry_config;
+
+#if ARGO_HAS_DRYRUN
+    /* Dry-run mode */
+    int dry_run;                   /* If true, validate workflow without executing steps */
+#endif
+
 } workflow_controller_t;
 
 /* Workflow lifecycle */
@@ -151,5 +172,11 @@ int workflow_checkpoint_to_file(workflow_controller_t* workflow,
 workflow_controller_t* workflow_restore_from_file(ci_registry_t* registry,
                                                   lifecycle_manager_t* lifecycle,
                                                   const char* filepath);
+
+#if ARGO_HAS_DRYRUN
+/* Dry-run mode control */
+void workflow_set_dryrun(workflow_controller_t* workflow, int enable);
+int workflow_is_dryrun(workflow_controller_t* workflow);
+#endif
 
 #endif /* ARGO_WORKFLOW_H */

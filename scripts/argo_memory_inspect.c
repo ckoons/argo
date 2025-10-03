@@ -18,6 +18,7 @@ static void print_usage(const char* prog) {
     printf("  --type TYPE, -t TYPE     Filter by memory type\n");
     printf("  --min-relevance N, -r N  Minimum relevance score (0.0-1.0)\n");
     printf("  --size                   Show size information only\n");
+    printf("  --churn                  Show memory churn metrics\n");
     printf("  --json, -j               JSON output format\n");
     printf("  --help, -h               Show this help\n");
     printf("\n");
@@ -154,11 +155,60 @@ static void print_size_info(ci_memory_digest_t* digest) {
     printf("\n");
 }
 
+static void print_churn_metrics(ci_memory_digest_t* digest) {
+    print_header(digest->session_id);
+
+    printf("Memory Churn Metrics\n");
+    printf("-------------------------------------------------\n");
+    printf("Session: %s\n", digest->session_id);
+    printf("CI: %s\n\n", digest->ci_name);
+
+    /* Calculate churn: items with high access but low relevance suggest churn */
+    int high_churn = 0;
+    int stable = 0;
+    int fresh = 0;
+
+    for (int i = 0; i < digest->selected_count; i++) {
+        memory_item_t* item = digest->selected[i];
+        if (!item) continue;
+
+        /* High access but dropping relevance = churn */
+        if (item->relevance.access_count > 5 && item->relevance.score < 0.3) {
+            high_churn++;
+        } else if (item->relevance.access_count > 3) {
+            stable++;
+        } else {
+            fresh++;
+        }
+    }
+
+    printf("Item Distribution:\n");
+    printf("  Fresh (new):        %d items\n", fresh);
+    printf("  Stable (reused):    %d items\n", stable);
+    printf("  Churned (fading):   %d items\n", high_churn);
+    printf("\n");
+
+    float churn_rate = digest->selected_count > 0 ?
+                      (high_churn * 100.0) / digest->selected_count : 0.0;
+    printf("Churn Rate: %.1f%%\n", churn_rate);
+
+    if (churn_rate > 30.0) {
+        printf("Status: HIGH CHURN - Consider sunset/sunrise cycle\n");
+    } else if (churn_rate > 15.0) {
+        printf("Status: MODERATE CHURN - Monitor memory usage\n");
+    } else {
+        printf("Status: LOW CHURN - Memory is stable\n");
+    }
+
+    printf("\n");
+}
+
 int main(int argc, char* argv[]) {
     const char* session_id = "demo-session";
     memory_type_t type_filter = (memory_type_t)-1;
     float min_relevance = 0.0f;
     bool size_only = false;
+    bool churn_mode = false;
     bool json_mode = false;
 
     /* Parse arguments */
@@ -181,6 +231,8 @@ int main(int argc, char* argv[]) {
             }
         } else if (strcmp(argv[i], "--size") == 0) {
             size_only = true;
+        } else if (strcmp(argv[i], "--churn") == 0) {
+            churn_mode = true;
         } else if (strcmp(argv[i], "--json") == 0 || strcmp(argv[i], "-j") == 0) {
             json_mode = true;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
@@ -238,6 +290,8 @@ int main(int argc, char* argv[]) {
         }
     } else if (size_only) {
         print_size_info(digest);
+    } else if (churn_mode) {
+        print_churn_metrics(digest);
     } else {
         print_digest_summary(digest, type_filter, min_relevance);
     }
