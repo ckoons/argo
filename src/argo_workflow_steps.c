@@ -245,6 +245,79 @@ int step_decide(const char* json, jsmntok_t* tokens, int step_index,
     return result;
 }
 
+/* Step: ci_ask */
+int step_ci_ask(ci_provider_t* provider,
+                const char* json, jsmntok_t* tokens, int step_index,
+                workflow_context_t* ctx) {
+    /* provider can be NULL - steps work without AI for now */
+    (void)provider;
+
+    if (!json || !tokens || !ctx) {
+        argo_report_error(E_INPUT_NULL, "step_ci_ask", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Find prompt_template field */
+    int prompt_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PROMPT_TEMPLATE);
+    if (prompt_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_ci_ask", "missing prompt_template");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char prompt_template[STEP_PROMPT_BUFFER_SIZE];
+    int result = workflow_json_extract_string(json, &tokens[prompt_idx],
+                                              prompt_template, sizeof(prompt_template));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Substitute variables in prompt */
+    char prompt[STEP_OUTPUT_BUFFER_SIZE];
+    result = workflow_context_substitute(ctx, prompt_template, prompt, sizeof(prompt));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Find save_to field */
+    int save_to_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_SAVE_TO);
+    if (save_to_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_ci_ask", "missing save_to");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char save_to[STEP_SAVE_TO_BUFFER_SIZE];
+    result = workflow_json_extract_string(json, &tokens[save_to_idx], save_to, sizeof(save_to));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Show AI persona's prompt */
+    printf("%s ", prompt);
+    fflush(stdout);
+
+    /* Read user input */
+    char input[STEP_INPUT_BUFFER_SIZE];
+    if (!fgets(input, sizeof(input), stdin)) {
+        argo_report_error(E_INPUT_INVALID, "step_ci_ask", "failed to read input");
+        return E_INPUT_INVALID;
+    }
+
+    /* Remove trailing newline */
+    size_t len = strlen(input);
+    if (len > 0 && input[len - 1] == '\n') {
+        input[len - 1] = '\0';
+    }
+
+    /* Save to context */
+    result = workflow_context_set(ctx, save_to, input);
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    LOG_DEBUG("CI ask: saved to '%s': %s", save_to, input);
+    return ARGO_SUCCESS;
+}
+
 /* Step: user_choose */
 int step_user_choose(const char* json, jsmntok_t* tokens, int step_index,
                      workflow_context_t* ctx,
@@ -364,4 +437,196 @@ int step_user_choose(const char* json, jsmntok_t* tokens, int step_index,
     /* Should never reach here */
     argo_report_error(E_INTERNAL_LOGIC, "step_user_choose", "failed to find selected option");
     return E_INTERNAL_LOGIC;
+}
+
+/* Step: ci_analyze */
+int step_ci_analyze(ci_provider_t* provider,
+                    const char* json, jsmntok_t* tokens, int step_index,
+                    workflow_context_t* ctx) {
+    /* provider can be NULL - steps work without AI for now */
+    (void)provider;
+
+    if (!json || !tokens || !ctx) {
+        argo_report_error(E_INPUT_NULL, "step_ci_analyze", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Find task field */
+    int task_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_TASK);
+    if (task_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_ci_analyze", "missing task");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char task[STEP_TASK_BUFFER_SIZE];
+    int result = workflow_json_extract_string(json, &tokens[task_idx], task, sizeof(task));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Find save_to field */
+    int save_to_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_SAVE_TO);
+    if (save_to_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_ci_analyze", "missing save_to");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char save_to[STEP_SAVE_TO_BUFFER_SIZE];
+    result = workflow_json_extract_string(json, &tokens[save_to_idx], save_to, sizeof(save_to));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* TODO: Call CI provider to perform analysis */
+    /* For now, just log the task */
+    printf("[CI Analysis] %s\n", task);
+    LOG_DEBUG("CI analyze: task='%s', save_to='%s'", task, save_to);
+
+    /* Save placeholder result to context */
+    result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
+
+    return result;
+}
+
+/* Step: ci_ask_series */
+int step_ci_ask_series(ci_provider_t* provider,
+                       const char* json, jsmntok_t* tokens, int step_index,
+                       workflow_context_t* ctx) {
+    /* provider can be NULL - steps work without AI for now */
+    (void)provider;
+
+    if (!json || !tokens || !ctx) {
+        argo_report_error(E_INPUT_NULL, "step_ci_ask_series", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Find optional intro field */
+    int intro_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_INTRO);
+    if (intro_idx >= 0) {
+        char intro[STEP_PROMPT_BUFFER_SIZE];
+        workflow_json_extract_string(json, &tokens[intro_idx], intro, sizeof(intro));
+        printf("\n%s\n", intro);
+    }
+
+    /* Find questions array */
+    int questions_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_QUESTIONS);
+    if (questions_idx < 0 || tokens[questions_idx].type != JSMN_ARRAY) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_ci_ask_series", "missing or invalid questions");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    int question_count = tokens[questions_idx].size;
+    if (question_count == 0) {
+        argo_report_error(E_INPUT_INVALID, "step_ci_ask_series", "no questions provided");
+        return E_INPUT_INVALID;
+    }
+
+    /* Find save_to field */
+    int save_to_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_SAVE_TO);
+    if (save_to_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_ci_ask_series", "missing save_to");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char save_to[STEP_SAVE_TO_BUFFER_SIZE];
+    int result = workflow_json_extract_string(json, &tokens[save_to_idx], save_to, sizeof(save_to));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Iterate through questions */
+    int question_token = questions_idx + 1;
+    for (int i = 0; i < question_count; i++) {
+        if (tokens[question_token].type != JSMN_OBJECT) {
+            question_token++;
+            continue;
+        }
+
+        /* Get question text */
+        int q_idx = workflow_json_find_field(json, tokens, question_token, "question");
+        if (q_idx >= 0) {
+            char question[STEP_PROMPT_BUFFER_SIZE];
+            workflow_json_extract_string(json, &tokens[q_idx], question, sizeof(question));
+
+            /* Ask question */
+            printf("\n%d. %s ", i + 1, question);
+            fflush(stdout);
+
+            /* Read answer */
+            char answer[STEP_INPUT_BUFFER_SIZE];
+            if (fgets(answer, sizeof(answer), stdin)) {
+                size_t len = strlen(answer);
+                if (len > 0 && answer[len - 1] == '\n') {
+                    answer[len - 1] = '\0';
+                }
+
+                /* Get question ID and save answer */
+                int id_idx = workflow_json_find_field(json, tokens, question_token, "id");
+                if (id_idx >= 0) {
+                    char id[STEP_SAVE_TO_BUFFER_SIZE];
+                    workflow_json_extract_string(json, &tokens[id_idx], id, sizeof(id));
+
+                    /* Build context path: save_to.id */
+                    char full_path[STEP_SAVE_TO_BUFFER_SIZE * 2];
+                    snprintf(full_path, sizeof(full_path), "%s.%s", save_to, id);
+                    workflow_context_set(ctx, full_path, answer);
+                }
+            }
+        }
+
+        /* Skip to next question */
+        int question_tokens = workflow_json_count_tokens(tokens, question_token);
+        question_token += question_tokens;
+    }
+
+    LOG_DEBUG("CI ask_series: completed %d questions, saved to '%s'", question_count, save_to);
+    printf("\n");
+    return ARGO_SUCCESS;
+}
+
+/* Step: ci_present */
+int step_ci_present(ci_provider_t* provider,
+                    const char* json, jsmntok_t* tokens, int step_index,
+                    workflow_context_t* ctx) {
+    /* provider can be NULL - steps work without AI for now */
+    (void)provider;
+
+    if (!json || !tokens || !ctx) {
+        argo_report_error(E_INPUT_NULL, "step_ci_present", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Find data field (context path to data) */
+    int data_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_DATA);
+    if (data_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_ci_present", "missing data");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char data_path[STEP_SAVE_TO_BUFFER_SIZE];
+    int result = workflow_json_extract_string(json, &tokens[data_idx], data_path, sizeof(data_path));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Find format field */
+    int format_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_FORMAT);
+    char format[STEP_SAVE_TO_BUFFER_SIZE] = "text";
+    if (format_idx >= 0) {
+        workflow_json_extract_string(json, &tokens[format_idx], format, sizeof(format));
+    }
+
+    /* TODO: Call CI provider to format and present data */
+    /* For now, just display a simple message */
+    printf("\n");
+    printf("========================================\n");
+    printf("PRESENTATION (%s format)\n", format);
+    printf("========================================\n");
+    printf("Data source: %s\n", data_path);
+    printf("(Full presentation would be generated by CI)\n");
+    printf("========================================\n");
+    printf("\n");
+
+    LOG_DEBUG("CI present: format='%s', data='%s'", format, data_path);
+    return ARGO_SUCCESS;
 }

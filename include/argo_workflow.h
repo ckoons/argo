@@ -54,6 +54,9 @@ typedef struct ci_task {
     struct ci_task* next;
 } ci_task_t;
 
+/* Forward declaration for CI provider */
+typedef struct ci_provider ci_provider_t;
+
 /* Workflow controller */
 typedef struct workflow_controller {
     char workflow_id[64];
@@ -63,6 +66,7 @@ typedef struct workflow_controller {
     /* Associated managers */
     ci_registry_t* registry;
     lifecycle_manager_t* lifecycle;
+    ci_provider_t* provider;       /* CI provider for AI-interactive steps */
 
     /* Task management */
     ci_task_t* tasks;

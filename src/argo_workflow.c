@@ -44,6 +44,7 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
     workflow->state = WORKFLOW_STATE_IDLE;
     workflow->registry = registry;
     workflow->lifecycle = lifecycle;
+    workflow->provider = NULL;          /* No provider by default */
     workflow->tasks = NULL;
     workflow->total_tasks = 0;
     workflow->completed_tasks = 0;
@@ -569,6 +570,14 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
             return ARGO_SUCCESS;
         }
         return result;
+    } else if (strcmp(type, STEP_TYPE_CI_ASK) == 0) {
+        result = step_ci_ask(workflow->provider, json, tokens, step_idx, workflow->context);
+    } else if (strcmp(type, STEP_TYPE_CI_ANALYZE) == 0) {
+        result = step_ci_analyze(workflow->provider, json, tokens, step_idx, workflow->context);
+    } else if (strcmp(type, STEP_TYPE_CI_ASK_SERIES) == 0) {
+        result = step_ci_ask_series(workflow->provider, json, tokens, step_idx, workflow->context);
+    } else if (strcmp(type, STEP_TYPE_CI_PRESENT) == 0) {
+        result = step_ci_present(workflow->provider, json, tokens, step_idx, workflow->context);
     } else {
         argo_report_error(E_INPUT_INVALID, "workflow_execute_current_step", type);
         return E_INPUT_INVALID;

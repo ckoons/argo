@@ -426,6 +426,7 @@ HARNESS_SOCKET = $(BUILD_DIR)/harness_socket
 HARNESS_TERMINAL = $(BUILD_DIR)/harness_terminal
 HARNESS_WORKFLOW_CONTEXT = $(BUILD_DIR)/harness_workflow_context
 HARNESS_CONTROL_FLOW = $(BUILD_DIR)/harness_control_flow
+HARNESS_CI_INTERACTIVE = $(BUILD_DIR)/harness_ci_interactive
 
 harness-init-basic: $(HARNESS_INIT_BASIC)
 	@./$(HARNESS_INIT_BASIC)
@@ -448,10 +449,13 @@ harness-terminal: $(HARNESS_TERMINAL)
 harness-workflow-context: $(HARNESS_WORKFLOW_CONTEXT)
 	@./$(HARNESS_WORKFLOW_CONTEXT)
 
-harness-workflow-executor: $(HARNESS_WORKFLOW_EXECUTOR)
-	@./$(HARNESS_WORKFLOW_EXECUTOR)
+harness-control-flow: $(HARNESS_CONTROL_FLOW)
+	@./$(HARNESS_CONTROL_FLOW)
 
-harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_WORKFLOW_EXECUTOR)
+harness-ci-interactive: $(HARNESS_CI_INTERACTIVE)
+	@./$(HARNESS_CI_INTERACTIVE)
+
+harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_CONTROL_FLOW) $(HARNESS_CI_INTERACTIVE)
 	@echo "Built all test harnesses"
 
 # Run all harnesses
@@ -515,13 +519,18 @@ $(HARNESS_CONTROL_FLOW): tests/harness_control_flow.c $(CORE_LIB)
 	@echo "Building harness_control_flow..."
 	@$(CC) $(CFLAGS) tests/harness_control_flow.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
+$(HARNESS_CI_INTERACTIVE): tests/harness_ci_interactive.c $(CORE_LIB)
+	@echo "Building harness_ci_interactive..."
+	@$(CC) $(CFLAGS) tests/harness_ci_interactive.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
         test-session test-env test-api test-api-calls test-harnesses count-core \
         clean distclean check debug update-models harnesses harness-init-basic \
         harness-env-inspect harness-reinit harness-init-error harness-socket \
-        harness-terminal harness-workflow-context harness-workflow-executor
+        harness-terminal harness-workflow-context harness-control-flow \
+        harness-ci-interactive
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
