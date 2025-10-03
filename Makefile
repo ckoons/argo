@@ -45,7 +45,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_workflow_steps_basic.c \
                $(SRC_DIR)/argo_workflow_steps_ci.c \
                $(SRC_DIR)/argo_workflow_steps_advanced.c \
-               $(SRC_DIR)/argo_workflow_persona.c
+               $(SRC_DIR)/argo_workflow_persona.c \
+               $(SRC_DIR)/argo_shutdown.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -106,9 +107,10 @@ PERSISTENCE_TEST_TARGET = $(BUILD_DIR)/test_persistence
 WORKFLOW_LOADER_TEST_TARGET = $(BUILD_DIR)/test_workflow_loader
 SESSION_TEST_TARGET = $(BUILD_DIR)/test_session
 ENV_TEST_TARGET = $(BUILD_DIR)/test_env
+THREAD_SAFETY_TEST_TARGET = $(BUILD_DIR)/test_thread_safety
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -266,8 +268,12 @@ $(SESSION_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_session.o $(STUB_OBJECTS)
 $(ENV_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_env.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build thread safety test executable
+$(THREAD_SAFETY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_thread_safety.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -366,6 +372,13 @@ test-env: $(ENV_TEST_TARGET)
 	@echo "=========================================="
 	@./$(ENV_TEST_TARGET)
 
+test-thread-safety: $(THREAD_SAFETY_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Thread Safety Tests"
+	@echo "=========================================="
+	@./$(THREAD_SAFETY_TEST_TARGET)
+
 test-api: $(API_TEST_TARGET)
 	@echo ""
 	@echo "=========================================="
@@ -382,6 +395,52 @@ test-api-calls: $(API_CALL_TARGET)
 	@echo "         and incur costs!"
 	@echo "=========================================="
 	@./$(API_CALL_TARGET)
+
+# Memory leak detection with valgrind
+test-valgrind: $(WORKFLOW_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(MEMORY_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Memory Leak Detection (Valgrind)"
+	@echo "=========================================="
+	@which valgrind > /dev/null 2>&1 || (echo "ERROR: valgrind not installed"; exit 1)
+	@echo "Testing workflow controller..."
+	@valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+		--error-exitcode=1 --suppressions=/dev/null \
+		./$(WORKFLOW_TEST_TARGET) > /dev/null 2>&1 && echo "  ✓ No leaks in workflow" || echo "  ✗ Memory leaks detected"
+	@echo "Testing thread safety..."
+	@valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+		--error-exitcode=1 --suppressions=/dev/null \
+		./$(THREAD_SAFETY_TEST_TARGET) > /dev/null 2>&1 && echo "  ✓ No leaks in thread safety" || echo "  ✗ Memory leaks detected"
+	@echo "Testing memory manager..."
+	@valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes \
+		--error-exitcode=1 --suppressions=/dev/null \
+		./$(MEMORY_TEST_TARGET) > /dev/null 2>&1 && echo "  ✓ No leaks in memory manager" || echo "  ✗ Memory leaks detected"
+	@echo ""
+	@echo "=========================================="
+	@echo "Valgrind Complete - See above for results"
+	@echo "=========================================="
+
+# Build with AddressSanitizer (catches memory errors at runtime)
+build-asan:
+	@echo "Building with AddressSanitizer..."
+	@$(MAKE) clean
+	@$(MAKE) CFLAGS="-Wall -Werror -Wextra -std=c11 -g -I./include -fsanitize=address -fno-omit-frame-pointer" \
+		LDFLAGS="-lpthread -fsanitize=address"
+
+# Run tests with AddressSanitizer
+test-asan: build-asan
+	@echo ""
+	@echo "=========================================="
+	@echo "AddressSanitizer Tests"
+	@echo "=========================================="
+	@echo "Running workflow tests..."
+	@./$(WORKFLOW_TEST_TARGET) && echo "  ✓ Workflow tests passed" || echo "  ✗ Workflow tests failed"
+	@echo "Running thread safety tests..."
+	@./$(THREAD_SAFETY_TEST_TARGET) && echo "  ✓ Thread safety tests passed" || echo "  ✗ Thread safety tests failed"
+	@echo ""
+	@echo "=========================================="
+	@echo "ASAN Complete - Rebuild normally with 'make'"
+	@echo "=========================================="
 
 # Line counting
 count-core:

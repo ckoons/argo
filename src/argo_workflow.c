@@ -15,6 +15,7 @@
 #include "argo_workflow.h"
 #include "argo_workflow_steps.h"
 #include "argo_workflow_persona.h"
+#include "argo_shutdown.h"
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
@@ -77,6 +78,9 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
     /* Initialize workflow chaining */
     workflow->recursion_depth = 0;
 
+    /* Register for graceful shutdown tracking */
+    argo_register_workflow(workflow);
+
     LOG_INFO("Created workflow: %s", workflow_id);
     return workflow;
 }
@@ -84,6 +88,9 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
 /* Destroy workflow controller */
 void workflow_destroy(workflow_controller_t* workflow) {
     if (!workflow) return;
+
+    /* Unregister from shutdown tracking */
+    argo_unregister_workflow(workflow);
 
     /* Free all tasks */
     ci_task_t* task = workflow->tasks;

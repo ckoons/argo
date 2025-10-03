@@ -63,7 +63,7 @@ typedef struct {
 } ci_lifecycle_t;
 
 /* Lifecycle manager */
-typedef struct {
+typedef struct lifecycle_manager {
     ci_lifecycle_t** cis;           /* Array of CI lifecycles */
     int count;
     int capacity;

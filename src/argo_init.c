@@ -9,6 +9,7 @@
 #include "argo_env_utils.h"
 #include "argo_config.h"
 #include "argo_globals.h"  /* Cleanup function declarations */
+#include "argo_shutdown.h"
 #include "argo_error.h"
 #include "argo_log.h"
 
@@ -41,6 +42,9 @@ void argo_exit(void) {
     LOG_INFO("Shutting down Argo library");
 
     /* Cleanup in reverse order of initialization */
+
+    /* Shutdown tracked objects (workflows, registries, lifecycles) */
+    argo_shutdown_cleanup();
 
     /* Config subsystem */
     argo_config_cleanup();

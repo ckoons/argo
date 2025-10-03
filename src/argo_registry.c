@@ -10,6 +10,7 @@
 
 /* Project includes */
 #include "argo_registry.h"
+#include "argo_shutdown.h"
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
@@ -36,6 +37,9 @@ ci_registry_t* registry_create(void) {
     registry->port_config.analysis_offset = REGISTRY_PORT_OFFSET_ANALYSIS;
     registry->port_config.reserved_offset = REGISTRY_PORT_OFFSET_RESERVED;
 
+    /* Register for graceful shutdown tracking */
+    argo_register_registry(registry);
+
     LOG_INFO("Registry created with base port %d", REGISTRY_BASE_PORT);
     return registry;
 }
@@ -43,6 +47,9 @@ ci_registry_t* registry_create(void) {
 /* Destroy registry */
 void registry_destroy(ci_registry_t* registry) {
     if (!registry) return;
+
+    /* Unregister from shutdown tracking */
+    argo_unregister_registry(registry);
 
     ci_registry_entry_t* entry = registry->entries;
     while (entry) {

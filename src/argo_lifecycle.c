@@ -8,6 +8,7 @@
 
 /* Project includes */
 #include "argo_lifecycle.h"
+#include "argo_shutdown.h"
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
@@ -38,6 +39,9 @@ lifecycle_manager_t* lifecycle_manager_create(ci_registry_t* registry) {
     manager->max_missed_heartbeats = DEFAULT_MAX_MISSED;
     manager->auto_restart_on_error = false;
 
+    /* Register for graceful shutdown tracking */
+    argo_register_lifecycle(manager);
+
     LOG_INFO("Lifecycle manager created");
     return manager;
 }
@@ -45,6 +49,9 @@ lifecycle_manager_t* lifecycle_manager_create(ci_registry_t* registry) {
 /* Destroy lifecycle manager */
 void lifecycle_manager_destroy(lifecycle_manager_t* manager) {
     if (!manager) return;
+
+    /* Unregister from shutdown tracking */
+    argo_unregister_lifecycle(manager);
 
     for (int i = 0; i < manager->count; i++) {
         if (manager->cis[i]) {
