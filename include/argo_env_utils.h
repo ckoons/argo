@@ -15,6 +15,7 @@
 
 /* Environment file names */
 #define ARGO_ENV_HOME_FILE ".env"
+#define ARGO_ENV_ARGORC_FILE ".argorc"
 #define ARGO_ENV_PROJECT_FILE ".env.argo"
 #define ARGO_ENV_LOCAL_FILE ".env.argo.local"
 
@@ -26,9 +27,10 @@
  * Loads environment in this sequence:
  * 1. System environment (environ)
  * 2. ~/.env (optional)
- * 3. ${ARGO_ROOT}/.env.argo or ./.env.argo (required)
- * 4. ${ARGO_ROOT}/.env.argo.local or ./.env.argo.local (optional)
- * 5. Expand ${VAR} references
+ * 3. ~/.argorc (optional)
+ * 4. ${ARGO_ROOT}/.env.argo or ./.env.argo (required)
+ * 5. ${ARGO_ROOT}/.env.argo.local or ./.env.argo.local (optional)
+ * 6. Expand ${VAR} references
  *
  * Thread-safe. Can be called multiple times to reload configuration.
  * Frees previous environment if already loaded.

@@ -382,13 +382,20 @@ cleanup:
     return result;
 }
 
-/* Load optional home environment file */
+/* Load optional home environment files */
 static void load_optional_home_env(void) {
     char* home = get_home_dir();
     if (home) {
         char home_env[PATH_MAX];
+
+        /* Load ~/.env */
         snprintf(home_env, sizeof(home_env), "%s/%s", home, ARGO_ENV_HOME_FILE);
         load_env_file(home_env, false);
+
+        /* Load ~/.argorc */
+        snprintf(home_env, sizeof(home_env), "%s/%s", home, ARGO_ENV_ARGORC_FILE);
+        load_env_file(home_env, false);
+
         free(home);
     }
 }
