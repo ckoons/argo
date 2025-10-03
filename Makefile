@@ -38,7 +38,10 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_env_load.c \
                $(SRC_DIR)/argo_init.c \
                $(SRC_DIR)/argo_config.c \
-               $(SRC_DIR)/argo_workflow_context.c
+               $(SRC_DIR)/argo_workflow_context.c \
+               $(SRC_DIR)/argo_workflow_json.c \
+               $(SRC_DIR)/argo_workflow_executor.c \
+               $(SRC_DIR)/argo_workflow_steps.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -422,6 +425,7 @@ HARNESS_INIT_ERROR = $(BUILD_DIR)/harness_init_error
 HARNESS_SOCKET = $(BUILD_DIR)/harness_socket
 HARNESS_TERMINAL = $(BUILD_DIR)/harness_terminal
 HARNESS_WORKFLOW_CONTEXT = $(BUILD_DIR)/harness_workflow_context
+HARNESS_WORKFLOW_EXECUTOR = $(BUILD_DIR)/harness_workflow_executor
 
 harness-init-basic: $(HARNESS_INIT_BASIC)
 	@./$(HARNESS_INIT_BASIC)
@@ -444,7 +448,10 @@ harness-terminal: $(HARNESS_TERMINAL)
 harness-workflow-context: $(HARNESS_WORKFLOW_CONTEXT)
 	@./$(HARNESS_WORKFLOW_CONTEXT)
 
-harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT)
+harness-workflow-executor: $(HARNESS_WORKFLOW_EXECUTOR)
+	@./$(HARNESS_WORKFLOW_EXECUTOR)
+
+harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_WORKFLOW_EXECUTOR)
 	@echo "Built all test harnesses"
 
 # Run all harnesses
@@ -504,13 +511,17 @@ $(HARNESS_WORKFLOW_CONTEXT): tests/harness_workflow_context.c $(CORE_LIB)
 	@echo "Building harness_workflow_context..."
 	@$(CC) $(CFLAGS) tests/harness_workflow_context.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
+$(HARNESS_WORKFLOW_EXECUTOR): tests/harness_workflow_executor.c $(CORE_LIB)
+	@echo "Building harness_workflow_executor..."
+	@$(CC) $(CFLAGS) tests/harness_workflow_executor.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
         test-session test-env test-api test-api-calls test-harnesses count-core \
         clean distclean check debug update-models harnesses harness-init-basic \
         harness-env-inspect harness-reinit harness-init-error harness-socket \
-        harness-terminal harness-workflow-context
+        harness-terminal harness-workflow-context harness-workflow-executor
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
