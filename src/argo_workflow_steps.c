@@ -933,10 +933,7 @@ int build_ai_prompt_with_persona(workflow_persona_t* persona,
 /* Helper: Extract retry configuration from step JSON */
 int step_extract_retry_config(const char* json, jsmntok_t* tokens,
                                int step_index, retry_config_t* config) {
-    if (!json || !tokens || !config) {
-        argo_report_error(E_INPUT_NULL, "step_extract_retry_config", "parameter is NULL");
-        return E_INPUT_NULL;
-    }
+    if (!json || !tokens || !config) return (argo_report_error(E_INPUT_NULL, "step_extract_retry_config", "parameter is NULL"), E_INPUT_NULL);
 
     /* Set defaults */
     config->max_retries = STEP_DEFAULT_MAX_RETRIES;
@@ -1019,10 +1016,7 @@ int step_calculate_retry_delay(const retry_config_t* config, int attempt) {
 int step_execute_with_retry(workflow_controller_t* workflow,
                             const char* json, jsmntok_t* tokens,
                             int step_index, step_execute_fn execute_fn) {
-    if (!workflow || !json || !tokens || !execute_fn) {
-        argo_report_error(E_INPUT_NULL, "step_execute_with_retry", "parameter is NULL");
-        return E_INPUT_NULL;
-    }
+    if (!workflow || !json || !tokens || !execute_fn) return (argo_report_error(E_INPUT_NULL, "step_execute_with_retry", "parameter is NULL"), E_INPUT_NULL);
 
     /* Extract retry configuration */
     retry_config_t config;
@@ -1076,10 +1070,7 @@ int step_handle_error(workflow_controller_t* workflow,
                       const char* json, jsmntok_t* tokens,
                       int step_index, int error_code,
                       char* next_step, size_t next_step_size) {
-    if (!workflow || !json || !tokens || !next_step) {
-        argo_report_error(E_INPUT_NULL, "step_handle_error", "parameter is NULL");
-        return E_INPUT_NULL;
-    }
+    if (!workflow || !json || !tokens || !next_step) return (argo_report_error(E_INPUT_NULL, "step_handle_error", "parameter is NULL"), E_INPUT_NULL);
 
     /* Check for on_error field */
     int on_error_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_ON_ERROR);
@@ -1091,9 +1082,9 @@ int step_handle_error(workflow_controller_t* workflow,
     /* on_error can be an object with action and target */
     if (tokens[on_error_idx].type == JSMN_OBJECT) {
         /* Get action */
-        int action_idx = workflow_json_find_field(json, tokens, on_error_idx, "action");
+        int action_idx = workflow_json_find_field(json, tokens, on_error_idx, STEP_FIELD_ERROR_ACTION);
         if (action_idx >= 0) {
-            char action[64];
+            char action[STEP_ACTION_BUFFER_SIZE];
             workflow_json_extract_string(json, &tokens[action_idx], action, sizeof(action));
 
             if (strcmp(action, ERROR_ACTION_SKIP) == 0) {
@@ -1106,7 +1097,7 @@ int step_handle_error(workflow_controller_t* workflow,
                 }
             } else if (strcmp(action, ERROR_ACTION_GOTO) == 0) {
                 /* Go to specific step */
-                int target_idx = workflow_json_find_field(json, tokens, on_error_idx, "target");
+                int target_idx = workflow_json_find_field(json, tokens, on_error_idx, STEP_FIELD_ERROR_TARGET);
                 if (target_idx >= 0) {
                     workflow_json_extract_string(json, &tokens[target_idx], next_step, next_step_size);
                     LOG_INFO("Error handled: jumping to step %s", next_step);
@@ -1262,10 +1253,7 @@ int step_workflow_call(workflow_controller_t* workflow,
 /* Step: parallel */
 int step_parallel(workflow_controller_t* workflow,
                   const char* json, jsmntok_t* tokens, int step_index) {
-    if (!workflow || !json || !tokens) {
-        argo_report_error(E_INPUT_NULL, "step_parallel", "parameter is NULL");
-        return E_INPUT_NULL;
-    }
+    if (!workflow || !json || !tokens) return (argo_report_error(E_INPUT_NULL, "step_parallel", "parameter is NULL"), E_INPUT_NULL);
 
     /* Find parallel_steps array */
     int steps_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PARALLEL_STEPS);
@@ -1290,7 +1278,7 @@ int step_parallel(workflow_controller_t* workflow,
 
     for (int i = 0; i < step_count; i++) {
         /* Get step ID */
-        char step_id[64];
+        char step_id[STEP_ID_BUFFER_SIZE];
         int result = workflow_json_extract_string(json, &tokens[step_token], step_id, sizeof(step_id));
         if (result != ARGO_SUCCESS) {
             LOG_ERROR("Failed to extract parallel step ID at index %d", i);

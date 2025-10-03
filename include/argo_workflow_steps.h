@@ -69,6 +69,8 @@ typedef struct workflow_persona workflow_persona_t;
 #define STEP_FIELD_RETRY_BACKOFF "retry_backoff"
 #define STEP_FIELD_TIMEOUT "timeout"
 #define STEP_FIELD_ON_ERROR "on_error"
+#define STEP_FIELD_ERROR_ACTION "action"
+#define STEP_FIELD_ERROR_TARGET "target"
 #define STEP_FIELD_PARALLEL "parallel"
 #define STEP_FIELD_PARALLEL_STEPS "parallel_steps"
 
@@ -106,6 +108,8 @@ typedef struct workflow_persona workflow_persona_t;
 #define STEP_TASK_BUFFER_SIZE 1024
 #define STEP_CI_RESPONSE_BUFFER_SIZE 16384
 #define STEP_AI_PROMPT_BUFFER_SIZE 8192
+#define STEP_ID_BUFFER_SIZE 64
+#define STEP_ACTION_BUFFER_SIZE 64
 
 /* Step: user_ask
  *
