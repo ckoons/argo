@@ -139,6 +139,9 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
     /* Initialize persona registry */
     workflow->personas = NULL;
 
+    /* Initialize workflow chaining */
+    workflow->recursion_depth = 0;
+
     LOG_INFO("Created workflow: %s", workflow_id);
     return workflow;
 }
@@ -679,6 +682,8 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         result = step_ci_ask_series(workflow, json, tokens, step_idx);
     } else if (strcmp(type, STEP_TYPE_CI_PRESENT) == 0) {
         result = step_ci_present(workflow, json, tokens, step_idx);
+    } else if (strcmp(type, STEP_TYPE_WORKFLOW_CALL) == 0) {
+        result = step_workflow_call(workflow, json, tokens, step_idx);
     } else {
         argo_report_error(E_INPUT_INVALID, "workflow_execute_current_step", type);
         return E_INPUT_INVALID;

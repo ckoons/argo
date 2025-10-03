@@ -100,6 +100,9 @@ typedef struct workflow_controller {
     /* Persona management */
     persona_registry_t* personas;  /* Persona definitions for AI interaction */
 
+    /* Workflow chaining */
+    int recursion_depth;           /* Current workflow call depth (prevent infinite recursion) */
+
 } workflow_controller_t;
 
 /* Workflow lifecycle */

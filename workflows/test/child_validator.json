@@ -1,0 +1,18 @@
+{
+  "workflow_id": "child_validator",
+  "description": "Child workflow that validates input",
+  "steps": [
+    {
+      "id": "1",
+      "type": "display",
+      "message": "  [Child Workflow] Validating input: {data}",
+      "next_step": "2"
+    },
+    {
+      "id": "2",
+      "type": "display",
+      "message": "  [Child Workflow] Validation complete!",
+      "next_step": "EXIT"
+    }
+  ]
+}

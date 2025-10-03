@@ -713,3 +713,133 @@ int step_ci_present(workflow_controller_t* workflow,
               persona ? persona->name : "none", format, data_path);
     return ARGO_SUCCESS;
 }
+
+/* Step: workflow_call */
+int step_workflow_call(workflow_controller_t* workflow,
+                       const char* json, jsmntok_t* tokens, int step_index) {
+    if (!workflow || !json || !tokens) {
+        argo_report_error(E_INPUT_NULL, "step_workflow_call", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Check recursion depth */
+    if (workflow->recursion_depth >= WORKFLOW_MAX_RECURSION_DEPTH) {
+        argo_report_error(E_INPUT_INVALID, "step_workflow_call", "max recursion depth exceeded");
+        return E_INPUT_INVALID;
+    }
+
+    workflow_context_t* parent_ctx = workflow->context;
+
+    /* Find workflow path field */
+    int workflow_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_WORKFLOW);
+    if (workflow_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_workflow_call", "missing workflow field");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char workflow_path[STEP_DESTINATION_BUFFER_SIZE];
+    int result = workflow_json_extract_string(json, &tokens[workflow_idx],
+                                              workflow_path, sizeof(workflow_path));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Find save_to field */
+    int save_to_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_SAVE_TO);
+    if (save_to_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_workflow_call", "missing save_to field");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char save_to[STEP_SAVE_TO_BUFFER_SIZE];
+    result = workflow_json_extract_string(json, &tokens[save_to_idx], save_to, sizeof(save_to));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Create child workflow */
+    LOG_DEBUG("Calling child workflow: %s (depth=%d)", workflow_path, workflow->recursion_depth + 1);
+    workflow_controller_t* child = workflow_create(workflow->registry,
+                                                   workflow->lifecycle,
+                                                   workflow_path);
+    if (!child) {
+        return E_SYSTEM_MEMORY;
+    }
+
+    /* Inherit provider and personas from parent */
+    child->provider = workflow->provider;
+    child->personas = workflow->personas;
+    child->recursion_depth = workflow->recursion_depth + 1;
+
+    /* Load child workflow */
+    result = workflow_load_json(child, workflow_path);
+    if (result != ARGO_SUCCESS) {
+        workflow_destroy(child);
+        return result;
+    }
+
+    /* Find input field (optional) */
+    int input_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_INPUT);
+    if (input_idx >= 0 && tokens[input_idx].type == JSMN_OBJECT) {
+        /* Copy input fields from parent context to child context */
+        jsmntok_t* input_obj = &tokens[input_idx];
+        int field_count = input_obj->size;
+        int field_token = input_idx + 1;
+
+        for (int i = 0; i < field_count; i++) {
+            /* Get key name */
+            if (tokens[field_token].type != JSMN_STRING) {
+                field_token++;
+                continue;
+            }
+
+            char key[STEP_SAVE_TO_BUFFER_SIZE];
+            int key_len = tokens[field_token].end - tokens[field_token].start;
+            if (key_len >= (int)sizeof(key)) {
+                key_len = sizeof(key) - 1;
+            }
+            strncpy(key, json + tokens[field_token].start, key_len);
+            key[key_len] = '\0';
+            field_token++;
+
+            /* Get value (can be string or substituted from parent context) */
+            char value_template[STEP_OUTPUT_BUFFER_SIZE];
+            workflow_json_extract_string(json, &tokens[field_token],
+                                        value_template, sizeof(value_template));
+
+            /* Substitute variables from parent context */
+            char value[STEP_OUTPUT_BUFFER_SIZE];
+            result = workflow_context_substitute(parent_ctx, value_template,
+                                                value, sizeof(value));
+            if (result != ARGO_SUCCESS) {
+                workflow_destroy(child);
+                return result;
+            }
+
+            /* Set in child context */
+            workflow_context_set(child->context, key, value);
+
+            field_token++;
+        }
+    }
+
+    /* Execute child workflow */
+    printf("[Workflow Call] Executing: %s\n", workflow_path);
+    result = workflow_execute_all_steps(child);
+    if (result != ARGO_SUCCESS) {
+        LOG_ERROR("Child workflow failed with error %d", result);
+        workflow_destroy(child);
+        return result;
+    }
+
+    /* Save entire child context to parent under save_to */
+    /* For now, save a simple success indicator */
+    /* TODO: Implement context serialization for full result capture */
+    result = workflow_context_set(parent_ctx, save_to, "{\"status\": \"success\"}");
+
+    /* Cleanup child workflow */
+    workflow_destroy(child);
+
+    LOG_DEBUG("Child workflow completed successfully");
+    return result;
+}

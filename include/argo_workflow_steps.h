@@ -56,6 +56,13 @@ typedef struct jsmntok jsmntok_t;
 /* Loop control field names */
 #define STEP_FIELD_MAX_ITERATIONS "max_iterations"
 
+/* Workflow call field names */
+#define STEP_FIELD_WORKFLOW "workflow"
+#define STEP_FIELD_INPUT "input"
+
+/* Workflow recursion limits */
+#define WORKFLOW_MAX_RECURSION_DEPTH 10
+
 /* Step buffer sizes */
 #define STEP_INPUT_BUFFER_SIZE 4096
 #define STEP_OUTPUT_BUFFER_SIZE 8192
@@ -331,5 +338,36 @@ int step_ci_ask_series(workflow_controller_t* workflow,
  */
 int step_ci_present(workflow_controller_t* workflow,
                     const char* json, jsmntok_t* tokens, int step_index);
+
+/* Step: workflow_call
+ *
+ * Calls another workflow and passes context data.
+ *
+ * JSON Format:
+ *   {
+ *     "type": "workflow_call",
+ *     "workflow": "workflows/shared/validation.json",
+ *     "input": {
+ *       "data": "{context.user_input}",
+ *       "rules": "strict"
+ *     },
+ *     "save_to": "context.result",
+ *     "next_step": 5
+ *   }
+ *
+ * Parameters:
+ *   workflow - Workflow controller (parent workflow)
+ *   json - Full JSON string
+ *   tokens - Parsed tokens
+ *   step_index - Token index of step object
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_INPUT_NULL if parameters NULL
+ *   E_PROTOCOL_FORMAT if required fields missing
+ *   E_INPUT_INVALID if recursion depth exceeded
+ */
+int step_workflow_call(workflow_controller_t* workflow,
+                       const char* json, jsmntok_t* tokens, int step_index);
 
 #endif /* ARGO_WORKFLOW_STEPS_H */

@@ -430,6 +430,7 @@ HARNESS_CONTROL_FLOW = $(BUILD_DIR)/harness_control_flow
 HARNESS_CI_INTERACTIVE = $(BUILD_DIR)/harness_ci_interactive
 HARNESS_LOOP = $(BUILD_DIR)/harness_loop
 HARNESS_PERSONA = $(BUILD_DIR)/harness_persona
+HARNESS_WORKFLOW_CHAIN = $(BUILD_DIR)/harness_workflow_chain
 
 harness-init-basic: $(HARNESS_INIT_BASIC)
 	@./$(HARNESS_INIT_BASIC)
@@ -464,7 +465,10 @@ harness-loop: $(HARNESS_LOOP)
 harness-persona: $(HARNESS_PERSONA)
 	@./$(HARNESS_PERSONA)
 
-harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_CONTROL_FLOW) $(HARNESS_CI_INTERACTIVE) $(HARNESS_LOOP) $(HARNESS_PERSONA)
+harness-workflow-chain: $(HARNESS_WORKFLOW_CHAIN)
+	@./$(HARNESS_WORKFLOW_CHAIN)
+
+harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_CONTROL_FLOW) $(HARNESS_CI_INTERACTIVE) $(HARNESS_LOOP) $(HARNESS_PERSONA) $(HARNESS_WORKFLOW_CHAIN)
 	@echo "Built all test harnesses"
 
 # Run all harnesses
@@ -540,6 +544,10 @@ $(HARNESS_PERSONA): tests/harness_persona.c $(CORE_LIB)
 	@echo "Building harness_persona..."
 	@$(CC) $(CFLAGS) tests/harness_persona.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
+$(HARNESS_WORKFLOW_CHAIN): tests/harness_workflow_chain.c $(CORE_LIB)
+	@echo "Building harness_workflow_chain..."
+	@$(CC) $(CFLAGS) tests/harness_workflow_chain.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
@@ -547,7 +555,7 @@ $(HARNESS_PERSONA): tests/harness_persona.c $(CORE_LIB)
         clean distclean check debug update-models harnesses harness-init-basic \
         harness-env-inspect harness-reinit harness-init-error harness-socket \
         harness-terminal harness-workflow-context harness-control-flow \
-        harness-ci-interactive harness-loop harness-persona
+        harness-ci-interactive harness-loop harness-persona harness-workflow-chain
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
