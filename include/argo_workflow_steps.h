@@ -207,8 +207,9 @@ int step_user_choose(const char* json, jsmntok_t* tokens, int step_index,
                      workflow_context_t* ctx,
                      char* next_step, size_t next_step_size);
 
-/* Forward declaration for CI provider */
+/* Forward declarations */
 typedef struct ci_provider ci_provider_t;
+typedef struct workflow_controller workflow_controller_t;
 
 /* Step: ci_ask
  *
@@ -237,9 +238,8 @@ typedef struct ci_provider ci_provider_t;
  *   E_INPUT_NULL if parameters NULL
  *   E_PROTOCOL_FORMAT if required fields missing
  */
-int step_ci_ask(ci_provider_t* provider,
-                const char* json, jsmntok_t* tokens, int step_index,
-                workflow_context_t* ctx);
+int step_ci_ask(workflow_controller_t* workflow,
+                const char* json, jsmntok_t* tokens, int step_index);
 
 /* Step: ci_analyze
  *
@@ -268,9 +268,8 @@ int step_ci_ask(ci_provider_t* provider,
  *   E_INPUT_NULL if parameters NULL
  *   E_PROTOCOL_FORMAT if required fields missing
  */
-int step_ci_analyze(ci_provider_t* provider,
-                    const char* json, jsmntok_t* tokens, int step_index,
-                    workflow_context_t* ctx);
+int step_ci_analyze(workflow_controller_t* workflow,
+                    const char* json, jsmntok_t* tokens, int step_index);
 
 /* Step: ci_ask_series
  *
@@ -290,20 +289,18 @@ int step_ci_analyze(ci_provider_t* provider,
  *   }
  *
  * Parameters:
- *   provider - CI provider to use for query
+ *   workflow - Workflow controller (contains provider, personas, context)
  *   json - Full JSON string
  *   tokens - Parsed tokens
  *   step_index - Token index of step object
- *   ctx - Workflow context
  *
  * Returns:
  *   ARGO_SUCCESS on success
  *   E_INPUT_NULL if parameters NULL
  *   E_PROTOCOL_FORMAT if required fields missing
  */
-int step_ci_ask_series(ci_provider_t* provider,
-                       const char* json, jsmntok_t* tokens, int step_index,
-                       workflow_context_t* ctx);
+int step_ci_ask_series(workflow_controller_t* workflow,
+                       const char* json, jsmntok_t* tokens, int step_index);
 
 /* Step: ci_present
  *
@@ -321,19 +318,17 @@ int step_ci_ask_series(ci_provider_t* provider,
  *   }
  *
  * Parameters:
- *   provider - CI provider to use for query
+ *   workflow - Workflow controller (contains provider, personas, context)
  *   json - Full JSON string
  *   tokens - Parsed tokens
  *   step_index - Token index of step object
- *   ctx - Workflow context
  *
  * Returns:
  *   ARGO_SUCCESS on success
  *   E_INPUT_NULL if parameters NULL
  *   E_PROTOCOL_FORMAT if required fields missing
  */
-int step_ci_present(ci_provider_t* provider,
-                    const char* json, jsmntok_t* tokens, int step_index,
-                    workflow_context_t* ctx);
+int step_ci_present(workflow_controller_t* workflow,
+                    const char* json, jsmntok_t* tokens, int step_index);
 
 #endif /* ARGO_WORKFLOW_STEPS_H */

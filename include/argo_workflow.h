@@ -55,8 +55,9 @@ typedef struct ci_task {
     struct ci_task* next;
 } ci_task_t;
 
-/* Forward declaration for CI provider */
+/* Forward declarations */
 typedef struct ci_provider ci_provider_t;
+typedef struct persona_registry persona_registry_t;
 
 /* Workflow controller */
 typedef struct workflow_controller {
@@ -95,6 +96,9 @@ typedef struct workflow_controller {
     char previous_step_id[WORKFLOW_STEP_ID_MAX];  /* Previous step (for loop detection) */
     char loop_start_step_id[WORKFLOW_STEP_ID_MAX]; /* Step that started current loop */
     int loop_iteration_count;      /* Current loop iteration count */
+
+    /* Persona management */
+    persona_registry_t* personas;  /* Persona definitions for AI interaction */
 
 } workflow_controller_t;
 

@@ -1,0 +1,95 @@
+{
+  "workflow_id": "persona_test",
+  "description": "Test workflow demonstrating persona system",
+  "personas": {
+    "default": "maia",
+    "maia": {
+      "name": "Maia",
+      "role": "Software Architect",
+      "style": "thoughtful, methodical, detail-oriented",
+      "greeting": "Hello! I'm Maia, your software architect. I'll help guide this workflow."
+    },
+    "alex": {
+      "name": "Alex",
+      "role": "Code Reviewer",
+      "style": "pragmatic, quality-focused, experienced",
+      "greeting": "Hi! I'm Alex, and I'll be reviewing the implementation details."
+    },
+    "kai": {
+      "name": "Kai",
+      "role": "Test Engineer",
+      "style": "thorough, systematic, quality-driven",
+      "greeting": "Hey! I'm Kai, your test engineer. Let's ensure quality!"
+    }
+  },
+  "steps": [
+    {
+      "id": "1",
+      "type": "display",
+      "message": "=== Persona System Test Workflow ===\n",
+      "next_step": "2"
+    },
+    {
+      "id": "2",
+      "type": "ci_ask",
+      "persona": "maia",
+      "prompt_template": "What feature would you like to build?",
+      "save_to": "context.feature",
+      "next_step": "3"
+    },
+    {
+      "id": "3",
+      "type": "ci_analyze",
+      "persona": "maia",
+      "task": "Analyzing feature requirements and design approach",
+      "save_to": "context.design",
+      "next_step": "4"
+    },
+    {
+      "id": "4",
+      "type": "display",
+      "message": "\n--- Switching to Code Review Phase ---\n",
+      "next_step": "5"
+    },
+    {
+      "id": "5",
+      "type": "ci_ask_series",
+      "persona": "alex",
+      "intro": "I need some implementation details:",
+      "questions": [
+        {
+          "id": "language",
+          "question": "What programming language?",
+          "required": true
+        },
+        {
+          "id": "tests",
+          "question": "Do you have tests?",
+          "required": true
+        }
+      ],
+      "save_to": "context.implementation",
+      "next_step": "6"
+    },
+    {
+      "id": "6",
+      "type": "display",
+      "message": "\n--- Switching to Testing Phase ---\n",
+      "next_step": "7"
+    },
+    {
+      "id": "7",
+      "type": "ci_present",
+      "persona": "kai",
+      "format": "test_report",
+      "data": "context.implementation",
+      "next_step": "8"
+    },
+    {
+      "id": "8",
+      "type": "display",
+      "message": "\n=== Workflow Complete ===",
+      "next_step": "EXIT"
+    }
+  ]
+}

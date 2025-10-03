@@ -13,6 +13,7 @@
 /* Project includes */
 #include "argo_workflow.h"
 #include "argo_workflow_steps.h"
+#include "argo_workflow_persona.h"
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
@@ -135,6 +136,9 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
     workflow->loop_start_step_id[0] = '\0';
     workflow->loop_iteration_count = 0;
 
+    /* Initialize persona registry */
+    workflow->personas = NULL;
+
     LOG_INFO("Created workflow: %s", workflow_id);
     return workflow;
 }
@@ -156,6 +160,11 @@ void workflow_destroy(workflow_controller_t* workflow) {
     free(workflow->tokens);
     if (workflow->context) {
         workflow_context_destroy(workflow->context);
+    }
+
+    /* Free persona registry */
+    if (workflow->personas) {
+        persona_registry_destroy(workflow->personas);
     }
 
     LOG_INFO("Destroyed workflow: %s", workflow->workflow_id);
@@ -505,11 +514,28 @@ int workflow_load_json(workflow_controller_t* workflow, const char* json_path) {
         return E_SYSTEM_MEMORY;
     }
 
+    /* Create and parse persona registry */
+    persona_registry_t* personas = persona_registry_create();
+    if (!personas) {
+        workflow_context_destroy(context);
+        free(json);
+        free(tokens);
+        return E_SYSTEM_MEMORY;
+    }
+
+    int persona_result = persona_registry_parse_json(personas, json, tokens, token_count);
+    if (persona_result != ARGO_SUCCESS) {
+        LOG_WARN("Failed to parse personas (continuing anyway): %d", persona_result);
+    }
+
     /* Free old workflow data if exists */
     free(workflow->json_workflow);
     free(workflow->tokens);
     if (workflow->context) {
         workflow_context_destroy(workflow->context);
+    }
+    if (workflow->personas) {
+        persona_registry_destroy(workflow->personas);
     }
 
     /* Store in workflow */
@@ -518,10 +544,12 @@ int workflow_load_json(workflow_controller_t* workflow, const char* json_path) {
     workflow->tokens = tokens;
     workflow->token_count = token_count;
     workflow->context = context;
+    workflow->personas = personas;
     strncpy(workflow->current_step_id, "1", sizeof(workflow->current_step_id) - 1);
     workflow->step_count = 0;
 
-    LOG_INFO("Loaded workflow JSON: %s (%d tokens)", json_path, token_count);
+    LOG_INFO("Loaded workflow JSON: %s (%d tokens, %d personas)",
+             json_path, token_count, personas ? personas->count : 0);
     return ARGO_SUCCESS;
 }
 
@@ -644,13 +672,13 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         }
         return result;
     } else if (strcmp(type, STEP_TYPE_CI_ASK) == 0) {
-        result = step_ci_ask(workflow->provider, json, tokens, step_idx, workflow->context);
+        result = step_ci_ask(workflow, json, tokens, step_idx);
     } else if (strcmp(type, STEP_TYPE_CI_ANALYZE) == 0) {
-        result = step_ci_analyze(workflow->provider, json, tokens, step_idx, workflow->context);
+        result = step_ci_analyze(workflow, json, tokens, step_idx);
     } else if (strcmp(type, STEP_TYPE_CI_ASK_SERIES) == 0) {
-        result = step_ci_ask_series(workflow->provider, json, tokens, step_idx, workflow->context);
+        result = step_ci_ask_series(workflow, json, tokens, step_idx);
     } else if (strcmp(type, STEP_TYPE_CI_PRESENT) == 0) {
-        result = step_ci_present(workflow->provider, json, tokens, step_idx, workflow->context);
+        result = step_ci_present(workflow, json, tokens, step_idx);
     } else {
         argo_report_error(E_INPUT_INVALID, "workflow_execute_current_step", type);
         return E_INPUT_INVALID;

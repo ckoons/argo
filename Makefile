@@ -41,7 +41,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_workflow_context.c \
                $(SRC_DIR)/argo_workflow_json.c \
                $(SRC_DIR)/argo_workflow_conditions.c \
-               $(SRC_DIR)/argo_workflow_steps.c
+               $(SRC_DIR)/argo_workflow_steps.c \
+               $(SRC_DIR)/argo_workflow_persona.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -428,6 +429,7 @@ HARNESS_WORKFLOW_CONTEXT = $(BUILD_DIR)/harness_workflow_context
 HARNESS_CONTROL_FLOW = $(BUILD_DIR)/harness_control_flow
 HARNESS_CI_INTERACTIVE = $(BUILD_DIR)/harness_ci_interactive
 HARNESS_LOOP = $(BUILD_DIR)/harness_loop
+HARNESS_PERSONA = $(BUILD_DIR)/harness_persona
 
 harness-init-basic: $(HARNESS_INIT_BASIC)
 	@./$(HARNESS_INIT_BASIC)
@@ -459,7 +461,10 @@ harness-ci-interactive: $(HARNESS_CI_INTERACTIVE)
 harness-loop: $(HARNESS_LOOP)
 	@./$(HARNESS_LOOP)
 
-harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_CONTROL_FLOW) $(HARNESS_CI_INTERACTIVE) $(HARNESS_LOOP)
+harness-persona: $(HARNESS_PERSONA)
+	@./$(HARNESS_PERSONA)
+
+harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_CONTROL_FLOW) $(HARNESS_CI_INTERACTIVE) $(HARNESS_LOOP) $(HARNESS_PERSONA)
 	@echo "Built all test harnesses"
 
 # Run all harnesses
@@ -531,6 +536,10 @@ $(HARNESS_LOOP): tests/harness_loop.c $(CORE_LIB)
 	@echo "Building harness_loop..."
 	@$(CC) $(CFLAGS) tests/harness_loop.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
+$(HARNESS_PERSONA): tests/harness_persona.c $(CORE_LIB)
+	@echo "Building harness_persona..."
+	@$(CC) $(CFLAGS) tests/harness_persona.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
@@ -538,7 +547,7 @@ $(HARNESS_LOOP): tests/harness_loop.c $(CORE_LIB)
         clean distclean check debug update-models harnesses harness-init-basic \
         harness-env-inspect harness-reinit harness-init-error harness-socket \
         harness-terminal harness-workflow-context harness-control-flow \
-        harness-ci-interactive harness-loop
+        harness-ci-interactive harness-loop harness-persona
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)

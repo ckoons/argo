@@ -12,6 +12,8 @@
 
 /* Project includes */
 #include "argo_workflow_steps.h"
+#include "argo_workflow.h"
+#include "argo_workflow_persona.h"
 #include "argo_workflow_json.h"
 #include "argo_workflow_conditions.h"
 #include "argo_error.h"
@@ -246,15 +248,27 @@ int step_decide(const char* json, jsmntok_t* tokens, int step_index,
 }
 
 /* Step: ci_ask */
-int step_ci_ask(ci_provider_t* provider,
-                const char* json, jsmntok_t* tokens, int step_index,
-                workflow_context_t* ctx) {
-    /* provider can be NULL - steps work without AI for now */
-    (void)provider;
-
-    if (!json || !tokens || !ctx) {
+int step_ci_ask(workflow_controller_t* workflow,
+                const char* json, jsmntok_t* tokens, int step_index) {
+    if (!workflow || !json || !tokens) {
         argo_report_error(E_INPUT_NULL, "step_ci_ask", "parameter is NULL");
         return E_INPUT_NULL;
+    }
+
+    workflow_context_t* ctx = workflow->context;
+
+    /* Find persona field (optional) */
+    workflow_persona_t* persona = NULL;
+    int persona_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PERSONA);
+    if (persona_idx >= 0) {
+        char persona_name[STEP_PERSONA_BUFFER_SIZE];
+        workflow_json_extract_string(json, &tokens[persona_idx],
+                                     persona_name, sizeof(persona_name));
+        persona = persona_registry_find(workflow->personas, persona_name);
+        if (!persona) {
+            LOG_DEBUG("Persona '%s' not found, using default", persona_name);
+            persona = persona_registry_get_default(workflow->personas);
+        }
     }
 
     /* Find prompt_template field */
@@ -291,8 +305,17 @@ int step_ci_ask(ci_provider_t* provider,
         return result;
     }
 
+    /* Show persona greeting if available */
+    if (persona && persona->greeting[0] != '\0') {
+        printf("%s\n", persona->greeting);
+    }
+
     /* Show AI persona's prompt */
-    printf("%s ", prompt);
+    if (persona && persona->name[0] != '\0') {
+        printf("[%s] %s ", persona->name, prompt);
+    } else {
+        printf("%s ", prompt);
+    }
     fflush(stdout);
 
     /* Read user input */
@@ -314,7 +337,8 @@ int step_ci_ask(ci_provider_t* provider,
         return result;
     }
 
-    LOG_DEBUG("CI ask: saved to '%s': %s", save_to, input);
+    LOG_DEBUG("CI ask: persona=%s, saved to '%s': %s",
+              persona ? persona->name : "none", save_to, input);
     return ARGO_SUCCESS;
 }
 
@@ -440,15 +464,27 @@ int step_user_choose(const char* json, jsmntok_t* tokens, int step_index,
 }
 
 /* Step: ci_analyze */
-int step_ci_analyze(ci_provider_t* provider,
-                    const char* json, jsmntok_t* tokens, int step_index,
-                    workflow_context_t* ctx) {
-    /* provider can be NULL - steps work without AI for now */
-    (void)provider;
-
-    if (!json || !tokens || !ctx) {
+int step_ci_analyze(workflow_controller_t* workflow,
+                    const char* json, jsmntok_t* tokens, int step_index) {
+    if (!workflow || !json || !tokens) {
         argo_report_error(E_INPUT_NULL, "step_ci_analyze", "parameter is NULL");
         return E_INPUT_NULL;
+    }
+
+    workflow_context_t* ctx = workflow->context;
+
+    /* Find persona field (optional) */
+    workflow_persona_t* persona = NULL;
+    int persona_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PERSONA);
+    if (persona_idx >= 0) {
+        char persona_name[STEP_PERSONA_BUFFER_SIZE];
+        workflow_json_extract_string(json, &tokens[persona_idx],
+                                     persona_name, sizeof(persona_name));
+        persona = persona_registry_find(workflow->personas, persona_name);
+        if (!persona) {
+            LOG_DEBUG("Persona '%s' not found, using default", persona_name);
+            persona = persona_registry_get_default(workflow->personas);
+        }
     }
 
     /* Find task field */
@@ -478,9 +514,15 @@ int step_ci_analyze(ci_provider_t* provider,
     }
 
     /* TODO: Call CI provider to perform analysis */
-    /* For now, just log the task */
-    printf("[CI Analysis] %s\n", task);
-    LOG_DEBUG("CI analyze: task='%s', save_to='%s'", task, save_to);
+    /* For now, show persona and task */
+    if (persona && persona->name[0] != '\0') {
+        printf("[%s - Analysis] %s\n", persona->name, task);
+    } else {
+        printf("[CI Analysis] %s\n", task);
+    }
+
+    LOG_DEBUG("CI analyze: persona=%s, task='%s', save_to='%s'",
+              persona ? persona->name : "none", task, save_to);
 
     /* Save placeholder result to context */
     result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
@@ -489,15 +531,32 @@ int step_ci_analyze(ci_provider_t* provider,
 }
 
 /* Step: ci_ask_series */
-int step_ci_ask_series(ci_provider_t* provider,
-                       const char* json, jsmntok_t* tokens, int step_index,
-                       workflow_context_t* ctx) {
-    /* provider can be NULL - steps work without AI for now */
-    (void)provider;
-
-    if (!json || !tokens || !ctx) {
+int step_ci_ask_series(workflow_controller_t* workflow,
+                       const char* json, jsmntok_t* tokens, int step_index) {
+    if (!workflow || !json || !tokens) {
         argo_report_error(E_INPUT_NULL, "step_ci_ask_series", "parameter is NULL");
         return E_INPUT_NULL;
+    }
+
+    workflow_context_t* ctx = workflow->context;
+
+    /* Find persona field (optional) */
+    workflow_persona_t* persona = NULL;
+    int persona_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PERSONA);
+    if (persona_idx >= 0) {
+        char persona_name[STEP_PERSONA_BUFFER_SIZE];
+        workflow_json_extract_string(json, &tokens[persona_idx],
+                                     persona_name, sizeof(persona_name));
+        persona = persona_registry_find(workflow->personas, persona_name);
+        if (!persona) {
+            LOG_DEBUG("Persona '%s' not found, using default", persona_name);
+            persona = persona_registry_get_default(workflow->personas);
+        }
+    }
+
+    /* Show persona greeting if available */
+    if (persona && persona->greeting[0] != '\0') {
+        printf("\n%s\n", persona->greeting);
     }
 
     /* Find optional intro field */
@@ -505,7 +564,11 @@ int step_ci_ask_series(ci_provider_t* provider,
     if (intro_idx >= 0) {
         char intro[STEP_PROMPT_BUFFER_SIZE];
         workflow_json_extract_string(json, &tokens[intro_idx], intro, sizeof(intro));
-        printf("\n%s\n", intro);
+        if (persona && persona->name[0] != '\0') {
+            printf("[%s] %s\n", persona->name, intro);
+        } else {
+            printf("\n%s\n", intro);
+        }
     }
 
     /* Find questions array */
@@ -548,8 +611,12 @@ int step_ci_ask_series(ci_provider_t* provider,
             char question[STEP_PROMPT_BUFFER_SIZE];
             workflow_json_extract_string(json, &tokens[q_idx], question, sizeof(question));
 
-            /* Ask question */
-            printf("\n%d. %s ", i + 1, question);
+            /* Ask question with persona name if available */
+            if (persona && persona->name[0] != '\0') {
+                printf("\n[%s] %d. %s ", persona->name, i + 1, question);
+            } else {
+                printf("\n%d. %s ", i + 1, question);
+            }
             fflush(stdout);
 
             /* Read answer */
@@ -579,21 +646,32 @@ int step_ci_ask_series(ci_provider_t* provider,
         question_token += question_tokens;
     }
 
-    LOG_DEBUG("CI ask_series: completed %d questions, saved to '%s'", question_count, save_to);
+    LOG_DEBUG("CI ask_series: persona=%s, completed %d questions, saved to '%s'",
+              persona ? persona->name : "none", question_count, save_to);
     printf("\n");
     return ARGO_SUCCESS;
 }
 
 /* Step: ci_present */
-int step_ci_present(ci_provider_t* provider,
-                    const char* json, jsmntok_t* tokens, int step_index,
-                    workflow_context_t* ctx) {
-    /* provider can be NULL - steps work without AI for now */
-    (void)provider;
-
-    if (!json || !tokens || !ctx) {
+int step_ci_present(workflow_controller_t* workflow,
+                    const char* json, jsmntok_t* tokens, int step_index) {
+    if (!workflow || !json || !tokens) {
         argo_report_error(E_INPUT_NULL, "step_ci_present", "parameter is NULL");
         return E_INPUT_NULL;
+    }
+
+    /* Find persona field (optional) */
+    workflow_persona_t* persona = NULL;
+    int persona_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PERSONA);
+    if (persona_idx >= 0) {
+        char persona_name[STEP_PERSONA_BUFFER_SIZE];
+        workflow_json_extract_string(json, &tokens[persona_idx],
+                                     persona_name, sizeof(persona_name));
+        persona = persona_registry_find(workflow->personas, persona_name);
+        if (!persona) {
+            LOG_DEBUG("Persona '%s' not found, using default", persona_name);
+            persona = persona_registry_get_default(workflow->personas);
+        }
     }
 
     /* Find data field (context path to data) */
@@ -617,16 +695,21 @@ int step_ci_present(ci_provider_t* provider,
     }
 
     /* TODO: Call CI provider to format and present data */
-    /* For now, just display a simple message */
+    /* For now, display with persona information */
     printf("\n");
     printf("========================================\n");
-    printf("PRESENTATION (%s format)\n", format);
+    if (persona && persona->name[0] != '\0') {
+        printf("[%s] PRESENTATION (%s format)\n", persona->name, format);
+    } else {
+        printf("PRESENTATION (%s format)\n", format);
+    }
     printf("========================================\n");
     printf("Data source: %s\n", data_path);
     printf("(Full presentation would be generated by CI)\n");
     printf("========================================\n");
     printf("\n");
 
-    LOG_DEBUG("CI present: format='%s', data='%s'", format, data_path);
+    LOG_DEBUG("CI present: persona=%s, format='%s', data='%s'",
+              persona ? persona->name : "none", format, data_path);
     return ARGO_SUCCESS;
 }
