@@ -22,6 +22,7 @@
 #include "argo_init.h"
 #include "argo_workflow_executor.h"
 #include "argo_workflow_json.h"
+#include "argo_workflow_steps.h"
 #include "argo_error.h"
 
 int main(void) {
@@ -60,16 +61,16 @@ int main(void) {
     }
 
     /* Display workflow info */
-    int name_idx = workflow_json_find_field(json, tokens, 0, "workflow_name");
+    int name_idx = workflow_json_find_field(json, tokens, 0, WORKFLOW_JSON_FIELD_WORKFLOW_NAME);
     if (name_idx >= 0) {
-        char name[128];
+        char name[EXECUTOR_NAME_BUFFER_SIZE];
         workflow_json_extract_string(json, &tokens[name_idx], name, sizeof(name));
         printf("Workflow: %s\n", name);
     }
 
-    int desc_idx = workflow_json_find_field(json, tokens, 0, "description");
+    int desc_idx = workflow_json_find_field(json, tokens, 0, WORKFLOW_JSON_FIELD_DESCRIPTION);
     if (desc_idx >= 0) {
-        char desc[256];
+        char desc[STEP_SAVE_TO_BUFFER_SIZE];
         workflow_json_extract_string(json, &tokens[desc_idx], desc, sizeof(desc));
         printf("Description: %s\n", desc);
     }

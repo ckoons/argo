@@ -14,9 +14,6 @@
 #include "argo_error.h"
 #include "argo_log.h"
 
-/* Maximum file size for workflow JSON */
-#define MAX_WORKFLOW_FILE_SIZE 1048576
-
 /* Count tokens in subtree (current token + all children) */
 static int count_tokens(jsmntok_t* tokens, int index) {
     jsmntok_t* t = &tokens[index];
@@ -67,7 +64,7 @@ char* workflow_json_load_file(const char* path, size_t* out_size) {
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    if (size <= 0 || size > MAX_WORKFLOW_FILE_SIZE) {
+    if (size <= 0 || size > WORKFLOW_JSON_MAX_FILE_SIZE) {
         argo_report_error(E_SYSTEM_FILE, "workflow_json_load_file", "invalid file size");
         fclose(f);
         return NULL;
@@ -183,7 +180,7 @@ int workflow_json_extract_int(const char* json, jsmntok_t* token, int* out_value
         return E_INPUT_NULL;
     }
 
-    char buffer[32];
+    char buffer[WORKFLOW_JSON_INT_BUFFER_SIZE];
     int len = token->end - token->start;
     if (len >= (int)sizeof(buffer)) {
         argo_report_error(E_INPUT_INVALID, "workflow_json_extract_int", "number too long");

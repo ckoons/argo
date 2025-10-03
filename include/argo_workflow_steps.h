@@ -13,9 +13,20 @@ typedef struct jsmntok jsmntok_t;
 #define STEP_TYPE_DISPLAY "display"
 #define STEP_TYPE_SAVE_FILE "save_file"
 
+/* Step JSON field names */
+#define STEP_FIELD_PROMPT "prompt"
+#define STEP_FIELD_SAVE_TO "save_to"
+#define STEP_FIELD_MESSAGE "message"
+#define STEP_FIELD_DESTINATION "destination"
+#define STEP_FIELD_DATA "data"
+
 /* Step buffer sizes */
 #define STEP_INPUT_BUFFER_SIZE 4096
 #define STEP_OUTPUT_BUFFER_SIZE 8192
+#define STEP_PROMPT_BUFFER_SIZE 512
+#define STEP_SAVE_TO_BUFFER_SIZE 256
+#define STEP_DESTINATION_BUFFER_SIZE 512
+#define STEP_TIMESTAMP_BUFFER_SIZE 64
 
 /* Step: user_ask
  *

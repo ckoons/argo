@@ -16,9 +16,6 @@
 #include "argo_error.h"
 #include "argo_log.h"
 
-/* Exit step constant */
-#define STEP_EXIT "EXIT"
-
 /* Find step in workflow */
 int workflow_find_step(const char* json, jsmntok_t* tokens, const char* step_id) {
     if (!json || !tokens || !step_id) {
@@ -26,7 +23,7 @@ int workflow_find_step(const char* json, jsmntok_t* tokens, const char* step_id)
     }
 
     /* Find phases array */
-    int phases_idx = workflow_json_find_field(json, tokens, 0, "phases");
+    int phases_idx = workflow_json_find_field(json, tokens, 0, WORKFLOW_JSON_FIELD_PHASES);
     if (phases_idx < 0 || tokens[phases_idx].type != JSMN_ARRAY) {
         return -1;
     }
@@ -41,7 +38,7 @@ int workflow_find_step(const char* json, jsmntok_t* tokens, const char* step_id)
         }
 
         /* Find steps array in this phase */
-        int steps_idx = workflow_json_find_field(json, tokens, current_token, "steps");
+        int steps_idx = workflow_json_find_field(json, tokens, current_token, WORKFLOW_JSON_FIELD_STEPS);
         if (steps_idx >= 0 && tokens[steps_idx].type == JSMN_ARRAY) {
             int step_count = tokens[steps_idx].size;
             int step_token = steps_idx + 1;
@@ -53,9 +50,9 @@ int workflow_find_step(const char* json, jsmntok_t* tokens, const char* step_id)
                 }
 
                 /* Check step number */
-                int step_num_idx = workflow_json_find_field(json, tokens, step_token, "step");
+                int step_num_idx = workflow_json_find_field(json, tokens, step_token, WORKFLOW_JSON_FIELD_STEP);
                 if (step_num_idx >= 0) {
-                    char num_str[32];
+                    char num_str[WORKFLOW_JSON_INT_BUFFER_SIZE];
                     int step_num;
                     if (workflow_json_extract_int(json, &tokens[step_num_idx], &step_num) == ARGO_SUCCESS) {
                         snprintf(num_str, sizeof(num_str), "%d", step_num);
@@ -95,13 +92,13 @@ int workflow_execute_step(const char* json, jsmntok_t* tokens, int step_index,
     }
 
     /* Get step type */
-    int type_idx = workflow_json_find_field(json, tokens, step_index, "type");
+    int type_idx = workflow_json_find_field(json, tokens, step_index, WORKFLOW_JSON_FIELD_TYPE);
     if (type_idx < 0) {
         argo_report_error(E_PROTOCOL_FORMAT, "workflow_execute_step", "missing step type");
         return E_PROTOCOL_FORMAT;
     }
 
-    char type[64];
+    char type[EXECUTOR_TYPE_BUFFER_SIZE];
     int result = workflow_json_extract_string(json, &tokens[type_idx], type, sizeof(type));
     if (result != ARGO_SUCCESS) {
         return result;
@@ -124,7 +121,7 @@ int workflow_execute_step(const char* json, jsmntok_t* tokens, int step_index,
     }
 
     /* Get next step */
-    int next_idx = workflow_json_find_field(json, tokens, step_index, "next_step");
+    int next_idx = workflow_json_find_field(json, tokens, step_index, WORKFLOW_JSON_FIELD_NEXT_STEP);
     if (next_idx < 0) {
         argo_report_error(E_PROTOCOL_FORMAT, "workflow_execute_step", "missing next_step");
         return E_PROTOCOL_FORMAT;
@@ -166,8 +163,8 @@ int workflow_execute(const char* json, jsmntok_t* tokens, int token_count) {
     }
 
     /* Get workflow name for logging */
-    char workflow_name[128] = "unknown";
-    int name_idx = workflow_json_find_field(json, tokens, 0, "workflow_name");
+    char workflow_name[EXECUTOR_NAME_BUFFER_SIZE] = EXECUTOR_DEFAULT_WORKFLOW_NAME;
+    int name_idx = workflow_json_find_field(json, tokens, 0, WORKFLOW_JSON_FIELD_WORKFLOW_NAME);
     if (name_idx >= 0) {
         workflow_json_extract_string(json, &tokens[name_idx], workflow_name, sizeof(workflow_name));
     }
@@ -180,7 +177,7 @@ int workflow_execute(const char* json, jsmntok_t* tokens, int token_count) {
     int result = ARGO_SUCCESS;
 
     /* Execute steps until EXIT */
-    while (strcmp(current_step, STEP_EXIT) != 0) {
+    while (strcmp(current_step, EXECUTOR_STEP_EXIT) != 0) {
         /* Safety check for infinite loops */
         if (step_count >= EXECUTOR_MAX_STEPS) {
             argo_report_error(E_INPUT_INVALID, "workflow_execute", "too many steps");

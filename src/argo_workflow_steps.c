@@ -25,26 +25,26 @@ int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
     }
 
     /* Find prompt field */
-    int prompt_idx = workflow_json_find_field(json, tokens, step_index, "prompt");
+    int prompt_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PROMPT);
     if (prompt_idx < 0) {
         argo_report_error(E_PROTOCOL_FORMAT, "step_user_ask", "missing prompt");
         return E_PROTOCOL_FORMAT;
     }
 
-    char prompt[512];
+    char prompt[STEP_PROMPT_BUFFER_SIZE];
     int result = workflow_json_extract_string(json, &tokens[prompt_idx], prompt, sizeof(prompt));
     if (result != ARGO_SUCCESS) {
         return result;
     }
 
     /* Find save_to field */
-    int save_to_idx = workflow_json_find_field(json, tokens, step_index, "save_to");
+    int save_to_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_SAVE_TO);
     if (save_to_idx < 0) {
         argo_report_error(E_PROTOCOL_FORMAT, "step_user_ask", "missing save_to");
         return E_PROTOCOL_FORMAT;
     }
 
-    char save_to[256];
+    char save_to[STEP_SAVE_TO_BUFFER_SIZE];
     result = workflow_json_extract_string(json, &tokens[save_to_idx], save_to, sizeof(save_to));
     if (result != ARGO_SUCCESS) {
         return result;
@@ -86,7 +86,7 @@ int step_display(const char* json, jsmntok_t* tokens, int step_index,
     }
 
     /* Find message field */
-    int message_idx = workflow_json_find_field(json, tokens, step_index, "message");
+    int message_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_MESSAGE);
     if (message_idx < 0) {
         argo_report_error(E_PROTOCOL_FORMAT, "step_display", "missing message");
         return E_PROTOCOL_FORMAT;
@@ -122,13 +122,13 @@ int step_save_file(const char* json, jsmntok_t* tokens, int step_index,
     }
 
     /* Find destination field */
-    int dest_idx = workflow_json_find_field(json, tokens, step_index, "destination");
+    int dest_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_DESTINATION);
     if (dest_idx < 0) {
         argo_report_error(E_PROTOCOL_FORMAT, "step_save_file", "missing destination");
         return E_PROTOCOL_FORMAT;
     }
 
-    char destination[512];
+    char destination[STEP_DESTINATION_BUFFER_SIZE];
     int result = workflow_json_extract_string(json, &tokens[dest_idx],
                                               destination, sizeof(destination));
     if (result != ARGO_SUCCESS) {
@@ -136,18 +136,18 @@ int step_save_file(const char* json, jsmntok_t* tokens, int step_index,
     }
 
     /* Find data field */
-    int data_idx = workflow_json_find_field(json, tokens, step_index, "data");
+    int data_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_DATA);
     if (data_idx < 0) {
         argo_report_error(E_PROTOCOL_FORMAT, "step_save_file", "missing data");
         return E_PROTOCOL_FORMAT;
     }
 
     /* Add timestamp to context if not present */
-    if (!workflow_context_has(ctx, "timestamp")) {
+    if (!workflow_context_has(ctx, WORKFLOW_JSON_FIELD_TIMESTAMP)) {
         time_t now = time(NULL);
-        char timestamp[64];
+        char timestamp[STEP_TIMESTAMP_BUFFER_SIZE];
         snprintf(timestamp, sizeof(timestamp), "%ld", (long)now);
-        workflow_context_set(ctx, "timestamp", timestamp);
+        workflow_context_set(ctx, WORKFLOW_JSON_FIELD_TIMESTAMP, timestamp);
     }
 
     /* Extract data object content (without outer braces) */

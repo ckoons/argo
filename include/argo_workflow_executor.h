@@ -12,6 +12,14 @@ typedef struct jsmntok jsmntok_t;
 #define EXECUTOR_MAX_STEPS 100
 #define EXECUTOR_STEP_NAME_MAX 64
 
+/* Workflow executor buffer sizes */
+#define EXECUTOR_TYPE_BUFFER_SIZE 64
+#define EXECUTOR_NAME_BUFFER_SIZE 128
+
+/* Workflow executor constants */
+#define EXECUTOR_STEP_EXIT "EXIT"
+#define EXECUTOR_DEFAULT_WORKFLOW_NAME "unknown"
+
 /* Workflow Executor
  *
  * Executes workflow definitions loaded from JSON files.

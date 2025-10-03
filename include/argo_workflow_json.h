@@ -11,6 +11,20 @@ typedef struct jsmntok jsmntok_t;
 /* Workflow JSON parsing constants */
 #define WORKFLOW_JSON_MAX_TOKENS 512
 #define WORKFLOW_JSON_MAX_DEPTH 10
+#define WORKFLOW_JSON_MAX_FILE_SIZE 1048576
+
+/* Workflow JSON buffer sizes */
+#define WORKFLOW_JSON_INT_BUFFER_SIZE 32
+
+/* Workflow JSON field names */
+#define WORKFLOW_JSON_FIELD_WORKFLOW_NAME "workflow_name"
+#define WORKFLOW_JSON_FIELD_DESCRIPTION "description"
+#define WORKFLOW_JSON_FIELD_PHASES "phases"
+#define WORKFLOW_JSON_FIELD_STEPS "steps"
+#define WORKFLOW_JSON_FIELD_STEP "step"
+#define WORKFLOW_JSON_FIELD_TYPE "type"
+#define WORKFLOW_JSON_FIELD_NEXT_STEP "next_step"
+#define WORKFLOW_JSON_FIELD_TIMESTAMP "timestamp"
 
 /* Load JSON file into buffer
  *
