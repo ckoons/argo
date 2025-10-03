@@ -7,7 +7,7 @@ Argo is a minimal C library (<10,000 lines) that coordinates multiple Companion 
 
 ## Status: Sprint 1 - Multi-CI Workflows (Complete)
 
-Current: 4,307 meaningful lines (43% of budget)
+Current: 4,460 meaningful lines (44% of budget)
 
 ### What Works Now
 - ✅ **8 CI Providers**: Ollama, Claude (socket/code/API), OpenAI, Gemini, Grok, DeepSeek, OpenRouter
@@ -23,11 +23,12 @@ Current: 4,307 meaningful lines (43% of budget)
 - ✅ **Merge Negotiation**: Conflict tracking, CI proposals, resolution selection
 - ✅ **Error Reporting**: Single standard routine with severity-based routing
 - ✅ **Workflow JSON**: Reusable workflow definitions in `argo/workflows/{category}/{event}/`
+- ✅ **Workflow Context**: Variable storage with {placeholder} substitution for step data
 - ✅ **Session Lifecycle**: `run_workflow()` - complete create→execute→destroy
 - ✅ **Checkpoints**: Workflow pause/resume with state save/restore
 - ✅ **Testing**: 95/95 tests passing (100% pass rate)
 - ✅ **Initialization**: `argo_init()`/`argo_exit()` lifecycle management
-- ✅ **Test Harnesses**: 6 interactive test programs (terminal, socket, reinit, etc.)
+- ✅ **Test Harnesses**: 7 interactive test programs (workflow context, terminal, socket, etc.)
 
 ### Core Principles
 1. **"What you don't build, you don't debug"** - Reuse over rewrite

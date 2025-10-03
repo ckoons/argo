@@ -37,7 +37,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_env_utils.c \
                $(SRC_DIR)/argo_env_load.c \
                $(SRC_DIR)/argo_init.c \
-               $(SRC_DIR)/argo_config.c
+               $(SRC_DIR)/argo_config.c \
+               $(SRC_DIR)/argo_workflow_context.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -420,6 +421,7 @@ HARNESS_REINIT = $(BUILD_DIR)/harness_reinit
 HARNESS_INIT_ERROR = $(BUILD_DIR)/harness_init_error
 HARNESS_SOCKET = $(BUILD_DIR)/harness_socket
 HARNESS_TERMINAL = $(BUILD_DIR)/harness_terminal
+HARNESS_WORKFLOW_CONTEXT = $(BUILD_DIR)/harness_workflow_context
 
 harness-init-basic: $(HARNESS_INIT_BASIC)
 	@./$(HARNESS_INIT_BASIC)
@@ -439,7 +441,10 @@ harness-socket: $(HARNESS_SOCKET)
 harness-terminal: $(HARNESS_TERMINAL)
 	@./$(HARNESS_TERMINAL)
 
-harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL)
+harness-workflow-context: $(HARNESS_WORKFLOW_CONTEXT)
+	@./$(HARNESS_WORKFLOW_CONTEXT)
+
+harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT)
 	@echo "Built all test harnesses"
 
 # Run all harnesses
@@ -451,6 +456,7 @@ test-harnesses: harnesses
 	@$(MAKE) harness-init-basic
 	@$(MAKE) harness-reinit
 	@$(MAKE) harness-socket
+	@$(MAKE) harness-workflow-context
 	@echo ""
 	@echo "=========================================="
 	@echo "Harness Tests Complete"
@@ -462,7 +468,7 @@ test-all: test-quick test-harnesses
 	@echo "=========================================="
 	@echo "ALL LOCAL TESTS COMPLETE"
 	@echo "  Unit Tests: PASSED (95 tests)"
-	@echo "  Harnesses:  PASSED (3 tests)"
+	@echo "  Harnesses:  PASSED (4 tests)"
 	@echo "=========================================="
 	@echo ""
 	@echo "To run tests with live API calls (costs money):"
@@ -494,13 +500,17 @@ $(HARNESS_TERMINAL): tests/harness_terminal.c $(CORE_LIB)
 	@echo "Building harness_terminal..."
 	@$(CC) $(CFLAGS) tests/harness_terminal.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
+$(HARNESS_WORKFLOW_CONTEXT): tests/harness_workflow_context.c $(CORE_LIB)
+	@echo "Building harness_workflow_context..."
+	@$(CC) $(CFLAGS) tests/harness_workflow_context.c $(CORE_LIB) -o $@ $(LDFLAGS)
+
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
         test-session test-env test-api test-api-calls test-harnesses count-core \
         clean distclean check debug update-models harnesses harness-init-basic \
         harness-env-inspect harness-reinit harness-init-error harness-socket \
-        harness-terminal
+        harness-terminal harness-workflow-context
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
