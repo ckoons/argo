@@ -16,8 +16,35 @@
 #include "argo_workflow_persona.h"
 #include "argo_workflow_json.h"
 #include "argo_workflow_conditions.h"
+#include "argo_provider.h"
 #include "argo_error.h"
 #include "argo_log.h"
+
+/* Helper: Simple callback to capture AI response */
+typedef struct {
+    char* buffer;
+    size_t buffer_size;
+    size_t bytes_written;
+} response_capture_t;
+
+static void capture_response_callback(const ci_response_t* response, void* userdata) {
+    response_capture_t* capture = (response_capture_t*)userdata;
+    if (!response || !capture || !capture->buffer) return;
+    if (!response->success || !response->content) return;
+
+    size_t response_len = response->content_len;
+    size_t available = capture->buffer_size - capture->bytes_written - 1;
+
+    if (response_len > available) {
+        response_len = available;
+    }
+
+    if (response_len > 0) {
+        memcpy(capture->buffer + capture->bytes_written, response->content, response_len);
+        capture->bytes_written += response_len;
+        capture->buffer[capture->bytes_written] = '\0';
+    }
+}
 
 /* Step: user_ask */
 int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
@@ -310,12 +337,49 @@ int step_ci_ask(workflow_controller_t* workflow,
         printf("%s\n", persona->greeting);
     }
 
-    /* Show AI persona's prompt */
-    if (persona && persona->name[0] != '\0') {
-        printf("[%s] %s ", persona->name, prompt);
+    /* Optionally use AI to present a more conversational prompt */
+    char final_prompt[STEP_OUTPUT_BUFFER_SIZE];
+    if (workflow->provider && persona) {
+        /* Build AI prompt to generate conversational question */
+        char ai_prompt[STEP_AI_PROMPT_BUFFER_SIZE];
+        snprintf(ai_prompt, sizeof(ai_prompt),
+                "You are %s, a %s. Your communication style is: %s.\n\n"
+                "Present this question to the user in a natural, conversational way that matches your persona:\n\n%s\n\n"
+                "Respond with ONLY the question itself, no additional commentary.",
+                persona->name, persona->role, persona->style, prompt);
+
+        /* Query AI using callback */
+        char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
+        response_capture_t capture = {
+            .buffer = response,
+            .buffer_size = sizeof(response),
+            .bytes_written = 0
+        };
+
+        result = workflow->provider->query(workflow->provider, ai_prompt,
+                                          capture_response_callback, &capture);
+
+        if (result == ARGO_SUCCESS && capture.bytes_written > 0) {
+            /* Use AI-generated conversational prompt */
+            snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, response);
+        } else {
+            /* Fall back to template prompt */
+            if (persona->name[0] != '\0') {
+                snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, prompt);
+            } else {
+                snprintf(final_prompt, sizeof(final_prompt), "%s ", prompt);
+            }
+        }
     } else {
-        printf("%s ", prompt);
+        /* No AI provider - use template prompt directly */
+        if (persona && persona->name[0] != '\0') {
+            snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, prompt);
+        } else {
+            snprintf(final_prompt, sizeof(final_prompt), "%s ", prompt);
+        }
     }
+
+    printf("%s", final_prompt);
     fflush(stdout);
 
     /* Read user input */
@@ -513,19 +577,50 @@ int step_ci_analyze(workflow_controller_t* workflow,
         return result;
     }
 
-    /* TODO: Call CI provider to perform analysis */
-    /* For now, show persona and task */
+    /* Show analysis starting */
     if (persona && persona->name[0] != '\0') {
         printf("[%s - Analysis] %s\n", persona->name, task);
     } else {
         printf("[CI Analysis] %s\n", task);
     }
 
+    /* If provider available, use AI to perform analysis */
+    if (workflow->provider) {
+        /* Build AI prompt with persona context and task */
+        char ai_prompt[STEP_AI_PROMPT_BUFFER_SIZE];
+        result = build_ai_prompt_with_persona(persona, task, ai_prompt, sizeof(ai_prompt));
+        if (result != ARGO_SUCCESS) {
+            return result;
+        }
+
+        /* Query AI using callback */
+        char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
+        response_capture_t capture = {
+            .buffer = response,
+            .buffer_size = sizeof(response),
+            .bytes_written = 0
+        };
+
+        result = workflow->provider->query(workflow->provider, ai_prompt,
+                                          capture_response_callback, &capture);
+
+        if (result != ARGO_SUCCESS) {
+            LOG_ERROR("AI query failed with error %d", result);
+            /* Fall back to placeholder result */
+            result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
+        } else {
+            /* Save AI response to context */
+            printf("\n[AI Response]\n%s\n", response);
+            result = workflow_context_set(ctx, save_to, response);
+        }
+    } else {
+        /* No provider - save placeholder result */
+        LOG_DEBUG("No AI provider available, using placeholder result");
+        result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
+    }
+
     LOG_DEBUG("CI analyze: persona=%s, task='%s', save_to='%s'",
               persona ? persona->name : "none", task, save_to);
-
-    /* Save placeholder result to context */
-    result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
 
     return result;
 }
@@ -611,12 +706,48 @@ int step_ci_ask_series(workflow_controller_t* workflow,
             char question[STEP_PROMPT_BUFFER_SIZE];
             workflow_json_extract_string(json, &tokens[q_idx], question, sizeof(question));
 
-            /* Ask question with persona name if available */
-            if (persona && persona->name[0] != '\0') {
-                printf("\n[%s] %d. %s ", persona->name, i + 1, question);
+            /* Optionally use AI to present a more conversational question */
+            char final_question[STEP_OUTPUT_BUFFER_SIZE];
+            if (workflow->provider && persona) {
+                /* Build AI prompt to generate conversational question */
+                char ai_prompt[STEP_AI_PROMPT_BUFFER_SIZE];
+                snprintf(ai_prompt, sizeof(ai_prompt),
+                        "You are %s, a %s. Your communication style is: %s.\n\n"
+                        "Present this question to the user in a natural, conversational way that matches your persona:\n\n%s\n\n"
+                        "Respond with ONLY the question itself, no additional commentary.",
+                        persona->name, persona->role, persona->style, question);
+
+                /* Query AI using callback */
+                char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
+                response_capture_t capture = {
+                    .buffer = response,
+                    .buffer_size = sizeof(response),
+                    .bytes_written = 0
+                };
+
+                result = workflow->provider->query(workflow->provider, ai_prompt,
+                                                  capture_response_callback, &capture);
+
+                if (result == ARGO_SUCCESS && capture.bytes_written > 0) {
+                    /* Use AI-generated conversational question */
+                    snprintf(final_question, sizeof(final_question), "\n[%s] %d. %s ",
+                            persona->name, i + 1, response);
+                } else {
+                    /* Fall back to template question */
+                    snprintf(final_question, sizeof(final_question), "\n[%s] %d. %s ",
+                            persona->name, i + 1, question);
+                }
             } else {
-                printf("\n%d. %s ", i + 1, question);
+                /* No AI provider - use template question directly */
+                if (persona && persona->name[0] != '\0') {
+                    snprintf(final_question, sizeof(final_question), "\n[%s] %d. %s ",
+                            persona->name, i + 1, question);
+                } else {
+                    snprintf(final_question, sizeof(final_question), "\n%d. %s ", i + 1, question);
+                }
             }
+
+            printf("%s", final_question);
             fflush(stdout);
 
             /* Read answer */
@@ -694,8 +825,7 @@ int step_ci_present(workflow_controller_t* workflow,
         workflow_json_extract_string(json, &tokens[format_idx], format, sizeof(format));
     }
 
-    /* TODO: Call CI provider to format and present data */
-    /* For now, display with persona information */
+    /* Show presentation header */
     printf("\n");
     printf("========================================\n");
     if (persona && persona->name[0] != '\0') {
@@ -704,13 +834,98 @@ int step_ci_present(workflow_controller_t* workflow,
         printf("PRESENTATION (%s format)\n", format);
     }
     printf("========================================\n");
-    printf("Data source: %s\n", data_path);
-    printf("(Full presentation would be generated by CI)\n");
+
+    /* If provider available, use AI to format and present */
+    if (workflow->provider) {
+        /* Get data from context */
+        const char* data_value = workflow_context_get(workflow->context, data_path);
+        if (!data_value) {
+            LOG_DEBUG("Data path '%s' not found in context, using path as value", data_path);
+            data_value = data_path;
+        }
+
+        /* Build presentation task */
+        char task[STEP_AI_PROMPT_BUFFER_SIZE];
+        int written = snprintf(task, sizeof(task),
+                              "Present the following data in %s format:\n\n%s",
+                              format, data_value);
+        if (written < 0 || (size_t)written >= sizeof(task)) {
+            argo_report_error(E_INPUT_TOO_LARGE, "step_ci_present", "task too large");
+            return E_INPUT_TOO_LARGE;
+        }
+
+        /* Build AI prompt with persona */
+        char ai_prompt[STEP_AI_PROMPT_BUFFER_SIZE];
+        result = build_ai_prompt_with_persona(persona, task, ai_prompt, sizeof(ai_prompt));
+        if (result != ARGO_SUCCESS) {
+            return result;
+        }
+
+        /* Query AI using callback */
+        char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
+        response_capture_t capture = {
+            .buffer = response,
+            .buffer_size = sizeof(response),
+            .bytes_written = 0
+        };
+
+        result = workflow->provider->query(workflow->provider, ai_prompt,
+                                          capture_response_callback, &capture);
+
+        if (result == ARGO_SUCCESS) {
+            /* Display AI-formatted presentation */
+            printf("\n%s\n", response);
+        } else {
+            LOG_ERROR("AI query failed with error %d", result);
+            printf("\nData source: %s\n", data_path);
+            printf("(AI formatting unavailable)\n");
+        }
+    } else {
+        /* No provider - basic display */
+        LOG_DEBUG("No AI provider available for presentation");
+        printf("\nData source: %s\n", data_path);
+        printf("(No AI provider configured for formatting)\n");
+    }
+
     printf("========================================\n");
     printf("\n");
 
     LOG_DEBUG("CI present: persona=%s, format='%s', data='%s'",
               persona ? persona->name : "none", format, data_path);
+    return ARGO_SUCCESS;
+}
+
+/* Helper: Build AI prompt with persona context */
+int build_ai_prompt_with_persona(workflow_persona_t* persona,
+                                  const char* prompt,
+                                  char* output,
+                                  size_t output_size) {
+    if (!prompt || !output) {
+        argo_report_error(E_INPUT_NULL, "build_ai_prompt_with_persona", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    if (!persona) {
+        /* No persona - use prompt directly */
+        if (strlen(prompt) >= output_size) {
+            argo_report_error(E_INPUT_TOO_LARGE, "build_ai_prompt_with_persona", "prompt too large");
+            return E_INPUT_TOO_LARGE;
+        }
+        strncpy(output, prompt, output_size - 1);
+        output[output_size - 1] = '\0';
+        return ARGO_SUCCESS;
+    }
+
+    /* Build prompt with persona context */
+    int written = snprintf(output, output_size,
+                          "You are %s, a %s. Your communication style is: %s.\n\n%s",
+                          persona->name, persona->role, persona->style, prompt);
+
+    if (written < 0 || (size_t)written >= output_size) {
+        argo_report_error(E_INPUT_TOO_LARGE, "build_ai_prompt_with_persona", "constructed prompt too large");
+        return E_INPUT_TOO_LARGE;
+    }
+
     return ARGO_SUCCESS;
 }
 

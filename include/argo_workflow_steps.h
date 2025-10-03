@@ -5,8 +5,9 @@
 
 #include "argo_workflow_context.h"
 
-/* Forward declaration */
+/* Forward declarations */
 typedef struct jsmntok jsmntok_t;
+typedef struct workflow_persona workflow_persona_t;
 
 /* Workflow step type constants */
 #define STEP_TYPE_USER_ASK "user_ask"
@@ -73,6 +74,7 @@ typedef struct jsmntok jsmntok_t;
 #define STEP_PERSONA_BUFFER_SIZE 64
 #define STEP_TASK_BUFFER_SIZE 1024
 #define STEP_CI_RESPONSE_BUFFER_SIZE 16384
+#define STEP_AI_PROMPT_BUFFER_SIZE 8192
 
 /* Step: user_ask
  *
@@ -369,5 +371,28 @@ int step_ci_present(workflow_controller_t* workflow,
  */
 int step_workflow_call(workflow_controller_t* workflow,
                        const char* json, jsmntok_t* tokens, int step_index);
+
+/* Helper functions for AI integration */
+
+/* Build AI prompt with persona context
+ *
+ * Constructs a prompt that includes persona information (role, style)
+ * to guide the AI's response style and behavior.
+ *
+ * Parameters:
+ *   persona - Persona to use (can be NULL for no persona)
+ *   prompt - User's prompt/question
+ *   output - Buffer to store constructed prompt
+ *   output_size - Size of output buffer
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_INPUT_NULL if required parameters NULL
+ *   E_INPUT_TOO_LARGE if prompt too large for buffer
+ */
+int build_ai_prompt_with_persona(workflow_persona_t* persona,
+                                  const char* prompt,
+                                  char* output,
+                                  size_t output_size);
 
 #endif /* ARGO_WORKFLOW_STEPS_H */
