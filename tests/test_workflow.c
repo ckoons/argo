@@ -338,6 +338,43 @@ static void test_conflict_json(void) {
     PASS();
 }
 
+/* Test JSON workflow execution */
+static void test_json_workflow_execution(void) {
+    TEST("JSON workflow execution");
+
+    ci_registry_t* registry = registry_create();
+    lifecycle_manager_t* lifecycle = lifecycle_manager_create(registry);
+    workflow_controller_t* workflow = workflow_create(registry, lifecycle, "json-test");
+
+    if (!workflow) {
+        registry_destroy(registry);
+        lifecycle_manager_destroy(lifecycle);
+        FAIL("Failed to create workflow");
+        return;
+    }
+
+    /* Load JSON workflow */
+    int result = workflow_load_json(workflow, "workflows/test/simple_test.json");
+    if (result != ARGO_SUCCESS) {
+        workflow_destroy(workflow);
+        lifecycle_manager_destroy(lifecycle);
+        registry_destroy(registry);
+        FAIL("Failed to load JSON workflow");
+        return;
+    }
+
+    /* Verify workflow loaded correctly */
+    assert(workflow->json_workflow != NULL);
+    assert(workflow->tokens != NULL);
+    assert(workflow->context != NULL);
+    assert(strcmp(workflow->current_step_id, "1") == 0);
+
+    workflow_destroy(workflow);
+    lifecycle_manager_destroy(lifecycle);
+    registry_destroy(registry);
+    PASS();
+}
+
 int main(void) {
     printf("========================================\n");
     printf("ARGO WORKFLOW TESTS\n");
@@ -351,6 +388,7 @@ int main(void) {
     test_task_completion();
     test_phase_advancement();
     test_auto_assignment();
+    test_json_workflow_execution();
 
     /* Merge negotiation tests */
     test_merge_negotiation_lifecycle();

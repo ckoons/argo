@@ -15,7 +15,7 @@
 #include "argo_log.h"
 
 /* Count tokens in subtree (current token + all children) */
-static int count_tokens(jsmntok_t* tokens, int index) {
+int workflow_json_count_tokens(jsmntok_t* tokens, int index) {
     jsmntok_t* t = &tokens[index];
     int count = 1;  /* Count current token */
     int children = t->size;
@@ -25,11 +25,11 @@ static int count_tokens(jsmntok_t* tokens, int index) {
         index++;
         for (int i = 0; i < children; i++) {
             /* Skip key */
-            int key_tokens = count_tokens(tokens, index);
+            int key_tokens = workflow_json_count_tokens(tokens, index);
             count += key_tokens;
             index += key_tokens;
             /* Skip value */
-            int val_tokens = count_tokens(tokens, index);
+            int val_tokens = workflow_json_count_tokens(tokens, index);
             count += val_tokens;
             index += val_tokens;
         }
@@ -37,7 +37,7 @@ static int count_tokens(jsmntok_t* tokens, int index) {
         /* Array: size = number of elements */
         index++;
         for (int i = 0; i < children; i++) {
-            int elem_tokens = count_tokens(tokens, index);
+            int elem_tokens = workflow_json_count_tokens(tokens, index);
             count += elem_tokens;
             index += elem_tokens;
         }
@@ -146,7 +146,7 @@ int workflow_json_find_field(const char* json, jsmntok_t* tokens,
 
         /* Skip to next field (key + value) */
         current_token++;  /* Skip key */
-        int value_tokens = count_tokens(tokens, current_token);
+        int value_tokens = workflow_json_count_tokens(tokens, current_token);
         current_token += value_tokens;  /* Skip value and its children */
     }
 

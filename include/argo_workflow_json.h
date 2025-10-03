@@ -104,4 +104,18 @@ int workflow_json_extract_string(const char* json, jsmntok_t* token,
  */
 int workflow_json_extract_int(const char* json, jsmntok_t* token, int* out_value);
 
+/* Count tokens in subtree
+ *
+ * Returns number of tokens including the token at index and all children.
+ * Useful for skipping over complex nested structures.
+ *
+ * Parameters:
+ *   tokens - Token array
+ *   index - Index of token to count from
+ *
+ * Returns:
+ *   Number of tokens in subtree (>= 1)
+ */
+int workflow_json_count_tokens(jsmntok_t* tokens, int index);
+
 #endif /* ARGO_WORKFLOW_JSON_H */

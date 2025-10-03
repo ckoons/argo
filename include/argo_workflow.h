@@ -6,10 +6,21 @@
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
 #include "argo_error.h"
+#include "argo_workflow_context.h"
+#include "argo_workflow_json.h"
+
+/* Forward declaration */
+typedef struct jsmntok jsmntok_t;
 
 /* Workflow buffer sizes */
 #define CHECKPOINT_PATTERN_SIZE 128
 #define CHECKPOINT_INITIAL_CAPACITY 8192
+#define WORKFLOW_STEP_ID_MAX 64
+
+/* Workflow execution constants */
+#define EXECUTOR_MAX_STEPS 100
+#define EXECUTOR_TYPE_BUFFER_SIZE 64
+#define EXECUTOR_STEP_EXIT "EXIT"
 
 /* Workflow phases */
 typedef enum {
@@ -66,6 +77,15 @@ typedef struct workflow_controller {
     char base_branch[128];
     char feature_branch[128];
 
+    /* JSON workflow execution (new) */
+    char* json_workflow;           /* Loaded JSON workflow definition */
+    size_t json_size;              /* Size of JSON data */
+    jsmntok_t* tokens;             /* Parsed JSON tokens */
+    int token_count;               /* Number of tokens */
+    workflow_context_t* context;   /* Variable context for step execution */
+    char current_step_id[WORKFLOW_STEP_ID_MAX];  /* Current executing step */
+    int step_count;                /* Number of steps executed */
+
 } workflow_controller_t;
 
 /* Workflow lifecycle */
@@ -98,6 +118,12 @@ const char* workflow_phase_name(workflow_phase_t phase);
 
 /* Auto-assignment based on CI roles */
 int workflow_auto_assign_tasks(workflow_controller_t* workflow);
+
+/* JSON workflow loading and execution */
+int workflow_load_json(workflow_controller_t* workflow, const char* json_path);
+int workflow_execute_current_step(workflow_controller_t* workflow);
+int workflow_execute_all_steps(workflow_controller_t* workflow);
+int workflow_find_step_token(workflow_controller_t* workflow, const char* step_id);
 
 /* Checkpoint save/restore for pause/resume */
 char* workflow_save_checkpoint(workflow_controller_t* workflow);

@@ -40,7 +40,6 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_config.c \
                $(SRC_DIR)/argo_workflow_context.c \
                $(SRC_DIR)/argo_workflow_json.c \
-               $(SRC_DIR)/argo_workflow_executor.c \
                $(SRC_DIR)/argo_workflow_steps.c
 
 # Provider implementation sources
@@ -425,7 +424,6 @@ HARNESS_INIT_ERROR = $(BUILD_DIR)/harness_init_error
 HARNESS_SOCKET = $(BUILD_DIR)/harness_socket
 HARNESS_TERMINAL = $(BUILD_DIR)/harness_terminal
 HARNESS_WORKFLOW_CONTEXT = $(BUILD_DIR)/harness_workflow_context
-HARNESS_WORKFLOW_EXECUTOR = $(BUILD_DIR)/harness_workflow_executor
 
 harness-init-basic: $(HARNESS_INIT_BASIC)
 	@./$(HARNESS_INIT_BASIC)
@@ -510,10 +508,6 @@ $(HARNESS_TERMINAL): tests/harness_terminal.c $(CORE_LIB)
 $(HARNESS_WORKFLOW_CONTEXT): tests/harness_workflow_context.c $(CORE_LIB)
 	@echo "Building harness_workflow_context..."
 	@$(CC) $(CFLAGS) tests/harness_workflow_context.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_WORKFLOW_EXECUTOR): tests/harness_workflow_executor.c $(CORE_LIB)
-	@echo "Building harness_workflow_executor..."
-	@$(CC) $(CFLAGS) tests/harness_workflow_executor.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
