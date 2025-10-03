@@ -26,6 +26,7 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_lifecycle.c \
                $(SRC_DIR)/argo_provider.c \
                $(SRC_DIR)/argo_workflow.c \
+               $(SRC_DIR)/argo_workflow_executor.c \
                $(SRC_DIR)/argo_workflow_checkpoint.c \
                $(SRC_DIR)/argo_workflow_loader.c \
                $(SRC_DIR)/argo_merge.c \
@@ -41,7 +42,9 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_workflow_context.c \
                $(SRC_DIR)/argo_workflow_json.c \
                $(SRC_DIR)/argo_workflow_conditions.c \
-               $(SRC_DIR)/argo_workflow_steps.c \
+               $(SRC_DIR)/argo_workflow_steps_basic.c \
+               $(SRC_DIR)/argo_workflow_steps_ci.c \
+               $(SRC_DIR)/argo_workflow_steps_advanced.c \
                $(SRC_DIR)/argo_workflow_persona.c
 
 # Provider implementation sources
