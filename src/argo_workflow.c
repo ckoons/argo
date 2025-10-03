@@ -540,6 +540,8 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         return result;
     }
 
+    char next_step[WORKFLOW_STEP_ID_MAX];
+
     /* Execute step based on type */
     if (strcmp(type, STEP_TYPE_USER_ASK) == 0) {
         result = step_user_ask(json, tokens, step_idx, workflow->context);
@@ -547,6 +549,26 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         result = step_display(json, tokens, step_idx, workflow->context);
     } else if (strcmp(type, STEP_TYPE_SAVE_FILE) == 0) {
         result = step_save_file(json, tokens, step_idx, workflow->context);
+    } else if (strcmp(type, STEP_TYPE_DECIDE) == 0) {
+        /* decide step determines next_step based on condition */
+        result = step_decide(json, tokens, step_idx, workflow->context, next_step, sizeof(next_step));
+        if (result == ARGO_SUCCESS) {
+            /* Update current step and return - decide handles next_step internally */
+            strncpy(workflow->current_step_id, next_step, sizeof(workflow->current_step_id) - 1);
+            workflow->step_count++;
+            return ARGO_SUCCESS;
+        }
+        return result;
+    } else if (strcmp(type, STEP_TYPE_USER_CHOOSE) == 0) {
+        /* user_choose step determines next_step based on selection */
+        result = step_user_choose(json, tokens, step_idx, workflow->context, next_step, sizeof(next_step));
+        if (result == ARGO_SUCCESS) {
+            /* Update current step and return - user_choose handles next_step internally */
+            strncpy(workflow->current_step_id, next_step, sizeof(workflow->current_step_id) - 1);
+            workflow->step_count++;
+            return ARGO_SUCCESS;
+        }
+        return result;
     } else {
         argo_report_error(E_INPUT_INVALID, "workflow_execute_current_step", type);
         return E_INPUT_INVALID;
@@ -556,7 +578,7 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         return result;
     }
 
-    /* Get next step */
+    /* Get next step from step definition (for non-branching steps) */
     int next_idx = workflow_json_find_field(json, tokens, step_idx, WORKFLOW_JSON_FIELD_NEXT_STEP);
     if (next_idx < 0) {
         argo_report_error(E_PROTOCOL_FORMAT, "workflow_execute_current_step", "missing next_step");
@@ -564,7 +586,6 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
     }
 
     /* Handle next_step as string or number */
-    char next_step[WORKFLOW_STEP_ID_MAX];
     if (tokens[next_idx].type == JSMN_STRING) {
         result = workflow_json_extract_string(json, &tokens[next_idx], next_step, sizeof(next_step));
     } else if (tokens[next_idx].type == JSMN_PRIMITIVE) {

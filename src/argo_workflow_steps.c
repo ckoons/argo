@@ -13,6 +13,7 @@
 /* Project includes */
 #include "argo_workflow_steps.h"
 #include "argo_workflow_json.h"
+#include "argo_workflow_conditions.h"
 #include "argo_error.h"
 #include "argo_log.h"
 
@@ -186,4 +187,181 @@ int step_save_file(const char* json, jsmntok_t* tokens, int step_index,
     printf("Saved workflow data to: %s\n", destination);
     LOG_DEBUG("Saved file: %s", destination);
     return ARGO_SUCCESS;
+}
+
+/* Step: decide */
+int step_decide(const char* json, jsmntok_t* tokens, int step_index,
+                workflow_context_t* ctx,
+                char* next_step, size_t next_step_size) {
+    if (!json || !tokens || !ctx || !next_step) {
+        argo_report_error(E_INPUT_NULL, "step_decide", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Find condition field */
+    int condition_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_CONDITION);
+    if (condition_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_decide", "missing condition");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char condition[STEP_OUTPUT_BUFFER_SIZE];
+    int result = workflow_json_extract_string(json, &tokens[condition_idx],
+                                              condition, sizeof(condition));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Evaluate condition */
+    int condition_result = 0;
+    result = workflow_evaluate_condition(ctx, condition, &condition_result);
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Find appropriate next step */
+    const char* next_field = condition_result ? STEP_FIELD_IF_TRUE : STEP_FIELD_IF_FALSE;
+    int next_idx = workflow_json_find_field(json, tokens, step_index, next_field);
+    if (next_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_decide", next_field);
+        return E_PROTOCOL_FORMAT;
+    }
+
+    /* Extract next step (can be string or number) */
+    if (tokens[next_idx].type == JSMN_STRING) {
+        result = workflow_json_extract_string(json, &tokens[next_idx], next_step, next_step_size);
+    } else if (tokens[next_idx].type == JSMN_PRIMITIVE) {
+        int next_num;
+        result = workflow_json_extract_int(json, &tokens[next_idx], &next_num);
+        if (result == ARGO_SUCCESS) {
+            snprintf(next_step, next_step_size, "%d", next_num);
+        }
+    } else {
+        argo_report_error(E_INPUT_INVALID, "step_decide", "invalid next_step type");
+        return E_INPUT_INVALID;
+    }
+
+    LOG_DEBUG("Decide: condition=%d, next_step=%s", condition_result, next_step);
+    return result;
+}
+
+/* Step: user_choose */
+int step_user_choose(const char* json, jsmntok_t* tokens, int step_index,
+                     workflow_context_t* ctx,
+                     char* next_step, size_t next_step_size) {
+    if (!json || !tokens || !ctx || !next_step) {
+        argo_report_error(E_INPUT_NULL, "step_user_choose", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Find prompt field */
+    int prompt_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PROMPT);
+    if (prompt_idx < 0) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_user_choose", "missing prompt");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    char prompt[STEP_PROMPT_BUFFER_SIZE];
+    int result = workflow_json_extract_string(json, &tokens[prompt_idx],
+                                              prompt, sizeof(prompt));
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* Find options array */
+    int options_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_OPTIONS);
+    if (options_idx < 0 || tokens[options_idx].type != JSMN_ARRAY) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_user_choose", "missing or invalid options");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    int option_count = tokens[options_idx].size;
+    if (option_count == 0) {
+        argo_report_error(E_INPUT_INVALID, "step_user_choose", "no options provided");
+        return E_INPUT_INVALID;
+    }
+
+    /* Display prompt and options */
+    printf("\n%s\n", prompt);
+
+    int option_token = options_idx + 1;
+    for (int i = 0; i < option_count; i++) {
+        if (tokens[option_token].type != JSMN_OBJECT) {
+            continue;
+        }
+
+        /* Get label */
+        int label_idx = workflow_json_find_field(json, tokens, option_token, STEP_FIELD_LABEL);
+        if (label_idx >= 0) {
+            char label[STEP_SAVE_TO_BUFFER_SIZE];
+            workflow_json_extract_string(json, &tokens[label_idx], label, sizeof(label));
+            printf("  %d. %s\n", i + 1, label);
+        }
+
+        /* Skip to next option */
+        int option_tokens = workflow_json_count_tokens(tokens, option_token);
+        option_token += option_tokens;
+    }
+
+    /* Read user input */
+    printf("\nSelect option (1-%d): ", option_count);
+    fflush(stdout);
+
+    char input[STEP_INPUT_BUFFER_SIZE];
+    if (!fgets(input, sizeof(input), stdin)) {
+        argo_report_error(E_INPUT_INVALID, "step_user_choose", "failed to read input");
+        return E_INPUT_INVALID;
+    }
+
+    /* Remove trailing newline */
+    size_t len = strlen(input);
+    if (len > 0 && input[len - 1] == '\n') {
+        input[len - 1] = '\0';
+    }
+
+    /* Parse selection */
+    char* endptr;
+    long selection = strtol(input, &endptr, 10);
+    if (*endptr != '\0' || selection < 1 || selection > option_count) {
+        argo_report_error(E_INPUT_INVALID, "step_user_choose", "invalid selection");
+        return E_INPUT_INVALID;
+    }
+
+    /* Find selected option's next_step */
+    option_token = options_idx + 1;
+    for (int i = 0; i < option_count; i++) {
+        if (i == (int)(selection - 1)) {
+            /* This is the selected option */
+            int next_idx = workflow_json_find_field(json, tokens, option_token, WORKFLOW_JSON_FIELD_NEXT_STEP);
+            if (next_idx < 0) {
+                argo_report_error(E_PROTOCOL_FORMAT, "step_user_choose", "option missing next_step");
+                return E_PROTOCOL_FORMAT;
+            }
+
+            /* Extract next step */
+            if (tokens[next_idx].type == JSMN_STRING) {
+                result = workflow_json_extract_string(json, &tokens[next_idx], next_step, next_step_size);
+            } else if (tokens[next_idx].type == JSMN_PRIMITIVE) {
+                int next_num;
+                result = workflow_json_extract_int(json, &tokens[next_idx], &next_num);
+                if (result == ARGO_SUCCESS) {
+                    snprintf(next_step, next_step_size, "%d", next_num);
+                }
+            } else {
+                argo_report_error(E_INPUT_INVALID, "step_user_choose", "invalid next_step type");
+                return E_INPUT_INVALID;
+            }
+
+            LOG_DEBUG("User selected option %ld, next_step=%s", selection, next_step);
+            return result;
+        }
+
+        /* Skip to next option */
+        int option_tokens = workflow_json_count_tokens(tokens, option_token);
+        option_token += option_tokens;
+    }
+
+    /* Should never reach here */
+    argo_report_error(E_INTERNAL_LOGIC, "step_user_choose", "failed to find selected option");
+    return E_INTERNAL_LOGIC;
 }
