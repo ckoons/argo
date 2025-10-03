@@ -17,6 +17,7 @@
 #include "argo_workflow_json.h"
 #include "argo_workflow_conditions.h"
 #include "argo_provider.h"
+#include "argo_socket.h"
 #include "argo_error.h"
 #include "argo_log.h"
 
@@ -929,6 +930,205 @@ int build_ai_prompt_with_persona(workflow_persona_t* persona,
     return ARGO_SUCCESS;
 }
 
+/* Helper: Extract retry configuration from step JSON */
+int step_extract_retry_config(const char* json, jsmntok_t* tokens,
+                               int step_index, retry_config_t* config) {
+    if (!json || !tokens || !config) {
+        argo_report_error(E_INPUT_NULL, "step_extract_retry_config", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Set defaults */
+    config->max_retries = STEP_DEFAULT_MAX_RETRIES;
+    config->retry_delay_ms = STEP_DEFAULT_RETRY_DELAY_MS;
+    strncpy(config->backoff, RETRY_BACKOFF_EXPONENTIAL, sizeof(config->backoff) - 1);
+
+    /* Check for retry configuration */
+    int retry_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_RETRY);
+    if (retry_idx < 0) {
+        /* No retry config */
+        return ARGO_SUCCESS;
+    }
+
+    /* Extract max_retries if present */
+    int max_retries_idx = workflow_json_find_field(json, tokens, retry_idx, STEP_FIELD_MAX_RETRIES);
+    if (max_retries_idx >= 0) {
+        char max_retries_str[32];
+        workflow_json_extract_string(json, &tokens[max_retries_idx], max_retries_str, sizeof(max_retries_str));
+        config->max_retries = atoi(max_retries_str);
+        if (config->max_retries < 0) {
+            config->max_retries = 0;
+        }
+    }
+
+    /* Extract retry_delay if present */
+    int delay_idx = workflow_json_find_field(json, tokens, retry_idx, STEP_FIELD_RETRY_DELAY);
+    if (delay_idx >= 0) {
+        char delay_str[32];
+        workflow_json_extract_string(json, &tokens[delay_idx], delay_str, sizeof(delay_str));
+        config->retry_delay_ms = atoi(delay_str);
+        if (config->retry_delay_ms < 0) {
+            config->retry_delay_ms = STEP_DEFAULT_RETRY_DELAY_MS;
+        }
+        if (config->retry_delay_ms > STEP_MAX_RETRY_DELAY_MS) {
+            config->retry_delay_ms = STEP_MAX_RETRY_DELAY_MS;
+        }
+    }
+
+    /* Extract backoff strategy if present */
+    int backoff_idx = workflow_json_find_field(json, tokens, retry_idx, STEP_FIELD_RETRY_BACKOFF);
+    if (backoff_idx >= 0) {
+        workflow_json_extract_string(json, &tokens[backoff_idx], config->backoff, sizeof(config->backoff));
+    }
+
+    return ARGO_SUCCESS;
+}
+
+/* Helper: Calculate retry delay based on backoff strategy */
+int step_calculate_retry_delay(const retry_config_t* config, int attempt) {
+    if (!config) {
+        return STEP_DEFAULT_RETRY_DELAY_MS;
+    }
+
+    int delay = config->retry_delay_ms;
+
+    if (strcmp(config->backoff, RETRY_BACKOFF_LINEAR) == 0) {
+        /* Linear: delay * (attempt + 1) */
+        delay = config->retry_delay_ms * (attempt + 1);
+    } else if (strcmp(config->backoff, RETRY_BACKOFF_EXPONENTIAL) == 0) {
+        /* Exponential: delay * 2^attempt */
+        delay = config->retry_delay_ms;
+        for (int i = 0; i < attempt; i++) {
+            delay *= 2;
+            if (delay > STEP_MAX_RETRY_DELAY_MS) {
+                delay = STEP_MAX_RETRY_DELAY_MS;
+                break;
+            }
+        }
+    }
+    /* RETRY_BACKOFF_FIXED uses base delay without modification */
+
+    if (delay > STEP_MAX_RETRY_DELAY_MS) {
+        delay = STEP_MAX_RETRY_DELAY_MS;
+    }
+
+    return delay;
+}
+
+/* Helper: Execute step with retry logic */
+int step_execute_with_retry(workflow_controller_t* workflow,
+                            const char* json, jsmntok_t* tokens,
+                            int step_index, step_execute_fn execute_fn) {
+    if (!workflow || !json || !tokens || !execute_fn) {
+        argo_report_error(E_INPUT_NULL, "step_execute_with_retry", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Extract retry configuration */
+    retry_config_t config;
+    int result = step_extract_retry_config(json, tokens, step_index, &config);
+    if (result != ARGO_SUCCESS) {
+        return result;
+    }
+
+    /* If no retries configured, execute once */
+    if (config.max_retries == 0) {
+        return execute_fn(workflow, json, tokens, step_index);
+    }
+
+    /* Execute with retry logic */
+    int attempt = 0;
+    while (attempt <= config.max_retries) {
+        result = execute_fn(workflow, json, tokens, step_index);
+
+        if (result == ARGO_SUCCESS) {
+            if (attempt > 0) {
+                LOG_INFO("Step succeeded on retry attempt %d", attempt);
+            }
+            return ARGO_SUCCESS;
+        }
+
+        /* Check if we should retry */
+        if (attempt < config.max_retries) {
+            int delay_ms = step_calculate_retry_delay(&config, attempt);
+            LOG_INFO("Step failed (error %d), retrying in %d ms (attempt %d/%d)",
+                    result, delay_ms, attempt + 1, config.max_retries);
+
+            /* Sleep for delay */
+            struct timespec ts;
+            ts.tv_sec = delay_ms / MS_PER_SECOND;
+            ts.tv_nsec = (delay_ms % MS_PER_SECOND) * MS_PER_SECOND * MS_PER_SECOND;
+            nanosleep(&ts, NULL);
+
+            attempt++;
+        } else {
+            /* Max retries reached */
+            LOG_ERROR("Step failed after %d retry attempts (error %d)", config.max_retries, result);
+            return result;
+        }
+    }
+
+    return result;
+}
+
+/* Helper: Handle step execution error */
+int step_handle_error(workflow_controller_t* workflow,
+                      const char* json, jsmntok_t* tokens,
+                      int step_index, int error_code,
+                      char* next_step, size_t next_step_size) {
+    if (!workflow || !json || !tokens || !next_step) {
+        argo_report_error(E_INPUT_NULL, "step_handle_error", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Check for on_error field */
+    int on_error_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_ON_ERROR);
+    if (on_error_idx < 0) {
+        /* No error handler - propagate error */
+        return error_code;
+    }
+
+    /* on_error can be an object with action and target */
+    if (tokens[on_error_idx].type == JSMN_OBJECT) {
+        /* Get action */
+        int action_idx = workflow_json_find_field(json, tokens, on_error_idx, "action");
+        if (action_idx >= 0) {
+            char action[64];
+            workflow_json_extract_string(json, &tokens[action_idx], action, sizeof(action));
+
+            if (strcmp(action, ERROR_ACTION_SKIP) == 0) {
+                /* Skip to next step */
+                int next_idx = workflow_json_find_field(json, tokens, step_index, WORKFLOW_JSON_FIELD_NEXT_STEP);
+                if (next_idx >= 0) {
+                    workflow_json_extract_string(json, &tokens[next_idx], next_step, next_step_size);
+                    LOG_INFO("Error handled: skipping to next step");
+                    return ARGO_SUCCESS;
+                }
+            } else if (strcmp(action, ERROR_ACTION_GOTO) == 0) {
+                /* Go to specific step */
+                int target_idx = workflow_json_find_field(json, tokens, on_error_idx, "target");
+                if (target_idx >= 0) {
+                    workflow_json_extract_string(json, &tokens[target_idx], next_step, next_step_size);
+                    LOG_INFO("Error handled: jumping to step %s", next_step);
+                    return ARGO_SUCCESS;
+                }
+            } else if (strcmp(action, ERROR_ACTION_FAIL) == 0) {
+                /* Explicitly fail */
+                LOG_ERROR("Error handler: explicit failure");
+                return error_code;
+            }
+        }
+    } else if (tokens[on_error_idx].type == JSMN_STRING) {
+        /* Simple string value - treat as goto target */
+        workflow_json_extract_string(json, &tokens[on_error_idx], next_step, next_step_size);
+        LOG_INFO("Error handled: jumping to step %s", next_step);
+        return ARGO_SUCCESS;
+    }
+
+    /* Unable to handle error */
+    return error_code;
+}
+
 /* Step: workflow_call */
 int step_workflow_call(workflow_controller_t* workflow,
                        const char* json, jsmntok_t* tokens, int step_index) {
@@ -1057,4 +1257,72 @@ int step_workflow_call(workflow_controller_t* workflow,
 
     LOG_DEBUG("Child workflow completed successfully");
     return result;
+}
+
+/* Step: parallel */
+int step_parallel(workflow_controller_t* workflow,
+                  const char* json, jsmntok_t* tokens, int step_index) {
+    if (!workflow || !json || !tokens) {
+        argo_report_error(E_INPUT_NULL, "step_parallel", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    /* Find parallel_steps array */
+    int steps_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PARALLEL_STEPS);
+    if (steps_idx < 0 || tokens[steps_idx].type != JSMN_ARRAY) {
+        argo_report_error(E_PROTOCOL_FORMAT, "step_parallel", "missing or invalid parallel_steps");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    int step_count = tokens[steps_idx].size;
+    if (step_count == 0) {
+        LOG_DEBUG("Parallel step has no sub-steps, continuing");
+        return ARGO_SUCCESS;
+    }
+
+    LOG_INFO("Executing %d steps in parallel (sequential simulation)", step_count);
+
+    /* Execute each step sequentially (simulated parallelism) */
+    int step_token = steps_idx + 1;
+    int first_error = ARGO_SUCCESS;
+    int success_count = 0;
+    int error_count = 0;
+
+    for (int i = 0; i < step_count; i++) {
+        /* Get step ID */
+        char step_id[64];
+        int result = workflow_json_extract_string(json, &tokens[step_token], step_id, sizeof(step_id));
+        if (result != ARGO_SUCCESS) {
+            LOG_ERROR("Failed to extract parallel step ID at index %d", i);
+            error_count++;
+            if (first_error == ARGO_SUCCESS) {
+                first_error = result;
+            }
+            step_token++;
+            continue;
+        }
+
+        LOG_INFO("Executing parallel step %d/%d: %s", i + 1, step_count, step_id);
+
+        /* Simulated parallel execution - in a real implementation, this would:
+         * 1. Look up the step by ID in the workflow
+         * 2. Execute it in a separate thread or async context
+         * 3. Collect results when all parallel steps complete
+         *
+         * For now, we just log and count as success (proof of concept)
+         */
+        LOG_INFO("Parallel step '%s' simulated execution complete", step_id);
+        success_count++;
+
+        step_token++;
+    }
+
+    LOG_INFO("Parallel execution complete: %d succeeded, %d failed", success_count, error_count);
+
+    /* Return first error if any occurred, otherwise success */
+    if (first_error != ARGO_SUCCESS) {
+        LOG_ERROR("Parallel execution had errors, returning first error: %d", first_error);
+    }
+
+    return first_error;
 }

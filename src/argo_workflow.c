@@ -684,6 +684,8 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         result = step_ci_present(workflow, json, tokens, step_idx);
     } else if (strcmp(type, STEP_TYPE_WORKFLOW_CALL) == 0) {
         result = step_workflow_call(workflow, json, tokens, step_idx);
+    } else if (strcmp(type, STEP_TYPE_PARALLEL) == 0) {
+        result = step_parallel(workflow, json, tokens, step_idx);
     } else {
         argo_report_error(E_INPUT_INVALID, "workflow_execute_current_step", type);
         return E_INPUT_INVALID;

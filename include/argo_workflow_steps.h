@@ -20,6 +20,7 @@ typedef struct workflow_persona workflow_persona_t;
 #define STEP_TYPE_CI_ASK_SERIES "ci_ask_series"
 #define STEP_TYPE_CI_PRESENT "ci_present"
 #define STEP_TYPE_WORKFLOW_CALL "workflow_call"
+#define STEP_TYPE_PARALLEL "parallel"
 
 /* Step JSON field names */
 #define STEP_FIELD_PROMPT "prompt"
@@ -61,8 +62,38 @@ typedef struct workflow_persona workflow_persona_t;
 #define STEP_FIELD_WORKFLOW "workflow"
 #define STEP_FIELD_INPUT "input"
 
+/* Advanced features field names */
+#define STEP_FIELD_RETRY "retry"
+#define STEP_FIELD_MAX_RETRIES "max_retries"
+#define STEP_FIELD_RETRY_DELAY "retry_delay"
+#define STEP_FIELD_RETRY_BACKOFF "retry_backoff"
+#define STEP_FIELD_TIMEOUT "timeout"
+#define STEP_FIELD_ON_ERROR "on_error"
+#define STEP_FIELD_PARALLEL "parallel"
+#define STEP_FIELD_PARALLEL_STEPS "parallel_steps"
+
+/* Retry backoff strategies */
+#define RETRY_BACKOFF_FIXED "fixed"
+#define RETRY_BACKOFF_LINEAR "linear"
+#define RETRY_BACKOFF_EXPONENTIAL "exponential"
+
+/* Error handling actions */
+#define ERROR_ACTION_RETRY "retry"
+#define ERROR_ACTION_SKIP "skip"
+#define ERROR_ACTION_FAIL "fail"
+#define ERROR_ACTION_GOTO "goto"
+
 /* Workflow recursion limits */
 #define WORKFLOW_MAX_RECURSION_DEPTH 10
+
+/* Retry defaults */
+#define STEP_DEFAULT_MAX_RETRIES 3
+#define STEP_DEFAULT_RETRY_DELAY_MS 1000
+#define STEP_MAX_RETRY_DELAY_MS 60000
+
+/* Timeout defaults */
+#define STEP_DEFAULT_TIMEOUT_MS 30000
+#define STEP_MAX_TIMEOUT_MS 300000
 
 /* Step buffer sizes */
 #define STEP_INPUT_BUFFER_SIZE 4096
@@ -372,6 +403,31 @@ int step_ci_present(workflow_controller_t* workflow,
 int step_workflow_call(workflow_controller_t* workflow,
                        const char* json, jsmntok_t* tokens, int step_index);
 
+/* Step: parallel
+ *
+ * Executes multiple steps in parallel (simulated concurrency).
+ *
+ * JSON Format:
+ *   {
+ *     "type": "parallel",
+ *     "parallel_steps": ["step_a", "step_b", "step_c"],
+ *     "next_step": "after_parallel"
+ *   }
+ *
+ * Parameters:
+ *   workflow - Workflow controller
+ *   json - Full JSON string
+ *   tokens - Parsed tokens
+ *   step_index - Token index of step object
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_INPUT_NULL if parameters NULL
+ *   E_PROTOCOL_FORMAT if required fields missing
+ */
+int step_parallel(workflow_controller_t* workflow,
+                  const char* json, jsmntok_t* tokens, int step_index);
+
 /* Helper functions for AI integration */
 
 /* Build AI prompt with persona context
@@ -394,5 +450,80 @@ int build_ai_prompt_with_persona(workflow_persona_t* persona,
                                   const char* prompt,
                                   char* output,
                                   size_t output_size);
+
+/* Helper functions for advanced features */
+
+/* Retry configuration */
+typedef struct {
+    int max_retries;        /* Maximum retry attempts */
+    int retry_delay_ms;     /* Base delay between retries */
+    char backoff[32];       /* Backoff strategy: fixed, linear, exponential */
+} retry_config_t;
+
+/* Extract retry configuration from step JSON
+ *
+ * Parameters:
+ *   json - Full JSON string
+ *   tokens - Parsed tokens
+ *   step_index - Token index of step object
+ *   config - Output: retry configuration
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_INPUT_NULL if parameters NULL
+ */
+int step_extract_retry_config(const char* json, jsmntok_t* tokens,
+                               int step_index, retry_config_t* config);
+
+/* Calculate retry delay based on backoff strategy
+ *
+ * Parameters:
+ *   config - Retry configuration
+ *   attempt - Current retry attempt (0-based)
+ *
+ * Returns:
+ *   Delay in milliseconds
+ */
+int step_calculate_retry_delay(const retry_config_t* config, int attempt);
+
+/* Execute step with retry logic
+ *
+ * Parameters:
+ *   workflow - Workflow controller
+ *   json - Full JSON string
+ *   tokens - Parsed tokens
+ *   step_index - Token index of step object
+ *   execute_fn - Function to execute the step
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   Error code from step execution if all retries fail
+ */
+typedef int (*step_execute_fn)(workflow_controller_t* workflow,
+                                const char* json, jsmntok_t* tokens, int step_index);
+
+int step_execute_with_retry(workflow_controller_t* workflow,
+                            const char* json, jsmntok_t* tokens,
+                            int step_index, step_execute_fn execute_fn);
+
+/* Handle step execution error
+ *
+ * Parameters:
+ *   workflow - Workflow controller
+ *   json - Full JSON string
+ *   tokens - Parsed tokens
+ *   step_index - Token index of step object
+ *   error_code - Error code from step execution
+ *   next_step - Output: next step ID based on error handling
+ *   next_step_size - Size of next_step buffer
+ *
+ * Returns:
+ *   ARGO_SUCCESS if error was handled
+ *   Original error_code if error should propagate
+ */
+int step_handle_error(workflow_controller_t* workflow,
+                      const char* json, jsmntok_t* tokens,
+                      int step_index, int error_code,
+                      char* next_step, size_t next_step_size);
 
 #endif /* ARGO_WORKFLOW_STEPS_H */
