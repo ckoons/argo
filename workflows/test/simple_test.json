@@ -1,0 +1,46 @@
+{
+  "workflow_name": "simple_test",
+  "workflow_version": "1.0.0",
+  "category": "test",
+  "description": "Simplest possible workflow - test executor basics",
+
+  "phases": [
+    {
+      "phase": "TEST",
+      "description": "Test basic workflow execution",
+      "steps": [
+        {
+          "step": 1,
+          "type": "user_ask",
+          "prompt": "What is your name?",
+          "save_to": "name",
+          "next_step": 2
+        },
+        {
+          "step": 2,
+          "type": "user_ask",
+          "prompt": "What are you building?",
+          "save_to": "project",
+          "next_step": 3
+        },
+        {
+          "step": 3,
+          "type": "display",
+          "message": "Great! {name} is building {project}",
+          "next_step": 4
+        },
+        {
+          "step": 4,
+          "type": "save_file",
+          "data": {
+            "name": "{name}",
+            "project": "{project}",
+            "timestamp": "{timestamp}"
+          },
+          "destination": "/tmp/workflow_test.json",
+          "next_step": "EXIT"
+        }
+      ]
+    }
+  ]
+}
