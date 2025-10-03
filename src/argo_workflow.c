@@ -24,6 +24,78 @@ static void generate_task_id(char* id_out, size_t len) {
     snprintf(id_out, len, "task-%ld-%d", (long)time(NULL), task_counter++);
 }
 
+/* Helper: Check loop and update workflow step tracking */
+static int check_and_update_loop(workflow_controller_t* workflow,
+                                 const char* json, jsmntok_t* tokens,
+                                 int step_idx, const char* next_step) {
+    /* Detect loop: check if next_step points to a previous step */
+    int is_looping_back = 0;
+
+    /* Convert step IDs to numbers for comparison (if possible) */
+    char* endptr;
+    long current_num = strtol(workflow->current_step_id, &endptr, 10);
+    int current_is_num = (*endptr == '\0');
+
+    long next_num = strtol(next_step, &endptr, 10);
+    int next_is_num = (*endptr == '\0');
+
+    /* Loop detected if next step number is less than or equal to current */
+    if (current_is_num && next_is_num && next_num <= current_num) {
+        is_looping_back = 1;
+    }
+
+    if (is_looping_back) {
+        /* Check if this is the same loop or a new loop */
+        if (workflow->loop_start_step_id[0] == '\0' ||
+            strcmp(next_step, workflow->loop_start_step_id) == 0) {
+            /* Same loop - increment iteration count */
+            workflow->loop_iteration_count++;
+
+            /* Set loop start if not set */
+            if (workflow->loop_start_step_id[0] == '\0') {
+                strncpy(workflow->loop_start_step_id, next_step, sizeof(workflow->loop_start_step_id) - 1);
+            }
+
+            /* Check max_iterations from step definition */
+            int max_iterations = EXECUTOR_MAX_LOOP_ITERATIONS;
+            int max_iter_idx = workflow_json_find_field(json, tokens, step_idx, STEP_FIELD_MAX_ITERATIONS);
+            if (max_iter_idx >= 0) {
+                int step_max_iter;
+                if (workflow_json_extract_int(json, &tokens[max_iter_idx], &step_max_iter) == ARGO_SUCCESS) {
+                    max_iterations = step_max_iter;
+                }
+            }
+
+            /* Check if we've exceeded max iterations */
+            if (workflow->loop_iteration_count > max_iterations) {
+                argo_report_error(E_INPUT_INVALID, "check_and_update_loop", "max_iterations exceeded");
+                return E_INPUT_INVALID;
+            }
+
+            LOG_DEBUG("Loop iteration %d/%d (back to step %s)",
+                     workflow->loop_iteration_count, max_iterations, next_step);
+        } else {
+            /* New loop - reset tracking */
+            strncpy(workflow->loop_start_step_id, next_step, sizeof(workflow->loop_start_step_id) - 1);
+            workflow->loop_iteration_count = 1;
+            LOG_DEBUG("Starting new loop at step %s", next_step);
+        }
+    } else {
+        /* Not looping - reset loop tracking */
+        workflow->loop_start_step_id[0] = '\0';
+        workflow->loop_iteration_count = 0;
+    }
+
+    /* Save previous step before updating */
+    strncpy(workflow->previous_step_id, workflow->current_step_id, sizeof(workflow->previous_step_id) - 1);
+
+    /* Update current step */
+    strncpy(workflow->current_step_id, next_step, sizeof(workflow->current_step_id) - 1);
+    workflow->step_count++;
+
+    return ARGO_SUCCESS;
+}
+
 /* Create workflow controller */
 workflow_controller_t* workflow_create(ci_registry_t* registry,
                                       lifecycle_manager_t* lifecycle,
@@ -57,6 +129,11 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
     workflow->context = NULL;
     workflow->current_step_id[0] = '\0';
     workflow->step_count = 0;
+
+    /* Initialize loop tracking */
+    workflow->previous_step_id[0] = '\0';
+    workflow->loop_start_step_id[0] = '\0';
+    workflow->loop_iteration_count = 0;
 
     LOG_INFO("Created workflow: %s", workflow_id);
     return workflow;
@@ -554,20 +631,16 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         /* decide step determines next_step based on condition */
         result = step_decide(json, tokens, step_idx, workflow->context, next_step, sizeof(next_step));
         if (result == ARGO_SUCCESS) {
-            /* Update current step and return - decide handles next_step internally */
-            strncpy(workflow->current_step_id, next_step, sizeof(workflow->current_step_id) - 1);
-            workflow->step_count++;
-            return ARGO_SUCCESS;
+            /* Check loop and update step tracking */
+            return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
         }
         return result;
     } else if (strcmp(type, STEP_TYPE_USER_CHOOSE) == 0) {
         /* user_choose step determines next_step based on selection */
         result = step_user_choose(json, tokens, step_idx, workflow->context, next_step, sizeof(next_step));
         if (result == ARGO_SUCCESS) {
-            /* Update current step and return - user_choose handles next_step internally */
-            strncpy(workflow->current_step_id, next_step, sizeof(workflow->current_step_id) - 1);
-            workflow->step_count++;
-            return ARGO_SUCCESS;
+            /* Check loop and update step tracking */
+            return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
         }
         return result;
     } else if (strcmp(type, STEP_TYPE_CI_ASK) == 0) {
@@ -612,11 +685,8 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         return result;
     }
 
-    /* Update current step */
-    strncpy(workflow->current_step_id, next_step, sizeof(workflow->current_step_id) - 1);
-    workflow->step_count++;
-
-    return ARGO_SUCCESS;
+    /* Check loop and update step tracking */
+    return check_and_update_loop(workflow, json, tokens, step_idx, next_step);
 }
 
 /* Execute all workflow steps */

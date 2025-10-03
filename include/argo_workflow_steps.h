@@ -52,6 +52,9 @@ typedef struct jsmntok jsmntok_t;
 #define STEP_FIELD_VALIDATION "validation"
 #define STEP_FIELD_VALIDATION_ERROR "validation_error"
 
+/* Loop control field names */
+#define STEP_FIELD_MAX_ITERATIONS "max_iterations"
+
 /* Step buffer sizes */
 #define STEP_INPUT_BUFFER_SIZE 4096
 #define STEP_OUTPUT_BUFFER_SIZE 8192

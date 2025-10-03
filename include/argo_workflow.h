@@ -21,6 +21,7 @@ typedef struct jsmntok jsmntok_t;
 #define EXECUTOR_MAX_STEPS 100
 #define EXECUTOR_TYPE_BUFFER_SIZE 64
 #define EXECUTOR_STEP_EXIT "EXIT"
+#define EXECUTOR_MAX_LOOP_ITERATIONS 10
 
 /* Workflow phases */
 typedef enum {
@@ -81,7 +82,7 @@ typedef struct workflow_controller {
     char base_branch[128];
     char feature_branch[128];
 
-    /* JSON workflow execution (new) */
+    /* JSON workflow execution */
     char* json_workflow;           /* Loaded JSON workflow definition */
     size_t json_size;              /* Size of JSON data */
     jsmntok_t* tokens;             /* Parsed JSON tokens */
@@ -89,6 +90,11 @@ typedef struct workflow_controller {
     workflow_context_t* context;   /* Variable context for step execution */
     char current_step_id[WORKFLOW_STEP_ID_MAX];  /* Current executing step */
     int step_count;                /* Number of steps executed */
+
+    /* Loop tracking */
+    char previous_step_id[WORKFLOW_STEP_ID_MAX];  /* Previous step (for loop detection) */
+    char loop_start_step_id[WORKFLOW_STEP_ID_MAX]; /* Step that started current loop */
+    int loop_iteration_count;      /* Current loop iteration count */
 
 } workflow_controller_t;
 
