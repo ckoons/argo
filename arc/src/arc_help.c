@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "arc_commands.h"
+#include "argo_output.h"
 
 /* General help */
 static void show_general_help(void) {
@@ -79,8 +80,8 @@ static void show_command_help(const char* command) {
         printf("  arc workflow status create_proposal_my_feature\n");
     }
     else {
-        fprintf(stderr, "Unknown command: %s\n", command);
-        fprintf(stderr, "Use 'arc help' to see available commands.\n");
+        LOG_USER_ERROR("Unknown command: %s\n", command);
+        LOG_USER_INFO("Use 'arc help' to see available commands.\n");
     }
 }
 

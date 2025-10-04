@@ -11,14 +11,15 @@
 #include "argo_orchestrator_api.h"
 #include "argo_init.h"
 #include "argo_error.h"
+#include "argo_output.h"
 
 #define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
 
 /* arc workflow start command handler */
 int arc_workflow_start(int argc, char** argv) {
     if (argc < 2) {
-        fprintf(stderr, "Error: template and instance name required\n");
-        fprintf(stderr, "Usage: arc workflow start [template] [instance]\n");
+        LOG_USER_ERROR("template and instance name required\n");
+        LOG_USER_INFO("Usage: arc workflow start [template] [instance]\n");
         return ARC_EXIT_ERROR;
     }
 
@@ -29,21 +30,21 @@ int arc_workflow_start(int argc, char** argv) {
     /* Initialize argo */
     int result = argo_init();
     if (result != ARGO_SUCCESS) {
-        fprintf(stderr, "Error: Failed to initialize argo\n");
+        LOG_USER_ERROR("Failed to initialize argo\n");
         return ARC_EXIT_ERROR;
     }
 
     /* Validate template exists */
     workflow_template_collection_t* templates = workflow_templates_create();
     if (!templates) {
-        fprintf(stderr, "Error: Failed to create template collection\n");
+        LOG_USER_ERROR("Failed to create template collection\n");
         argo_exit();
         return ARC_EXIT_ERROR;
     }
 
     result = workflow_templates_discover(templates);
     if (result != ARGO_SUCCESS) {
-        fprintf(stderr, "Error: Failed to discover templates\n");
+        LOG_USER_ERROR("Failed to discover templates\n");
         workflow_templates_destroy(templates);
         argo_exit();
         return ARC_EXIT_ERROR;
@@ -51,8 +52,8 @@ int arc_workflow_start(int argc, char** argv) {
 
     workflow_template_t* template = workflow_templates_find(templates, template_name);
     if (!template) {
-        fprintf(stderr, "Error: Template not found: %s\n", template_name);
-        fprintf(stderr, "  Try: arc workflow list template\n");
+        LOG_USER_ERROR("Template not found: %s\n", template_name);
+        LOG_USER_INFO("  Try: arc workflow list template\n");
         workflow_templates_destroy(templates);
         argo_exit();
         return ARC_EXIT_ERROR;
@@ -61,8 +62,8 @@ int arc_workflow_start(int argc, char** argv) {
     /* Validate template file */
     result = workflow_template_validate(template->path);
     if (result != ARGO_SUCCESS) {
-        fprintf(stderr, "Error: Template is invalid: %s\n", template_name);
-        fprintf(stderr, "  Path: %s\n", template->path);
+        LOG_USER_ERROR("Template is invalid: %s\n", template_name);
+        LOG_USER_INFO("  Path: %s\n", template->path);
         workflow_templates_destroy(templates);
         argo_exit();
         return ARC_EXIT_ERROR;
@@ -73,14 +74,14 @@ int arc_workflow_start(int argc, char** argv) {
     /* Load workflow registry */
     workflow_registry_t* registry = workflow_registry_create(WORKFLOW_REGISTRY_PATH);
     if (!registry) {
-        fprintf(stderr, "Error: Failed to create workflow registry\n");
+        LOG_USER_ERROR("Failed to create workflow registry\n");
         argo_exit();
         return ARC_EXIT_ERROR;
     }
 
     result = workflow_registry_load(registry);
     if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
-        fprintf(stderr, "Error: Failed to load workflow registry\n");
+        LOG_USER_ERROR("Failed to load workflow registry\n");
         workflow_registry_destroy(registry);
         argo_exit();
         return ARC_EXIT_ERROR;
@@ -89,9 +90,9 @@ int arc_workflow_start(int argc, char** argv) {
     /* Add workflow to registry */
     result = workflow_registry_add_workflow(registry, template_name, instance_name, branch);
     if (result == E_DUPLICATE) {
-        fprintf(stderr, "Error: Workflow already exists: %s_%s\n", template_name, instance_name);
-        fprintf(stderr, "  Try: arc workflow list\n");
-        fprintf(stderr, "  Or use: arc workflow abandon %s_%s\n", template_name, instance_name);
+        LOG_USER_ERROR("Workflow already exists: %s_%s\n", template_name, instance_name);
+        LOG_USER_INFO("  Try: arc workflow list\n");
+        LOG_USER_INFO("  Or use: arc workflow abandon %s_%s\n", template_name, instance_name);
         workflow_registry_destroy(registry);
         argo_exit();
         return ARC_EXIT_ERROR;
@@ -111,7 +112,7 @@ int arc_workflow_start(int argc, char** argv) {
     /* Start workflow execution */
     result = workflow_exec_start(workflow_id, template->path, branch, registry);
     if (result != ARGO_SUCCESS) {
-        fprintf(stderr, "Error: Failed to start workflow execution\n");
+        LOG_USER_ERROR("Failed to start workflow execution\n");
         workflow_registry_remove_workflow(registry, workflow_id);
         workflow_registry_destroy(registry);
         argo_exit();
@@ -119,8 +120,8 @@ int arc_workflow_start(int argc, char** argv) {
     }
 
     /* Print confirmation */
-    fprintf(stderr, "Started workflow: %s\n", workflow_id);
-    fprintf(stderr, "Logs: ~/.argo/logs/%s.log\n", workflow_id);
+    LOG_USER_SUCCESS("Started workflow: %s\n", workflow_id);
+    LOG_USER_INFO("Logs: ~/.argo/logs/%s.log\n", workflow_id);
 
     /* Cleanup */
     workflow_registry_destroy(registry);

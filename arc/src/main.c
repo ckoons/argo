@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "arc_commands.h"
+#include "argo_output.h"
 
 int main(int argc, char** argv) {
     /* No arguments or just 'arc' - show general help */
@@ -22,8 +23,8 @@ int main(int argc, char** argv) {
         return arc_cmd_workflow(argc - 2, argv + 2);
     }
     else {
-        fprintf(stderr, "Unknown command: %s\n", argv[1]);
-        fprintf(stderr, "Use 'arc help' to see available commands.\n");
+        LOG_USER_ERROR("Unknown command: %s\n", argv[1]);
+        LOG_USER_INFO("Use 'arc help' to see available commands.\n");
         return ARC_EXIT_ERROR;
     }
 }

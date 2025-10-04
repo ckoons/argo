@@ -10,6 +10,7 @@
 #include "argo_workflow_templates.h"
 #include "argo_init.h"
 #include "argo_error.h"
+#include "argo_output.h"
 
 #define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
 
@@ -36,15 +37,15 @@ static int list_active_workflows(workflow_registry_t* registry) {
     }
 
     if (count == 0) {
-        printf("\nNo active workflows.\n");
-        printf("Use 'arc workflow start' to create a workflow.\n\n");
+        LOG_USER_STATUS("\nNo active workflows.\n");
+        LOG_USER_STATUS("Use 'arc workflow start' to create a workflow.\n\n");
         return ARC_EXIT_SUCCESS;
     }
 
-    printf("\nACTIVE WORKFLOWS:\n");
-    printf("%-8s %-30s %-16s %-12s %-8s %-12s\n",
+    LOG_USER_STATUS("\nACTIVE WORKFLOWS:\n");
+    LOG_USER_STATUS("%-8s %-30s %-16s %-12s %-8s %-12s\n",
            "CONTEXT", "NAME", "TEMPLATE", "INSTANCE", "STATUS", "TIME");
-    printf("------------------------------------------------------------------------\n");
+    LOG_USER_STATUS("------------------------------------------------------------------------\n");
 
     time_t now = time(NULL);
     for (int i = 0; i < count; i++) {
@@ -54,7 +55,7 @@ static int list_active_workflows(workflow_registry_t* registry) {
 
         const char* mark = (context && strcmp(context, wf->id) == 0) ? "*" : " ";
 
-        printf("%-8s %-30s %-16s %-12s %-8s %-12s\n",
+        LOG_USER_STATUS("%-8s %-30s %-16s %-12s %-8s %-12s\n",
                mark,
                wf->id,
                wf->template_name,
@@ -63,7 +64,7 @@ static int list_active_workflows(workflow_registry_t* registry) {
                duration);
     }
 
-    printf("\n");
+    LOG_USER_STATUS("\n");
     return ARC_EXIT_SUCCESS;
 }
 
@@ -72,38 +73,38 @@ static int list_templates(void) {
     /* Discover templates */
     workflow_template_collection_t* templates = workflow_templates_create();
     if (!templates) {
-        fprintf(stderr, "Error: Failed to create template collection\n");
+        LOG_USER_ERROR("Failed to create template collection\n");
         return ARC_EXIT_ERROR;
     }
 
     int result = workflow_templates_discover(templates);
     if (result != ARGO_SUCCESS) {
-        fprintf(stderr, "Warning: Failed to discover templates\n");
+        LOG_USER_WARN("Failed to discover templates\n");
         workflow_templates_destroy(templates);
         return ARC_EXIT_ERROR;
     }
 
     if (templates->count == 0) {
-        printf("\nNo templates found.\n");
-        printf("  System templates: workflows/templates/\n");
-        printf("  User templates:   ~/.argo/workflows/templates/\n\n");
+        LOG_USER_STATUS("\nNo templates found.\n");
+        LOG_USER_STATUS("  System templates: workflows/templates/\n");
+        LOG_USER_STATUS("  User templates:   ~/.argo/workflows/templates/\n\n");
         workflow_templates_destroy(templates);
         return ARC_EXIT_SUCCESS;
     }
 
-    printf("\nTEMPLATES:\n");
-    printf("%-8s %-20s %-40s\n", "SCOPE", "NAME", "DESCRIPTION");
-    printf("------------------------------------------------------------------------\n");
+    LOG_USER_STATUS("\nTEMPLATES:\n");
+    LOG_USER_STATUS("%-8s %-20s %-40s\n", "SCOPE", "NAME", "DESCRIPTION");
+    LOG_USER_STATUS("------------------------------------------------------------------------\n");
 
     for (int i = 0; i < templates->count; i++) {
         workflow_template_t* tmpl = &templates->templates[i];
-        printf("%-8s %-20s %-40s\n",
+        LOG_USER_STATUS("%-8s %-20s %-40s\n",
                tmpl->is_system ? "system" : "user",
                tmpl->name,
                tmpl->description);
     }
 
-    printf("\n");
+    LOG_USER_STATUS("\n");
     workflow_templates_destroy(templates);
     return ARC_EXIT_SUCCESS;
 }
@@ -118,7 +119,7 @@ int arc_workflow_list(int argc, char** argv) {
     /* Initialize argo */
     int result = argo_init();
     if (result != ARGO_SUCCESS) {
-        fprintf(stderr, "Error: Failed to initialize argo\n");
+        LOG_USER_ERROR("Failed to initialize argo\n");
         return ARC_EXIT_ERROR;
     }
 
@@ -132,14 +133,14 @@ int arc_workflow_list(int argc, char** argv) {
     /* Load workflow registry */
     workflow_registry_t* registry = workflow_registry_create(WORKFLOW_REGISTRY_PATH);
     if (!registry) {
-        fprintf(stderr, "Error: Failed to create workflow registry\n");
+        LOG_USER_ERROR("Failed to create workflow registry\n");
         argo_exit();
         return ARC_EXIT_ERROR;
     }
 
     result = workflow_registry_load(registry);
     if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
-        fprintf(stderr, "Error: Failed to load workflow registry\n");
+        LOG_USER_ERROR("Failed to load workflow registry\n");
         workflow_registry_destroy(registry);
         argo_exit();
         return ARC_EXIT_ERROR;

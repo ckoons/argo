@@ -13,13 +13,14 @@
 #include "argo_workflow_executor.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_output.h"
 
 /* Log file path pattern */
 #define LOG_PATH_PATTERN "%s/.argo/logs/%s.log"
 #define LOG_PATH_MAX 512
 
 /* Workflow executor binary path (relative to argo installation) */
-#define EXECUTOR_BINARY "./argo_workflow_executor"
+#define EXECUTOR_BINARY "./bin/argo_workflow_executor"
 
 /* Get log file path for workflow */
 static int get_log_path(const char* workflow_id, char* path, size_t path_size) {
@@ -86,7 +87,7 @@ int workflow_exec_start(const char* workflow_id,
         /* Redirect stdout and stderr to log file */
         int log_fd = open(log_path, O_WRONLY | O_CREAT | O_APPEND, 0644);
         if (log_fd < 0) {
-            fprintf(stderr, "Failed to open log file: %s\n", log_path);
+            FORK_ERROR("Failed to open log file: %s\n", log_path);
             exit(1);
         }
 
@@ -108,7 +109,7 @@ int workflow_exec_start(const char* workflow_id,
         execv(EXECUTOR_BINARY, args);
 
         /* If execv returns, it failed */
-        fprintf(stderr, "Failed to execute workflow executor: %s\n", strerror(errno));
+        FORK_ERROR("Failed to execute workflow executor: %s\n", strerror(errno));
         exit(1);
     }
 

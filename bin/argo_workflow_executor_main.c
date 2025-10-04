@@ -12,6 +12,7 @@
 #include "argo_json.h"
 #include "argo_error.h"
 #include "argo_workflow_executor.h"
+#include "argo_output.h"
 
 /* External library */
 #define JSMN_HEADER
@@ -94,7 +95,7 @@ static void get_checkpoint_path(const char* workflow_id, char* path, size_t path
 static int load_template(const char* template_path, workflow_state_t* state) {
     FILE* file = fopen(template_path, "r");
     if (!file) {
-        fprintf(stderr, "Failed to open template: %s\n", template_path);
+        LOG_WORKFLOW_ERROR("Failed to open template: %s\n", template_path);
         return -1;
     }
 
@@ -109,7 +110,7 @@ static int load_template(const char* template_path, workflow_state_t* state) {
     jsmn_init(&parser);
     int token_count = jsmn_parse(&parser, buffer, bytes_read, tokens, 256);
     if (token_count < 0) {
-        fprintf(stderr, "Failed to parse template JSON\n");
+        LOG_WORKFLOW_ERROR("Failed to parse template JSON\n");
         return -1;
     }
 
@@ -127,7 +128,7 @@ static int load_template(const char* template_path, workflow_state_t* state) {
     }
 
     if (steps_idx == -1 || tokens[steps_idx].type != JSMN_ARRAY) {
-        fprintf(stderr, "No steps array found in template\n");
+        LOG_WORKFLOW_ERROR("No steps array found in template\n");
         return -1;
     }
 
@@ -187,18 +188,18 @@ static int save_checkpoint(workflow_state_t* state) {
 
     FILE* file = fopen(checkpoint_path, "w");
     if (!file) {
-        fprintf(stderr, "Failed to create checkpoint file: %s\n", checkpoint_path);
+        LOG_WORKFLOW_ERROR("Failed to create checkpoint file: %s\n", checkpoint_path);
         return -1;
     }
 
-    fprintf(file, "{\n");
-    fprintf(file, "  \"workflow_id\": \"%s\",\n", state->workflow_id);
-    fprintf(file, "  \"template_path\": \"%s\",\n", state->template_path);
-    fprintf(file, "  \"branch\": \"%s\",\n", state->branch);
-    fprintf(file, "  \"current_step\": %d,\n", state->current_step);
-    fprintf(file, "  \"total_steps\": %d,\n", state->total_steps);
-    fprintf(file, "  \"is_paused\": %s\n", state->is_paused ? "true" : "false");
-    fprintf(file, "}\n");
+    LOG_WORKFLOW("{\n");
+    LOG_WORKFLOW("  \"workflow_id\": \"%s\",\n", state->workflow_id);
+    LOG_WORKFLOW("  \"template_path\": \"%s\",\n", state->template_path);
+    LOG_WORKFLOW("  \"branch\": \"%s\",\n", state->branch);
+    LOG_WORKFLOW("  \"current_step\": %d,\n", state->current_step);
+    LOG_WORKFLOW("  \"total_steps\": %d,\n", state->total_steps);
+    LOG_WORKFLOW("  \"is_paused\": %s\n", state->is_paused ? "true" : "false");
+    LOG_WORKFLOW("}\n");
 
     fclose(file);
     return 0;
@@ -230,19 +231,19 @@ static int load_checkpoint(workflow_state_t* state) {
 
 /* Execute a single workflow step */
 static void execute_step(workflow_step_t* step, int step_num, int total_steps) {
-    fprintf(stdout, "\n");
-    fprintf(stdout, "========================================\n");
-    fprintf(stdout, "Step %d/%d: %s\n", step_num + 1, total_steps, step->step_name);
-    fprintf(stdout, "========================================\n");
-    fprintf(stdout, "Type: %s\n", step->step_type);
-    fprintf(stdout, "Task: %s\n", step->prompt);
-    fprintf(stdout, "----------------------------------------\n");
-    fprintf(stdout, "Executing...\n");
+    LOG_WORKFLOW("\n");
+    LOG_WORKFLOW("========================================\n");
+    LOG_WORKFLOW("Step %d/%d: %s\n", step_num + 1, total_steps, step->step_name);
+    LOG_WORKFLOW("========================================\n");
+    LOG_WORKFLOW("Type: %s\n", step->step_type);
+    LOG_WORKFLOW("Task: %s\n", step->prompt);
+    LOG_WORKFLOW("----------------------------------------\n");
+    LOG_WORKFLOW("Executing...\n");
 
     /* Simulate step execution */
     sleep(STEP_EXECUTION_DELAY_SEC);
 
-    fprintf(stdout, "Step completed successfully\n");
+    LOG_WORKFLOW("Step completed successfully\n");
 }
 
 /* Check if paused and wait for resume */
@@ -250,7 +251,7 @@ static void check_pause_state(workflow_state_t* state) {
     if (pause_requested && !state->is_paused) {
         state->is_paused = true;
         save_checkpoint(state);
-        fprintf(stdout, "\n>>> Workflow PAUSED at step %d/%d\n",
+        LOG_WORKFLOW("\n>>> Workflow PAUSED at step %d/%d\n",
                 state->current_step + 1, state->total_steps);
     }
 
@@ -261,7 +262,7 @@ static void check_pause_state(workflow_state_t* state) {
     if (state->is_paused && !pause_requested) {
         state->is_paused = false;
         save_checkpoint(state);
-        fprintf(stdout, ">>> Workflow RESUMED from step %d/%d\n\n",
+        LOG_WORKFLOW(">>> Workflow RESUMED from step %d/%d\n\n",
                 state->current_step + 1, state->total_steps);
     }
 }
@@ -269,7 +270,7 @@ static void check_pause_state(workflow_state_t* state) {
 /* Main workflow executor */
 int main(int argc, char** argv) {
     if (argc < 4) {
-        fprintf(stderr, "Usage: %s <workflow_id> <template_path> <branch>\n", argv[0]);
+        LOG_WORKFLOW_ERROR("Usage: %s <workflow_id> <template_path> <branch>\n", argv[0]);
         return 1;
     }
 
@@ -283,32 +284,32 @@ int main(int argc, char** argv) {
     /* Setup signal handlers */
     setup_signal_handlers();
 
-    fprintf(stdout, "========================================\n");
-    fprintf(stdout, "Argo Workflow Executor\n");
-    fprintf(stdout, "========================================\n");
-    fprintf(stdout, "Workflow ID: %s\n", state.workflow_id);
-    fprintf(stdout, "Template:    %s\n", state.template_path);
-    fprintf(stdout, "Branch:      %s\n", state.branch);
-    fprintf(stdout, "PID:         %d\n", getpid());
-    fprintf(stdout, "========================================\n");
+    LOG_WORKFLOW("========================================\n");
+    LOG_WORKFLOW("Argo Workflow Executor\n");
+    LOG_WORKFLOW("========================================\n");
+    LOG_WORKFLOW("Workflow ID: %s\n", state.workflow_id);
+    LOG_WORKFLOW("Template:    %s\n", state.template_path);
+    LOG_WORKFLOW("Branch:      %s\n", state.branch);
+    LOG_WORKFLOW("PID:         %d\n", getpid());
+    LOG_WORKFLOW("========================================\n");
 
     /* Load workflow template */
     if (load_template(state.template_path, &state) != 0) {
-        fprintf(stderr, "Failed to load workflow template\n");
+        LOG_WORKFLOW_ERROR("Failed to load workflow template\n");
         return 1;
     }
 
-    fprintf(stdout, "Loaded template with %d steps\n", state.total_steps);
+    LOG_WORKFLOW("Loaded template with %d steps\n", state.total_steps);
 
     /* Try to restore from checkpoint */
     if (load_checkpoint(&state) == 0) {
-        fprintf(stdout, "Resuming from checkpoint at step %d\n", state.current_step + 1);
+        LOG_WORKFLOW("Resuming from checkpoint at step %d\n", state.current_step + 1);
     } else {
-        fprintf(stdout, "Starting fresh execution\n");
+        LOG_WORKFLOW("Starting fresh execution\n");
         state.current_step = 0;
     }
 
-    fprintf(stdout, "========================================\n\n");
+    LOG_WORKFLOW("========================================\n\n");
 
     /* Main execution loop */
     while (state.current_step < state.total_steps && !shutdown_requested) {
@@ -334,18 +335,18 @@ int main(int argc, char** argv) {
     get_checkpoint_path(state.workflow_id, checkpoint_path, sizeof(checkpoint_path));
 
     if (shutdown_requested) {
-        fprintf(stdout, "\n========================================\n");
-        fprintf(stdout, "Workflow %s TERMINATED by signal\n", state.workflow_id);
-        fprintf(stdout, "Completed %d/%d steps\n", state.current_step, state.total_steps);
-        fprintf(stdout, "Checkpoint saved: %s\n", checkpoint_path);
-        fprintf(stdout, "========================================\n");
+        LOG_WORKFLOW("\n========================================\n");
+        LOG_WORKFLOW("Workflow %s TERMINATED by signal\n", state.workflow_id);
+        LOG_WORKFLOW("Completed %d/%d steps\n", state.current_step, state.total_steps);
+        LOG_WORKFLOW("Checkpoint saved: %s\n", checkpoint_path);
+        LOG_WORKFLOW("========================================\n");
         return 2;
     }
 
-    fprintf(stdout, "\n========================================\n");
-    fprintf(stdout, "Workflow %s COMPLETED successfully\n", state.workflow_id);
-    fprintf(stdout, "All %d steps executed\n", state.total_steps);
-    fprintf(stdout, "========================================\n");
+    LOG_WORKFLOW("\n========================================\n");
+    LOG_WORKFLOW("Workflow %s COMPLETED successfully\n", state.workflow_id);
+    LOG_WORKFLOW("All %d steps executed\n", state.total_steps);
+    LOG_WORKFLOW("========================================\n");
 
     /* Remove checkpoint on successful completion */
     unlink(checkpoint_path);

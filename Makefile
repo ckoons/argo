@@ -100,7 +100,7 @@ SCRIPT_SOURCES = $(SCRIPT_DIR)/argo_monitor.c \
 SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
 
 # Workflow executor binary
-EXECUTOR_BINARY = argo_workflow_executor
+EXECUTOR_BINARY = bin/argo_workflow_executor
 EXECUTOR_SOURCE = bin/argo_workflow_executor_main.c
 
 # Test files

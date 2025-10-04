@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "arc_error.h"
 #include "argo_error.h"
+#include "argo_output.h"
 
 /* Get user-friendly error message */
 const char* arc_error_message(int error_code) {
@@ -26,13 +27,13 @@ const char* arc_error_message(int error_code) {
 
 /* Report error with context and suggestion */
 void arc_report_error(int error_code, const char* context, const char* suggestion) {
-    fprintf(stderr, "Error: %s\n", arc_error_message(error_code));
+    LOG_USER_ERROR("%s\n", arc_error_message(error_code));
 
     if (context) {
-        fprintf(stderr, "  Context: %s\n", context);
+        LOG_USER_INFO("  Context: %s\n", context);
     }
 
     if (suggestion) {
-        fprintf(stderr, "  Suggestion: %s\n", suggestion);
+        LOG_USER_INFO("  Suggestion: %s\n", suggestion);
     }
 }
