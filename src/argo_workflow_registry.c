@@ -7,8 +7,21 @@
 #include <errno.h>
 #include "argo_workflow_registry.h"
 #include "argo_json.h"
+#include "argo_workflow_json.h"
 #include "argo_error.h"
 #include "argo_log.h"
+
+/* Forward declaration from jsmn.h */
+typedef struct jsmntok {
+    int type;
+    int start;
+    int end;
+    int size;
+} jsmntok_t;
+
+/* JSMN token types */
+#define JSMN_OBJECT (1 << 0)
+#define JSMN_ARRAY (1 << 1)
 
 /* Create workflow registry */
 workflow_registry_t* workflow_registry_create(const char* registry_path) {
@@ -49,6 +62,47 @@ void workflow_registry_destroy(workflow_registry_t* registry) {
     free(registry);
 }
 
+/* Create directory and all parent directories (like mkdir -p) */
+static int mkdir_recursive(const char* path) {
+    char tmp[WORKFLOW_REGISTRY_PATH_MAX];
+    char* p = NULL;
+    size_t len;
+
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    len = strlen(tmp);
+    if (tmp[len - 1] == '/') {
+        tmp[len - 1] = '\0';
+    }
+
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+                return E_SYSTEM_FILE;
+            }
+            *p = '/';
+        }
+    }
+
+    if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+        return E_SYSTEM_FILE;
+    }
+
+    return ARGO_SUCCESS;
+}
+
+/* Parse status string to enum */
+static workflow_status_t parse_workflow_status(const char* status_str) {
+    if (strcmp(status_str, "active") == 0) {
+        return WORKFLOW_STATUS_ACTIVE;
+    } else if (strcmp(status_str, "suspended") == 0) {
+        return WORKFLOW_STATUS_SUSPENDED;
+    } else if (strcmp(status_str, "completed") == 0) {
+        return WORKFLOW_STATUS_COMPLETED;
+    }
+    return WORKFLOW_STATUS_ACTIVE;  /* Default to active */
+}
+
 /* Load registry from JSON file */
 int workflow_registry_load(workflow_registry_t* registry) {
     if (!registry) {
@@ -84,9 +138,128 @@ int workflow_registry_load(workflow_registry_t* registry) {
     /* Parse JSON */
     registry->workflow_count = 0;
 
-    /* TODO: Parse workflows array from JSON */
-    /* For now, this is a placeholder - full JSON parsing will be implemented */
+    jsmntok_t* tokens = malloc(sizeof(jsmntok_t) * WORKFLOW_JSON_MAX_TOKENS);
+    if (!tokens) {
+        free(json_content);
+        return E_SYSTEM_MEMORY;
+    }
 
+    int token_count = workflow_json_parse(json_content, tokens, WORKFLOW_JSON_MAX_TOKENS);
+    if (token_count < 0) {
+        free(tokens);
+        free(json_content);
+        LOG_ERROR("Failed to parse registry JSON");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    /* Find workflows array */
+    int workflows_idx = workflow_json_find_field(json_content, tokens, 0, "workflows");
+    if (workflows_idx < 0) {
+        /* No workflows in registry yet */
+        free(tokens);
+        free(json_content);
+        registry->dirty = false;
+        registry->last_saved = time(NULL);
+        LOG_DEBUG("No workflows in registry");
+        return ARGO_SUCCESS;
+    }
+
+    /* Workflows array token */
+    jsmntok_t* workflows_array = &tokens[workflows_idx];
+    if (workflows_array->type != JSMN_ARRAY) {
+        free(tokens);
+        free(json_content);
+        LOG_ERROR("workflows field is not an array");
+        return E_PROTOCOL_FORMAT;
+    }
+
+    int workflow_count = workflows_array->size;
+    if (workflow_count > WORKFLOW_REGISTRY_MAX_WORKFLOWS) {
+        workflow_count = WORKFLOW_REGISTRY_MAX_WORKFLOWS;
+        LOG_WARN("Registry has more workflows than max, truncating to %d", workflow_count);
+    }
+
+    /* Parse each workflow object */
+    int current_token = workflows_idx + 1;  /* First element after array token */
+    for (int i = 0; i < workflow_count; i++) {
+        if (current_token >= token_count) {
+            break;
+        }
+
+        jsmntok_t* wf_obj = &tokens[current_token];
+        if (wf_obj->type != JSMN_OBJECT) {
+            /* Skip this token and continue */
+            current_token += workflow_json_count_tokens(tokens, current_token);
+            continue;
+        }
+
+        workflow_instance_t* wf = &registry->workflows[registry->workflow_count];
+
+        /* Extract fields */
+        int field_idx;
+
+        /* id */
+        field_idx = workflow_json_find_field(json_content, tokens, current_token, "id");
+        if (field_idx >= 0) {
+            workflow_json_extract_string(json_content, &tokens[field_idx],
+                                        wf->id, sizeof(wf->id));
+        }
+
+        /* template */
+        field_idx = workflow_json_find_field(json_content, tokens, current_token, "template");
+        if (field_idx >= 0) {
+            workflow_json_extract_string(json_content, &tokens[field_idx],
+                                        wf->template_name, sizeof(wf->template_name));
+        }
+
+        /* instance */
+        field_idx = workflow_json_find_field(json_content, tokens, current_token, "instance");
+        if (field_idx >= 0) {
+            workflow_json_extract_string(json_content, &tokens[field_idx],
+                                        wf->instance_name, sizeof(wf->instance_name));
+        }
+
+        /* branch */
+        field_idx = workflow_json_find_field(json_content, tokens, current_token, "branch");
+        if (field_idx >= 0) {
+            workflow_json_extract_string(json_content, &tokens[field_idx],
+                                        wf->active_branch, sizeof(wf->active_branch));
+        }
+
+        /* status */
+        field_idx = workflow_json_find_field(json_content, tokens, current_token, "status");
+        if (field_idx >= 0) {
+            char status_str[32];
+            workflow_json_extract_string(json_content, &tokens[field_idx],
+                                        status_str, sizeof(status_str));
+            wf->status = parse_workflow_status(status_str);
+        }
+
+        /* created_at */
+        field_idx = workflow_json_find_field(json_content, tokens, current_token, "created_at");
+        if (field_idx >= 0) {
+            int created_at_int;
+            if (workflow_json_extract_int(json_content, &tokens[field_idx], &created_at_int) == ARGO_SUCCESS) {
+                wf->created_at = (time_t)created_at_int;
+            }
+        }
+
+        /* last_active */
+        field_idx = workflow_json_find_field(json_content, tokens, current_token, "last_active");
+        if (field_idx >= 0) {
+            int last_active_int;
+            if (workflow_json_extract_int(json_content, &tokens[field_idx], &last_active_int) == ARGO_SUCCESS) {
+                wf->last_active = (time_t)last_active_int;
+            }
+        }
+
+        registry->workflow_count++;
+
+        /* Move to next workflow object */
+        current_token += workflow_json_count_tokens(tokens, current_token);
+    }
+
+    free(tokens);
     free(json_content);
 
     registry->dirty = false;
@@ -114,7 +287,11 @@ int workflow_registry_save(workflow_registry_t* registry) {
     char* last_slash = strrchr(dir_path, '/');
     if (last_slash) {
         *last_slash = '\0';
-        mkdir(dir_path, 0755);  /* Create if doesn't exist */
+        int result = mkdir_recursive(dir_path);
+        if (result != ARGO_SUCCESS) {
+            LOG_ERROR("Failed to create registry directory: %s", dir_path);
+            return result;
+        }
     }
 
     /* Open file for writing */
