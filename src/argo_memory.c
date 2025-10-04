@@ -59,6 +59,9 @@ int memory_add_item(ci_memory_digest_t* digest,
                    memory_type_t type,
                    const char* content,
                    const char* creator_ci) {
+    int result = ARGO_SUCCESS;
+    memory_item_t* item = NULL;
+
     ARGO_CHECK_NULL(digest);
     ARGO_CHECK_NULL(content);
 
@@ -67,20 +70,33 @@ int memory_add_item(ci_memory_digest_t* digest,
         return E_PROTOCOL_QUEUE;
     }
 
-    memory_item_t* item = calloc(1, sizeof(memory_item_t));
+    item = calloc(1, sizeof(memory_item_t));
     if (!item) {
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
+    }
+
+    item->content = strdup(content);
+    if (!item->content) {
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
     item->id = g_next_memory_id++;
     item->type = type;
-    item->content = strdup(content);
     item->content_size = strlen(content);
     item->created = time(NULL);
-    item->creator_ci = creator_ci ? strdup(creator_ci) : NULL;
     item->relevance.score = 1.0f;
     item->relevance.last_accessed = time(NULL);
     item->relevance.access_count = 0;
+
+    if (creator_ci) {
+        item->creator_ci = strdup(creator_ci);
+        if (!item->creator_ci) {
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
+        }
+    }
 
     digest->selected[digest->selected_count++] = item;
 
@@ -88,6 +104,14 @@ int memory_add_item(ci_memory_digest_t* digest,
              item->id, type, item->content_size);
 
     return ARGO_SUCCESS;
+
+cleanup:
+    if (item) {
+        free(item->content);
+        free(item->creator_ci);
+        free(item);
+    }
+    return result;
 }
 
 /* Add breadcrumb */

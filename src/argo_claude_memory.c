@@ -86,26 +86,26 @@ char* build_context_with_memory(claude_context_t* ctx, const char* prompt) {
         return NULL;
     }
 
-    /* Build context */
-    context[0] = '\0';
+    /* Build context using safe string operations */
+    size_t offset = 0;
 
     /* Add sunset notes if available */
     if (mem->has_sunset && mem->sunset_offset > 0) {
-        strcat(context, "## Previous Session Context\n");
-        strcat(context, mem->content + mem->sunset_offset);
-        strcat(context, "\n\n");
+        offset += snprintf(context + offset, total_size - offset,
+                          "## Previous Session Context\n%s\n\n",
+                          mem->content + mem->sunset_offset);
     }
 
     /* Add Apollo digest if available */
     if (mem->has_apollo && mem->apollo_offset > 0) {
-        strcat(context, "## Memory Digest\n");
-        strcat(context, mem->content + mem->apollo_offset);
-        strcat(context, "\n\n");
+        offset += snprintf(context + offset, total_size - offset,
+                          "## Memory Digest\n%s\n\n",
+                          mem->content + mem->apollo_offset);
     }
 
     /* Add current prompt */
-    strcat(context, "## Current Task\n");
-    strcat(context, prompt);
+    snprintf(context + offset, total_size - offset,
+             "## Current Task\n%s", prompt);
 
     return context;
 }

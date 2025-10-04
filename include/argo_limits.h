@@ -78,4 +78,15 @@
 /* Full merge result buffer size */
 #define MERGE_RESULT_BUFFER_SIZE 16384
 
+/* ===== Filesystem Paths and Permissions ===== */
+
+/* Maximum path length for Argo filesystem operations */
+#define ARGO_PATH_MAX 512
+
+/* Directory permissions for Argo-created directories */
+#define ARGO_DIR_PERMISSIONS 0755
+
+/* File permissions for Argo-created files */
+#define ARGO_FILE_PERMISSIONS 0644
+
 #endif /* ARGO_LIMITS_H */

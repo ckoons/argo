@@ -14,10 +14,10 @@
 #include "argo_error.h"
 #include "argo_log.h"
 #include "argo_output.h"
+#include "argo_limits.h"
 
 /* Log file path pattern */
 #define LOG_PATH_PATTERN "%s/.argo/logs/%s.log"
-#define LOG_PATH_MAX 512
 
 /* Workflow executor binary path (relative to argo installation) */
 #define EXECUTOR_BINARY "./bin/argo_workflow_executor"
@@ -40,11 +40,11 @@ static int ensure_log_directory(void) {
         return E_SYSTEM_FILE;
     }
 
-    char log_dir[LOG_PATH_MAX];
+    char log_dir[ARGO_PATH_MAX];
     snprintf(log_dir, sizeof(log_dir), "%s/.argo/logs", home);
 
     /* Create directory (ignore error if exists) */
-    if (mkdir(log_dir, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(log_dir, ARGO_DIR_PERMISSIONS) != 0 && errno != EEXIST) {
         return E_SYSTEM_FILE;
     }
 
@@ -68,7 +68,7 @@ int workflow_exec_start(const char* workflow_id,
     }
 
     /* Get log file path */
-    char log_path[LOG_PATH_MAX];
+    char log_path[ARGO_PATH_MAX];
     result = get_log_path(workflow_id, log_path, sizeof(log_path));
     if (result != ARGO_SUCCESS) {
         return result;
@@ -85,7 +85,7 @@ int workflow_exec_start(const char* workflow_id,
         /* Child process */
 
         /* Redirect stdout and stderr to log file */
-        int log_fd = open(log_path, O_WRONLY | O_CREAT | O_APPEND, 0644);
+        int log_fd = open(log_path, O_WRONLY | O_CREAT | O_APPEND, ARGO_FILE_PERMISSIONS);
         if (log_fd < 0) {
             FORK_ERROR("Failed to open log file: %s\n", log_path);
             exit(1);
@@ -282,7 +282,7 @@ int workflow_exec_get_state(const char* workflow_id,
     }
 
     /* Try to read checkpoint file for execution state */
-    char checkpoint_path[512];
+    char checkpoint_path[ARGO_PATH_MAX];
     const char* home = getenv("HOME");
     if (home) {
         snprintf(checkpoint_path, sizeof(checkpoint_path),
@@ -290,7 +290,7 @@ int workflow_exec_get_state(const char* workflow_id,
 
         FILE* cp_file = fopen(checkpoint_path, "r");
         if (cp_file) {
-            char buffer[512];
+            char buffer[ARGO_PATH_MAX];
             size_t bytes = fread(buffer, 1, sizeof(buffer) - 1, cp_file);
             fclose(cp_file);
             buffer[bytes] = '\0';
