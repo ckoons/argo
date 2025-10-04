@@ -49,6 +49,13 @@ int argo_term_load_config(const char* config_file, char* prompt, size_t prompt_s
                 len--;
             }
 
+            /* Strip surrounding quotes if present */
+            if (len >= 2 && value[0] == '"' && value[len - 1] == '"') {
+                value++;      /* Skip opening quote */
+                len -= 2;     /* Remove both quotes from length */
+                value[len] = '\0';  /* Terminate at closing quote position */
+            }
+
             /* Copy to output buffer */
             if (len > 0 && len < prompt_size) {
                 strncpy(prompt, value, prompt_size - 1);

@@ -37,20 +37,26 @@
 # Simple prompt:
 # ARGO_TERM_PROMPT=argo>
 #
+# With trailing space (use quotes to make it explicit):
+# ARGO_TERM_PROMPT="argo "
+#
 # With hostname:
-# ARGO_TERM_PROMPT=%h argo>
+# ARGO_TERM_PROMPT="%h argo "
 #
 # With directory:
-# ARGO_TERM_PROMPT=%~ argo>
+# ARGO_TERM_PROMPT="%~ argo "
 #
 # Multi-line (like zsh):
-# ARGO_TERM_PROMPT=%h %~ %b\nargo>
+# ARGO_TERM_PROMPT="%h %~ %b\nargo "
 #
 # Full featured (all phases):
-# ARGO_TERM_PROMPT=%F{green}%h%f %F{blue}%d%f %F{cyan}%b%f %F{magenta}%w%f %F{yellow}%s%f\nargo>
+# ARGO_TERM_PROMPT="%F{green}%h%f %F{blue}%d%f %F{cyan}%b%f %F{magenta}%w%f %F{yellow}%s%f\nargo "
+#
+# Note: Quotes are optional but recommended for trailing spaces.
+#       Only surrounding quotes are stripped (quotes in the middle are literal).
 
 # Default: simple prompt
-ARGO_TERM_PROMPT=argo>
+ARGO_TERM_PROMPT="argo> "
 
 # ==============================================================================
 # ARC PROMPT CONFIGURATION
@@ -62,16 +68,18 @@ ARGO_TERM_PROMPT=argo>
 # Examples:
 #
 # Simple prompt:
-# ARC_PROMPT=arc>
+# ARC_PROMPT="arc> "
 #
 # With hostname and directory:
-# ARC_PROMPT=%h %~ arc>
+# ARC_PROMPT="%h %~ arc "
 #
 # Full featured (Casey's preferred):
-# ARC_PROMPT=%F{green}%h%f %F{blue}%d%f %F{cyan}%b%f %F{magenta}%w%f %F{yellow}%s%f\narc>
+# ARC_PROMPT="%F{green}%h%f %F{blue}%d%f %F{cyan}%b%f %F{magenta}%w%f %F{yellow}%s%f\narc "
+#
+# Note: Same quote syntax as ARGO_TERM_PROMPT above.
 
 # Default: simple prompt
-ARC_PROMPT=arc>
+ARC_PROMPT="arc> "
 
 # ==============================================================================
 # ADDITIONAL CONFIGURATION
