@@ -99,6 +99,10 @@ SCRIPT_SOURCES = $(SCRIPT_DIR)/argo_monitor.c \
 # Script executables
 SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
 
+# Workflow executor binary
+EXECUTOR_BINARY = argo_workflow_executor
+EXECUTOR_SOURCE = bin/argo_workflow_executor_main.c
+
 # Test files
 TEST_SOURCES = $(TEST_DIR)/test_ci_providers.c
 TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/%.o,$(TEST_SOURCES))
@@ -130,7 +134,7 @@ SHARED_SERVICES_TEST_TARGET = $(BUILD_DIR)/test_shared_services
 WORKFLOW_REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_workflow_registry
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(EXECUTOR_BINARY) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -225,6 +229,11 @@ $(BUILD_DIR)/stubs.o: $(BUILD_DIR)/stubs.c
 $(CORE_LIB): $(CORE_OBJECTS) $(STUB_OBJECTS)
 	ar rcs $@ $^
 	@echo "Created core library: $@"
+
+# Build workflow executor binary
+$(EXECUTOR_BINARY): $(EXECUTOR_SOURCE) $(CORE_LIB)
+	$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
+	@echo "Built workflow executor: $@"
 
 # Build script executables
 $(BUILD_DIR)/%: $(SCRIPT_DIR)/%.c $(CORE_LIB)
@@ -541,6 +550,7 @@ count-core:
 # Clean build artifacts
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f $(EXECUTOR_BINARY)
 	@for script in $(SCRIPT_TARGETS); do \
 		rm -f $(SCRIPT_DIR)/$$(basename $$script); \
 	done

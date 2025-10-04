@@ -96,18 +96,19 @@ int workflow_exec_start(const char* workflow_id,
         /* Close stdin */
         close(STDIN_FILENO);
 
-        /* TODO: Execute workflow executor */
-        /* For now, just log that we would execute */
-        fprintf(stdout, "Workflow %s started (template=%s, branch=%s)\n",
-                workflow_id, template_path, branch);
-        fprintf(stdout, "Process would execute workflow here\n");
-        fprintf(stdout, "Workflow executor integration pending\n");
+        /* Execute workflow executor binary */
+        char* args[5];
+        args[0] = EXECUTOR_BINARY;
+        args[1] = (char*)workflow_id;
+        args[2] = (char*)template_path;
+        args[3] = (char*)branch;
+        args[4] = NULL;
 
-        /* Sleep to simulate workflow execution */
-        sleep(5);
+        execv(EXECUTOR_BINARY, args);
 
-        fprintf(stdout, "Workflow %s completed\n", workflow_id);
-        exit(0);
+        /* If execv returns, it failed */
+        fprintf(stderr, "Failed to execute workflow executor: %s\n", strerror(errno));
+        exit(1);
     }
 
     /* Parent process */
