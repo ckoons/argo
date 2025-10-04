@@ -6,6 +6,7 @@
 #include <time.h>
 #include "arc_commands.h"
 #include "arc_context.h"
+#include "arc_error.h"
 #include "argo_workflow_registry.h"
 #include "argo_init.h"
 #include "argo_error.h"
@@ -90,6 +91,8 @@ int arc_workflow_status(int argc, char** argv) {
         workflow_instance_t* wf = workflow_registry_get_workflow(registry, workflow_name);
         if (!wf) {
             fprintf(stderr, "Error: Workflow not found: %s\n", workflow_name);
+            fprintf(stderr, "  Try: arc workflow list\n");
+            fprintf(stderr, "  Or: arc workflow list active\n");
             workflow_registry_destroy(registry);
             argo_exit();
             return ARC_EXIT_ERROR;

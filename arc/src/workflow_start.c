@@ -5,6 +5,7 @@
 #include <string.h>
 #include "arc_commands.h"
 #include "arc_context.h"
+#include "arc_error.h"
 #include "argo_workflow_registry.h"
 #include "argo_init.h"
 #include "argo_error.h"
@@ -50,11 +51,15 @@ int arc_workflow_start(int argc, char** argv) {
     result = workflow_registry_add_workflow(registry, template_name, instance_name, branch);
     if (result == E_DUPLICATE) {
         fprintf(stderr, "Error: Workflow already exists: %s_%s\n", template_name, instance_name);
+        fprintf(stderr, "  Try: arc workflow list\n");
+        fprintf(stderr, "  Or use: arc workflow abandon %s_%s\n", template_name, instance_name);
         workflow_registry_destroy(registry);
         argo_exit();
         return ARC_EXIT_ERROR;
     } else if (result != ARGO_SUCCESS) {
-        fprintf(stderr, "Error: Failed to create workflow (error %d)\n", result);
+        char context[128];
+        snprintf(context, sizeof(context), "Creating workflow %s_%s", template_name, instance_name);
+        arc_report_error(result, context, "Check that the .argo directory is writable");
         workflow_registry_destroy(registry);
         argo_exit();
         return ARC_EXIT_ERROR;
