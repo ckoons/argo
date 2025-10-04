@@ -253,6 +253,17 @@ int workflow_registry_load(workflow_registry_t* registry) {
             }
         }
 
+        /* pid */
+        field_idx = workflow_json_find_field(json_content, tokens, current_token, "pid");
+        if (field_idx >= 0) {
+            int pid_int;
+            if (workflow_json_extract_int(json_content, &tokens[field_idx], &pid_int) == ARGO_SUCCESS) {
+                wf->pid = (pid_t)pid_int;
+            }
+        } else {
+            wf->pid = 0;  /* Default to no process */
+        }
+
         registry->workflow_count++;
 
         /* Move to next workflow object */
@@ -317,7 +328,8 @@ int workflow_registry_save(workflow_registry_t* registry) {
         fprintf(file, "      \"status\": \"%s\",\n",
                 workflow_status_string(wf->status));
         fprintf(file, "      \"created_at\": %ld,\n", (long)wf->created_at);
-        fprintf(file, "      \"last_active\": %ld\n", (long)wf->last_active);
+        fprintf(file, "      \"last_active\": %ld,\n", (long)wf->last_active);
+        fprintf(file, "      \"pid\": %d\n", (int)wf->pid);
         fprintf(file, "    }%s\n", (i < registry->workflow_count - 1) ? "," : "");
     }
 
@@ -385,6 +397,7 @@ int workflow_registry_add_workflow(workflow_registry_t* registry,
     wf->status = WORKFLOW_STATUS_ACTIVE;
     wf->created_at = time(NULL);
     wf->last_active = wf->created_at;
+    wf->pid = 0;  /* No process yet */
 
     registry->workflow_count++;
 

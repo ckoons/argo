@@ -6,6 +6,7 @@
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "argo_workflow_registry.h"
+#include "argo_orchestrator_api.h"
 #include "argo_init.h"
 #include "argo_error.h"
 
@@ -69,8 +70,14 @@ int arc_workflow_pause(int argc, char** argv) {
         return ARC_EXIT_SUCCESS;
     }
 
-    /* TODO: Signal argo orchestrator to pause at next checkpoint */
-    /* For now, just update registry status */
+    /* Send pause signal to workflow process */
+    result = workflow_exec_pause(workflow_name, registry);
+    if (result != ARGO_SUCCESS) {
+        fprintf(stderr, "Error: Failed to pause workflow\n");
+        workflow_registry_destroy(registry);
+        argo_exit();
+        return ARC_EXIT_ERROR;
+    }
 
     /* Update status to suspended */
     result = workflow_registry_set_status(registry, workflow_name, WORKFLOW_STATUS_SUSPENDED);
@@ -82,9 +89,7 @@ int arc_workflow_pause(int argc, char** argv) {
     }
 
     /* Print confirmation */
-    fprintf(stderr, "Pausing workflow: %s\n", workflow_name);
-    fprintf(stderr, "\nNote: Workflow execution control not yet implemented.\n");
-    fprintf(stderr, "      Status updated in registry only.\n");
+    fprintf(stderr, "Paused workflow: %s\n", workflow_name);
 
     /* Cleanup */
     workflow_registry_destroy(registry);

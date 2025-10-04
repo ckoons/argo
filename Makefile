@@ -59,7 +59,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_shutdown.c \
                $(SRC_DIR)/argo_shared_services.c \
                $(SRC_DIR)/argo_workflow_registry.c \
-               $(SRC_DIR)/argo_workflow_templates.c
+               $(SRC_DIR)/argo_workflow_templates.c \
+               $(SRC_DIR)/argo_orchestrator_api.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \

@@ -8,6 +8,7 @@
 #include "arc_error.h"
 #include "argo_workflow_registry.h"
 #include "argo_workflow_templates.h"
+#include "argo_orchestrator_api.h"
 #include "argo_init.h"
 #include "argo_error.h"
 
@@ -107,14 +108,19 @@ int arc_workflow_start(int argc, char** argv) {
     char workflow_id[128];
     snprintf(workflow_id, sizeof(workflow_id), "%s_%s", template_name, instance_name);
 
-    /* TODO: Start workflow execution via argo orchestrator */
-    /* For now, workflow is created in registry but not actually executing */
+    /* Start workflow execution */
+    result = workflow_exec_start(workflow_id, template->path, branch, registry);
+    if (result != ARGO_SUCCESS) {
+        fprintf(stderr, "Error: Failed to start workflow execution\n");
+        workflow_registry_remove_workflow(registry, workflow_id);
+        workflow_registry_destroy(registry);
+        argo_exit();
+        return ARC_EXIT_ERROR;
+    }
 
     /* Print confirmation */
     fprintf(stderr, "Started workflow: %s\n", workflow_id);
     fprintf(stderr, "Logs: ~/.argo/logs/%s.log\n", workflow_id);
-    fprintf(stderr, "\nNote: Workflow execution not yet implemented.\n");
-    fprintf(stderr, "      Workflow created in registry only.\n");
 
     /* Cleanup */
     workflow_registry_destroy(registry);

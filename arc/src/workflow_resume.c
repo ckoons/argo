@@ -6,6 +6,7 @@
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "argo_workflow_registry.h"
+#include "argo_orchestrator_api.h"
 #include "argo_init.h"
 #include "argo_error.h"
 
@@ -69,8 +70,14 @@ int arc_workflow_resume(int argc, char** argv) {
         return ARC_EXIT_SUCCESS;
     }
 
-    /* TODO: Signal argo orchestrator to resume from checkpoint */
-    /* For now, just update registry status */
+    /* Send resume signal to workflow process */
+    result = workflow_exec_resume(workflow_name, registry);
+    if (result != ARGO_SUCCESS) {
+        fprintf(stderr, "Error: Failed to resume workflow\n");
+        workflow_registry_destroy(registry);
+        argo_exit();
+        return ARC_EXIT_ERROR;
+    }
 
     /* Update status to active */
     result = workflow_registry_set_status(registry, workflow_name, WORKFLOW_STATUS_ACTIVE);
@@ -82,9 +89,7 @@ int arc_workflow_resume(int argc, char** argv) {
     }
 
     /* Print confirmation */
-    fprintf(stderr, "Resuming workflow: %s\n", workflow_name);
-    fprintf(stderr, "\nNote: Workflow execution control not yet implemented.\n");
-    fprintf(stderr, "      Status updated in registry only.\n");
+    fprintf(stderr, "Resumed workflow: %s\n", workflow_name);
 
     /* Cleanup */
     workflow_registry_destroy(registry);

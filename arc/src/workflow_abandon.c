@@ -6,6 +6,7 @@
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "argo_workflow_registry.h"
+#include "argo_orchestrator_api.h"
 #include "argo_init.h"
 #include "argo_error.h"
 
@@ -79,8 +80,14 @@ int arc_workflow_abandon(int argc, char** argv) {
         return ARC_EXIT_SUCCESS;
     }
 
-    /* TODO: Signal argo executor to kill workflow processes */
-    /* For now, just remove from registry */
+    /* Kill workflow process */
+    result = workflow_exec_abandon(workflow_name, registry);
+    if (result != ARGO_SUCCESS) {
+        fprintf(stderr, "Error: Failed to terminate workflow process\n");
+        workflow_registry_destroy(registry);
+        argo_exit();
+        return ARC_EXIT_ERROR;
+    }
 
     /* Remove workflow from registry */
     result = workflow_registry_remove_workflow(registry, workflow_name);
@@ -100,8 +107,6 @@ int arc_workflow_abandon(int argc, char** argv) {
     /* Print confirmation */
     fprintf(stderr, "Abandoned workflow: %s\n", workflow_name);
     fprintf(stderr, "Logs preserved: ~/.argo/logs/%s.log\n", workflow_name);
-    fprintf(stderr, "\nNote: Process cleanup not yet implemented.\n");
-    fprintf(stderr, "      Workflow removed from registry only.\n");
 
     /* Cleanup */
     workflow_registry_destroy(registry);

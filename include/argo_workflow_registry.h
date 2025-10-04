@@ -5,6 +5,7 @@
 
 #include <time.h>
 #include <stdbool.h>
+#include <sys/types.h>
 
 /* Maximum sizes */
 #define WORKFLOW_REGISTRY_MAX_WORKFLOWS 64
@@ -34,6 +35,7 @@ typedef struct workflow_instance {
     workflow_status_t status;
     time_t created_at;
     time_t last_active;
+    pid_t pid;                                          /* Process ID (0 if not running) */
 } workflow_instance_t;
 
 /* Forward declaration */
