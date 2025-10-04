@@ -1,295 +1,399 @@
-# Arc CLI Design
+# Arc CLI Design (Final)
 
 ## Overview
-Arc is the command-line interface for managing Argo workflows. It queries and updates the workflow registry managed by the Argo core library.
+Arc is the command-line interface for managing Argo workflows. It tells the Argo orchestrator to start/stop workflows and queries workflow state from the registry and executor.
 
 ## Architecture
-- **argo** = Core library (manages workflow registry in `.argo/workflows/registry/active_workflow_registry.json`)
-- **arc** = CLI tool (queries/updates registry via argo API)
-- **Per-terminal context** = `$ARGO_ACTIVE_WORKFLOW` environment variable
+- **argo** = Core library (orchestrator spawns/manages workflow processes, maintains registry)
+- **arc** = CLI tool (sends commands to argo, queries state, manages user context)
+- **Context** = `$ARGO_ACTIVE_WORKFLOW` environment variable (terminal-session scoped)
+- **Logs** = `~/.argo/logs/workflow-name.log`
+
+## Context
+
+Arc maintains a **terminal-session context** via `$ARGO_ACTIVE_WORKFLOW`:
+- Set by `arc switch [workflow_name]`
+- Used as default for single-workflow commands (pause, resume, abandon)
+- Does NOT persist across terminals
+- Convenience to avoid repeating workflow names
 
 ## Commands
 
-### `arc init <template> <instance> [branch]`
-Create and activate a new workflow instance.
+### `arc help`
+Show general usage.
 
-**Arguments:**
-- `template` - Workflow template name (e.g., `create_proposal`, `fix_bug`)
-- `instance` - Instance identifier (e.g., `my_feature`, `issue_123`)
-- `branch` - Optional git branch name (default: `main`)
-
-**Behavior:**
-1. Validate template exists (check `.argo/workflows/templates/` and `~/.argo/workflows/templates/`)
-2. Create workflow ID: `template_instance`
-3. Check for duplicates in registry
-4. Add to workflow registry
-5. Set `$ARGO_ACTIVE_WORKFLOW` to new workflow ID
-6. Save registry
-7. Print success message with workflow ID
-
-**Example:**
-```bash
-$ arc init create_proposal my_feature
-Created workflow: create_proposal_my_feature
-Active workflow: create_proposal_my_feature (branch: main)
-
-$ arc init fix_bug issue_123 bugfix/issue-123
-Created workflow: fix_bug_issue_123
-Active workflow: fix_bug_issue_123 (branch: bugfix/issue-123)
+**Output:**
 ```
+arc - Argo Workflow CLI
 
-**Errors:**
-- Template not found → Exit with error
-- Duplicate workflow ID → Exit with error
-- Invalid characters in instance name → Exit with error
+Usage:
+  arc help [command]          Show help for a specific command
+  arc switch [workflow_name]  Set active workflow context
+  arc workflow <subcommand>   Manage workflows
+
+Workflow Subcommands:
+  start [template] [instance]     Create and start workflow
+  list [active|template]          List workflows or templates
+  status [workflow_name]          Show workflow status
+  pause [workflow_name]           Pause workflow at next checkpoint
+  resume [workflow_name]          Resume paused workflow
+  abandon [workflow_name]         Stop and remove workflow
+
+For more details: arc help <command>
+```
 
 ---
 
-### `arc list`
-List all active workflows in the registry.
-
-**Behavior:**
-1. Load workflow registry
-2. Display table of all workflows
-3. Mark active workflow with `*`
+### `arc help [command]`
+Show detailed help for a specific command.
 
 **Example:**
 ```bash
-$ arc list
-ACTIVE  ID                          TEMPLATE         INSTANCE     BRANCH           STATUS      CREATED
-*       create_proposal_my_feature  create_proposal  my_feature   main             active      2025-01-15
-        fix_bug_issue_123          fix_bug          issue_123    bugfix/issue-123 active      2025-01-14
-        refactor_cleanup           refactor         cleanup      develop          suspended   2025-01-10
-```
+$ arc help workflow start
+arc workflow start [template] [instance]
 
-**Options:**
-- `--status <status>` - Filter by status (active/suspended/completed)
-- `--template <name>` - Filter by template
+Creates a new workflow instance and starts background execution.
+
+Arguments:
+  template  - Workflow template name (from system or user templates)
+  instance  - Unique instance identifier
+
+Workflow name format: template_instance
+Example: arc workflow start create_proposal my_feature
+         Creates workflow: create_proposal_my_feature
+```
 
 ---
 
-### `arc switch <workflow_id>`
-Switch the active workflow for the current terminal.
-
-**Arguments:**
-- `workflow_id` - Full workflow ID (template_instance)
+### `arc switch [workflow_name]`
+Set the active workflow context for the current terminal.
 
 **Behavior:**
 1. Validate workflow exists in registry
-2. Set `$ARGO_ACTIVE_WORKFLOW` to workflow_id
-3. Update workflow's `last_active` timestamp
+2. Set `$ARGO_ACTIVE_WORKFLOW` to workflow_name
+3. Update workflow's `last_active` timestamp in registry
 4. Print confirmation
 
-**Example:**
+**Output:**
 ```bash
-$ arc switch fix_bug_issue_123
-Switched to workflow: fix_bug_issue_123 (branch: bugfix/issue-123)
-
 $ arc switch create_proposal_my_feature
-Switched to workflow: create_proposal_my_feature (branch: main)
+Switched to workflow: create_proposal_my_feature
 ```
 
 **Errors:**
-- Workflow not found → Exit with error
+- Workflow not found → stderr + exit 1
+- No workflow name provided → stderr + exit 1
 
 ---
 
-### `arc status`
-Show information about the current active workflow.
-
-**Behavior:**
-1. Read `$ARGO_ACTIVE_WORKFLOW`
-2. If not set → "No active workflow"
-3. Load workflow from registry
-4. Display workflow details
-
-**Example:**
-```bash
-$ arc status
-Active workflow: create_proposal_my_feature
-  Template:      create_proposal
-  Instance:      my_feature
-  Branch:        main
-  Status:        active
-  Created:       2025-01-15 10:30:00
-  Last active:   2025-01-15 14:45:23
-
-$ arc status
-No active workflow. Use 'arc init' or 'arc switch' to activate a workflow.
-```
-
----
-
-### `arc branch <name>`
-Switch the active branch within the current workflow.
+### `arc workflow start [template] [instance]`
+Create a new workflow instance and start background execution.
 
 **Arguments:**
-- `name` - Branch name
+- `template` - Template name (required)
+- `instance` - Instance identifier (required)
 
 **Behavior:**
-1. Read `$ARGO_ACTIVE_WORKFLOW`
-2. Validate workflow exists
-3. Update workflow's `active_branch` field
-4. Save registry
-5. Print confirmation
+1. Validate template exists (system or user templates)
+2. Create workflow ID: `template_instance`
+3. Check for duplicate in registry
+4. Add to workflow registry (status: active)
+5. Tell argo orchestrator to start workflow execution
+6. Print confirmation with workflow name
 
-**Example:**
+**Output:**
 ```bash
-$ arc branch feature/new-design
-Updated workflow branch: create_proposal_my_feature → feature/new-design
-
-$ arc status
-Active workflow: create_proposal_my_feature
-  Template:      create_proposal
-  Instance:      my_feature
-  Branch:        feature/new-design
-  ...
+$ arc workflow start create_proposal my_feature
+Started workflow: create_proposal_my_feature
+Logs: ~/.argo/logs/create_proposal_my_feature.log
 ```
 
 **Errors:**
-- No active workflow → Exit with error
-- Workflow not found → Exit with error
+- Template not found → stderr + exit 1
+- Duplicate workflow ID → stderr + exit 1
+- Invalid instance name → stderr + exit 1
+- Orchestrator start failed → stderr + exit 1
+
+**Notes:**
+- Does NOT automatically switch context
+- Workflow begins executing in background immediately
+- User can switch to it later with `arc switch`
 
 ---
 
-### `arc complete`
-Mark the current workflow as completed.
+### `arc workflow list`
+List all active workflows and available templates.
 
-**Behavior:**
-1. Read `$ARGO_ACTIVE_WORKFLOW`
-2. Validate workflow exists
-3. Set status to `completed`
-4. Clear `$ARGO_ACTIVE_WORKFLOW`
-5. Save registry
-6. Print confirmation
-
-**Example:**
+**Output:**
 ```bash
-$ arc complete
-Workflow complete: create_proposal_my_feature
-Active workflow cleared.
+$ arc workflow list
+
+ACTIVE WORKFLOWS:
+CONTEXT  NAME                           TEMPLATE         INSTANCE     STATUS   STEP        TIME
+*        create_proposal_my_feature     create_proposal  my_feature   running  3/5         2m 15s
+         fix_bug_issue_123              fix_bug          issue_123    paused   2/4         45s
+
+TEMPLATES:
+SCOPE    NAME
+user     custom_review
+user     experimental_flow
+system   create_proposal
+system   fix_bug
+system   refactor
+```
+
+**Notes:**
+- `*` marks current context workflow
+- Shows both active workflows and available templates
+
+---
+
+### `arc workflow list active`
+List only active workflows.
+
+**Output:**
+```bash
+$ arc workflow list active
+
+CONTEXT  NAME                           TEMPLATE         INSTANCE     STATUS   STEP        TIME
+*        create_proposal_my_feature     create_proposal  my_feature   running  3/5         2m 15s
+         fix_bug_issue_123              fix_bug          issue_123    paused   2/4         45s
 ```
 
 ---
 
-### `arc suspend`
-Mark the current workflow as suspended (pause work).
+### `arc workflow list template`
+List only available templates (user and system).
 
-**Behavior:**
-1. Read `$ARGO_ACTIVE_WORKFLOW`
-2. Validate workflow exists
-3. Set status to `suspended`
-4. Save registry
-5. Print confirmation (keep workflow active)
-
-**Example:**
+**Output:**
 ```bash
-$ arc suspend
-Workflow suspended: create_proposal_my_feature
-(Workflow remains active. Use 'arc switch' to change workflows.)
+$ arc workflow list template
+
+SCOPE    NAME                DESCRIPTION
+user     custom_review       Custom code review workflow
+user     experimental_flow   Experimental multi-agent flow
+system   create_proposal     Create GitHub issue/PR proposal
+system   fix_bug            Debug and fix reported issues
+system   refactor           Code refactoring workflow
+```
+
+**Template Discovery:**
+- User templates: `~/.argo/workflows/templates/`
+- System templates: `argo/workflows/templates/` (shipped with argo)
+
+---
+
+### `arc workflow status`
+Show status of all active workflows.
+
+**Output:**
+```bash
+$ arc workflow status
+
+WORKFLOW: create_proposal_my_feature
+  Template:       create_proposal
+  Instance:       my_feature
+  Status:         running
+  Current Step:   3/5 (generate_proposal)
+  Checkpoint:     step_2_complete
+  Step Time:      45s
+  Total Time:     2m 15s
+  Created:        2025-01-15 10:30:00
+
+WORKFLOW: fix_bug_issue_123
+  Template:       fix_bug
+  Instance:       issue_123
+  Status:         paused
+  Current Step:   2/4 (analyze_code)
+  Checkpoint:     step_1_complete
+  Step Time:      12s
+  Total Time:     45s
+  Created:        2025-01-14 15:20:00
 ```
 
 ---
 
-### `arc resume`
-Resume a suspended workflow.
+### `arc workflow status [workflow_name]`
+Show status of a specific workflow.
 
 **Arguments:**
-- `workflow_id` - Optional (uses current if not specified)
+- `workflow_name` - Full workflow ID (template_instance)
 
-**Behavior:**
-1. Get workflow ID (from arg or `$ARGO_ACTIVE_WORKFLOW`)
-2. Validate workflow exists and is suspended
-3. Set status to `active`
-4. If workflow_id was provided, also switch to it
-5. Save registry
-6. Print confirmation
-
-**Example:**
+**Output:**
 ```bash
-$ arc resume
-Resumed workflow: create_proposal_my_feature
+$ arc workflow status create_proposal_my_feature
 
-$ arc resume fix_bug_issue_123
-Resumed and switched to workflow: fix_bug_issue_123
+WORKFLOW: create_proposal_my_feature
+  Template:       create_proposal
+  Instance:       my_feature
+  Status:         running
+  Current Step:   3/5 (generate_proposal)
+  Checkpoint:     step_2_complete
+  Step Time:      45s
+  Total Time:     2m 15s
+  Created:        2025-01-15 10:30:00
+  Logs:           ~/.argo/logs/create_proposal_my_feature.log
 ```
+
+**Errors:**
+- Workflow not found → stderr + exit 1
 
 ---
 
-### `arc remove <workflow_id>`
-Remove a workflow from the registry.
+### `arc workflow pause [workflow_name]`
+Pause workflow execution at the next checkpoint.
 
 **Arguments:**
-- `workflow_id` - Full workflow ID
+- `workflow_name` - Optional (uses context if omitted)
 
 **Behavior:**
-1. Validate workflow exists
-2. If workflow is active, clear `$ARGO_ACTIVE_WORKFLOW`
-3. Remove from registry
-4. Save registry
+1. Get workflow name (from arg or `$ARGO_ACTIVE_WORKFLOW`)
+2. Validate workflow exists and is running
+3. Signal argo orchestrator to pause at next checkpoint
+4. Update registry status to 'paused'
 5. Print confirmation
 
-**Example:**
+**Output:**
 ```bash
-$ arc remove old_experiment_test
-Removed workflow: old_experiment_test
+$ arc workflow pause
+Pausing workflow: create_proposal_my_feature
+Workflow will pause at next checkpoint.
 
-$ arc remove create_proposal_my_feature
-Warning: Removing active workflow
-Removed workflow: create_proposal_my_feature
-Active workflow cleared.
+$ arc workflow pause fix_bug_issue_123
+Pausing workflow: fix_bug_issue_123
+Workflow will pause at next checkpoint.
 ```
 
-**Options:**
-- `--force` or `-f` - Skip confirmation prompt
+**Idempotent:**
+- Already paused → No change, print "Workflow already paused"
+
+**Errors:**
+- No context and no name provided → stderr + exit 1
+- Workflow not found → stderr + exit 1
+
+---
+
+### `arc workflow resume [workflow_name]`
+Resume paused workflow from last checkpoint.
+
+**Arguments:**
+- `workflow_name` - Optional (uses context if omitted)
+
+**Behavior:**
+1. Get workflow name (from arg or `$ARGO_ACTIVE_WORKFLOW`)
+2. Validate workflow exists and is paused
+3. Signal argo orchestrator to resume from checkpoint
+4. Update registry status to 'running'
+5. Print confirmation
+
+**Output:**
+```bash
+$ arc workflow resume
+Resuming workflow: create_proposal_my_feature
+Workflow restarted from checkpoint: step_2_complete
+
+$ arc workflow resume fix_bug_issue_123
+Resuming workflow: fix_bug_issue_123
+Workflow restarted from checkpoint: step_1_complete
+```
+
+**Idempotent:**
+- Already running → No change, print "Workflow already running"
+
+**Errors:**
+- No context and no name provided → stderr + exit 1
+- Workflow not found → stderr + exit 1
+
+---
+
+### `arc workflow abandon [workflow_name]`
+Stop workflow execution and remove from registry.
+
+**Arguments:**
+- `workflow_name` - Optional (uses context if omitted)
+
+**Behavior:**
+1. Get workflow name (from arg or `$ARGO_ACTIVE_WORKFLOW`)
+2. Validate workflow exists
+3. **Prompt for confirmation:** "Abandon workflow [name]? (y/N)"
+4. If confirmed:
+   - Signal argo executor to kill workflow processes
+   - Remove from workflow registry
+   - Clear context if this was the active workflow
+   - Keep logs in `~/.argo/logs/`
+   - Leave /tmp files (cleaned on reboot)
+5. Print confirmation
+
+**Output:**
+```bash
+$ arc workflow abandon
+Abandon workflow: create_proposal_my_feature? (y/N) y
+Stopping workflow processes...
+Removed from registry: create_proposal_my_feature
+Logs preserved: ~/.argo/logs/create_proposal_my_feature.log
+Context cleared.
+
+$ arc workflow abandon fix_bug_issue_123
+Abandon workflow: fix_bug_issue_123? (y/N) n
+Cancelled.
+```
+
+**Cleanup:**
+- ✓ Kill processes (executor handles graceful then force)
+- ✓ Remove registry entry
+- ✗ Keep logs (user manages)
+- ✗ Leave /tmp files
+
+**Errors:**
+- No context and no name provided → stderr + exit 1
+- Workflow not found → stderr + exit 1
+- User declined confirmation → exit 0 (not an error)
 
 ---
 
 ## Environment Variable Management
 
-Arc needs to set `$ARGO_ACTIVE_WORKFLOW` in the parent shell. Options:
+Arc sets `$ARGO_ACTIVE_WORKFLOW` via wrapper function in user's shell rc file.
 
-### Option 1: Wrapper Function (Recommended)
-User adds to `.bashrc` / `.zshrc`:
+**User adds to `.bashrc` / `.zshrc`:**
 ```bash
 arc() {
-    local output=$(command arc "$@")
+    local output
+    output=$(command arc "$@" 2>&1)
+    local exit_code=$?
+
     echo "$output"
 
-    # Check if arc set an environment variable
-    if [[ "$output" == "ARGO_SET_ENV:"* ]]; then
-        local envvar="${output#ARGO_SET_ENV:}"
+    # Check if arc wants to set environment variable
+    if echo "$output" | grep -q "^ARGO_SET_ENV:"; then
+        local envvar=$(echo "$output" | grep "^ARGO_SET_ENV:" | cut -d: -f2)
         export ARGO_ACTIVE_WORKFLOW="$envvar"
     fi
+
+    # Check if arc wants to clear environment variable
+    if echo "$output" | grep -q "^ARGO_CLEAR_ENV"; then
+        unset ARGO_ACTIVE_WORKFLOW
+    fi
+
+    return $exit_code
 }
 ```
 
-Arc prints: `ARGO_SET_ENV:workflow_id` when it needs to set the variable.
+**Arc outputs special directives:**
+- `ARGO_SET_ENV:workflow_name` - Sets context
+- `ARGO_CLEAR_ENV` - Clears context
 
-### Option 2: Eval Pattern
-```bash
-$ eval "$(arc init create_proposal my_feature)"
-```
-
-Arc outputs: `export ARGO_ACTIVE_WORKFLOW=create_proposal_my_feature`
-
-### Option 3: Source Pattern
-```bash
-$ arc init create_proposal my_feature > /tmp/arc_env.sh
-$ source /tmp/arc_env.sh
-```
-
-**Recommendation:** Start with Option 1 (wrapper function) - most user-friendly.
+**These lines are filtered from user-visible output by the wrapper.**
 
 ---
 
 ## Error Handling
 
-All commands should:
-- Return exit code 0 on success
-- Return exit code 1 on error
-- Print error messages to stderr
-- Print success messages to stdout
+- Exit code 0 on success
+- Exit code 1 on error
+- Error messages to stderr
+- Success messages to stdout
+- Special env directives to stdout (filtered by wrapper)
 
 ---
 
@@ -298,50 +402,62 @@ All commands should:
 ```
 arc/
 ├── src/
-│   ├── main.c              # Main entry point, command dispatcher
-│   ├── cmd_init.c          # arc init
-│   ├── cmd_list.c          # arc list
+│   ├── main.c              # Entry point, command dispatcher
+│   ├── arc_context.c       # Context management (set/get/clear)
+│   ├── arc_help.c          # Help text
 │   ├── cmd_switch.c        # arc switch
-│   ├── cmd_status.c        # arc status
-│   ├── cmd_branch.c        # arc branch
-│   ├── cmd_complete.c      # arc complete
-│   ├── cmd_suspend.c       # arc suspend
-│   ├── cmd_resume.c        # arc resume
-│   └── cmd_remove.c        # arc remove
+│   ├── cmd_workflow.c      # Workflow subcommand dispatcher
+│   ├── workflow_start.c    # arc workflow start
+│   ├── workflow_list.c     # arc workflow list
+│   ├── workflow_status.c   # arc workflow status
+│   ├── workflow_pause.c    # arc workflow pause
+│   ├── workflow_resume.c   # arc workflow resume
+│   └── workflow_abandon.c  # arc workflow abandon
 ├── include/
-│   └── arc_commands.h      # Command function signatures
-├── Makefile                # Build system
+│   ├── arc_commands.h      # Command function signatures
+│   └── arc_context.h       # Context utilities
+├── Makefile
 └── arc                     # Executable (component-local)
 ```
 
 ---
 
-## Questions for Review
+## Integration with Argo
 
-1. **Command names:** Are these command names clear? Any aliases needed?
-2. **Environment variable:** Which pattern do you prefer for setting `$ARGO_ACTIVE_WORKFLOW`?
-3. **Template validation:** Should `arc init` validate that the template exists, or just trust the user?
-4. **Confirmation prompts:** Should `arc remove` always prompt, or only without `--force`?
-5. **Missing commands:** Any other workflow management commands needed?
-6. **Output format:** Plain text vs. JSON option for `arc list`?
-7. **Color output:** Should we use colors for status indicators?
+Arc interacts with argo through:
+1. **Workflow Registry API** (`argo_workflow_registry.h`)
+   - Add/remove workflows
+   - Query workflow state
+   - Update status/timestamps
+
+2. **Workflow Executor API** (to be defined)
+   - Start workflow execution
+   - Pause/resume at checkpoints
+   - Kill workflow processes
+   - Query execution state
+
+3. **Template Discovery**
+   - Scan `~/.argo/workflows/templates/`
+   - Scan `argo/workflows/templates/`
+   - Validate template files
 
 ---
 
-## Implementation Priority
+## Implementation Phases
 
-Phase 1 (MVP):
-1. `arc init` - Create workflow
-2. `arc list` - List workflows
-3. `arc status` - Show current workflow
-4. `arc switch` - Change workflow
+**Phase 1 (MVP):**
+1. `arc help`
+2. `arc switch`
+3. `arc workflow start`
+4. `arc workflow list`
+5. `arc workflow status`
 
-Phase 2:
-5. `arc branch` - Switch branch
-6. `arc complete` - Mark complete
-7. `arc suspend` / `arc resume` - Pause/resume
+**Phase 2:**
+6. `arc workflow pause`
+7. `arc workflow resume`
+8. `arc workflow abandon`
 
-Phase 3:
-8. `arc remove` - Delete workflow
-9. Options and filters for `arc list`
-10. Shell completion scripts
+**Phase 3:**
+9. Enhanced status displays
+10. Shell completion
+11. Error recovery
