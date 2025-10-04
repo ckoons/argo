@@ -1,0 +1,92 @@
+# © 2025 Casey Koons All rights reserved
+# Argo Configuration File Example
+#
+# This file should be placed in your home directory as ~/.argorc
+# It configures prompts and behavior for Argo components.
+
+# ==============================================================================
+# ARGO-TERM PROMPT CONFIGURATION
+# ==============================================================================
+#
+# ARGO_TERM_PROMPT defines the prompt displayed in the argo-term UI.
+#
+# Format Specifiers (Phase 1 - Basic):
+#   %h - hostname
+#   %d - current working directory (full path)
+#   %~ - current working directory (home-relative)
+#   %% - literal percent sign
+#   \n - newline (use actual newline in config)
+#
+# Format Specifiers (Phase 2 - Colors):
+#   %F{color} - start color (green, blue, cyan, yellow, magenta, red, white, black)
+#   %f        - reset color to default
+#
+# Format Specifiers (Phase 3 - Git):
+#   %b - git branch (current branch name, empty if not in git repo)
+#
+# Format Specifiers (Phase 4 - Workflow):
+#   %w - current workflow name (empty if no active workflow)
+#   %s - current workflow status (empty if no active workflow)
+#
+# Format Specifiers (Phase 5 - Time):
+#   %D{format} - date/time using strftime format
+#              Example: %D{%Y-%m-%d %H:%M:%S} → 2025-10-04 09:47:37
+#
+# Examples:
+#
+# Simple prompt:
+# ARGO_TERM_PROMPT=argo>
+#
+# With hostname:
+# ARGO_TERM_PROMPT=%h argo>
+#
+# With directory:
+# ARGO_TERM_PROMPT=%~ argo>
+#
+# Multi-line (like zsh):
+# ARGO_TERM_PROMPT=%h %~ %b\nargo>
+#
+# Full featured (all phases):
+# ARGO_TERM_PROMPT=%F{green}%h%f %F{blue}%d%f %F{cyan}%b%f %F{magenta}%w%f %F{yellow}%s%f\nargo>
+
+# Default: simple prompt
+ARGO_TERM_PROMPT=argo>
+
+# ==============================================================================
+# ARC PROMPT CONFIGURATION
+# ==============================================================================
+#
+# ARC_PROMPT defines the prompt displayed in the arc CLI REPL.
+# Uses the same format specifiers as ARGO_TERM_PROMPT.
+#
+# Examples:
+#
+# Simple prompt:
+# ARC_PROMPT=arc>
+#
+# With hostname and directory:
+# ARC_PROMPT=%h %~ arc>
+#
+# Full featured (Casey's preferred):
+# ARC_PROMPT=%F{green}%h%f %F{blue}%d%f %F{cyan}%b%f %F{magenta}%w%f %F{yellow}%s%f\narc>
+
+# Default: simple prompt
+ARC_PROMPT=arc>
+
+# ==============================================================================
+# ADDITIONAL CONFIGURATION
+# ==============================================================================
+#
+# API keys and provider configuration (future)
+# ANTHROPIC_API_KEY=your_key_here
+# OPENAI_API_KEY=your_key_here
+# DEFAULT_PROVIDER=claude
+# DEFAULT_MODEL=claude-sonnet-4
+
+# Workflow defaults (future)
+# DEFAULT_WORKFLOW_TIMEOUT=300
+# MAX_CONCURRENT_CIS=5
+
+# Debug and logging (future)
+# ARGO_LOG_LEVEL=INFO
+# ARGO_DEBUG=0

@@ -6,7 +6,7 @@ build/
 *.dylib
 
 # Executables
-argo-term
+/argo-term
 test_*
 
 # Debug files

@@ -26,7 +26,7 @@ TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%.o,$(TEST_SOURCES))
 TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%,$(TEST_SOURCES))
 
 # Main target
-TARGET = $(PARENT_BUILD)/arc
+TARGET = arc
 
 .PHONY: all clean test directories count
 
@@ -41,7 +41,7 @@ directories:
 # Build arc executable
 $(TARGET): $(OBJECTS) $(ARGO_CORE)
 	$(CC) $(OBJECTS) $(ARGO_CORE) -o $@ $(LDFLAGS)
-	@echo "Built arc CLI -> ../build/arc"
+	@echo "Built arc CLI -> ./arc"
 
 # Compile source files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c

@@ -6,7 +6,7 @@ build/
 *.dylib
 
 # Executables
-arc
+/arc
 test_*
 
 # Debug files

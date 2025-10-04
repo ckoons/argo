@@ -26,7 +26,7 @@ TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%.o,$(TEST_SOURCES))
 TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%,$(TEST_SOURCES))
 
 # Main target
-TARGET = $(PARENT_BUILD)/argo-term
+TARGET = argo-term
 
 .PHONY: all clean test directories count
 
@@ -41,7 +41,7 @@ directories:
 # Build argo-term executable
 $(TARGET): $(OBJECTS) $(ARGO_CORE)
 	$(CC) $(OBJECTS) $(ARGO_CORE) -o $@ $(LDFLAGS)
-	@echo "Built argo-term UI -> ../../build/argo-term"
+	@echo "Built argo-term UI -> ./argo-term"
 
 # Compile source files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
