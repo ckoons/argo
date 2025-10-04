@@ -18,6 +18,19 @@ static int append_string(char** dest, size_t* remaining, const char* src) {
     return 0;
 }
 
+/* Helper: map color name to ANSI code */
+static const char* get_color_code(const char* color_name) {
+    if (strcmp(color_name, "black") == 0) return ARGO_TERM_COLOR_BLACK;
+    if (strcmp(color_name, "red") == 0) return ARGO_TERM_COLOR_RED;
+    if (strcmp(color_name, "green") == 0) return ARGO_TERM_COLOR_GREEN;
+    if (strcmp(color_name, "yellow") == 0) return ARGO_TERM_COLOR_YELLOW;
+    if (strcmp(color_name, "blue") == 0) return ARGO_TERM_COLOR_BLUE;
+    if (strcmp(color_name, "magenta") == 0) return ARGO_TERM_COLOR_MAGENTA;
+    if (strcmp(color_name, "cyan") == 0) return ARGO_TERM_COLOR_CYAN;
+    if (strcmp(color_name, "white") == 0) return ARGO_TERM_COLOR_WHITE;
+    return NULL;  /* Unknown color */
+}
+
 /* Helper: get home-relative path */
 static int get_home_relative_path(char* output, size_t output_size) {
     char cwd[1024];
@@ -102,6 +115,46 @@ int argo_term_expand_prompt(const char* format, char* output, size_t output_size
 
                 case '~':  /* home-relative directory */
                     if (append_string(&dest, &remaining, home_cwd) != 0) {
+                        return -1;
+                    }
+                    break;
+
+                case 'F':  /* color start %F{color} */
+                    src++;
+                    if (*src == '{') {
+                        char color_name[32];
+                        size_t color_len = 0;
+                        src++;
+                        /* Extract color name */
+                        while (*src && *src != '}' && color_len < sizeof(color_name) - 1) {
+                            color_name[color_len++] = *src++;
+                        }
+                        color_name[color_len] = '\0';
+
+                        if (*src == '}') {
+                            /* Valid color syntax */
+                            const char* color_code = get_color_code(color_name);
+                            if (color_code) {
+                                if (append_string(&dest, &remaining, color_code) != 0) {
+                                    return -1;
+                                }
+                            }
+                            /* If unknown color, just skip it */
+                        } else {
+                            /* Malformed - missing closing brace */
+                            src--;  /* Back up so we don't skip the char after color_name */
+                        }
+                    } else {
+                        /* Not followed by { - output literally */
+                        *dest++ = '%';
+                        *dest++ = 'F';
+                        remaining -= 2;
+                        src--;  /* Back up to reprocess this character */
+                    }
+                    break;
+
+                case 'f':  /* color reset */
+                    if (append_string(&dest, &remaining, ARGO_TERM_COLOR_RESET) != 0) {
                         return -1;
                     }
                     break;
