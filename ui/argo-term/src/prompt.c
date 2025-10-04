@@ -62,11 +62,51 @@ static int get_home_relative_path(char* output, size_t output_size) {
     return 0;
 }
 
-/* Expand prompt format specifiers - Phase 1 */
+/* Helper: get current git branch */
+static int get_git_branch(char* output, size_t output_size) {
+    FILE* fp = NULL;
+    char buffer[256];
+
+    if (!output || output_size == 0) {
+        return -1;
+    }
+
+    /* Initialize to empty string */
+    output[0] = '\0';
+
+    /* Run git command to get current branch */
+    fp = popen("git rev-parse --abbrev-ref HEAD 2>/dev/null", "r");
+    if (!fp) {
+        return -1;
+    }
+
+    /* Read branch name */
+    if (fgets(buffer, sizeof(buffer), fp)) {
+        size_t len = strlen(buffer);
+
+        /* Remove trailing newline */
+        if (len > 0 && buffer[len - 1] == '\n') {
+            buffer[len - 1] = '\0';
+            len--;
+        }
+
+        /* Copy to output */
+        if (len > 0 && len < output_size) {
+            strncpy(output, buffer, output_size - 1);
+            output[output_size - 1] = '\0';
+        }
+    }
+
+    pclose(fp);
+    return 0;
+}
+
+/* Expand prompt format specifiers */
 int argo_term_expand_prompt(const char* format, char* output, size_t output_size) {
     char hostname[256];
     char cwd[1024];
     char home_cwd[1024];
+    char git_branch[256];
     const char* src = format;
     char* dest = output;
     size_t remaining = output_size;
@@ -88,6 +128,9 @@ int argo_term_expand_prompt(const char* format, char* output, size_t output_size
     if (get_home_relative_path(home_cwd, sizeof(home_cwd)) != 0) {
         strncpy(home_cwd, cwd, sizeof(home_cwd) - 1);
     }
+
+    /* Get git branch (empty string if not in git repo) */
+    get_git_branch(git_branch, sizeof(git_branch));
 
     /* Process format string */
     while (*src && remaining > 1) {
@@ -115,6 +158,12 @@ int argo_term_expand_prompt(const char* format, char* output, size_t output_size
 
                 case '~':  /* home-relative directory */
                     if (append_string(&dest, &remaining, home_cwd) != 0) {
+                        return -1;
+                    }
+                    break;
+
+                case 'b':  /* git branch */
+                    if (append_string(&dest, &remaining, git_branch) != 0) {
                         return -1;
                     }
                     break;
