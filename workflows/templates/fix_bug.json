@@ -1,0 +1,21 @@
+{
+  "workflow_name": "fix_bug",
+  "description": "Debug and fix reported issues",
+  "steps": [
+    {
+      "step": "reproduce_bug",
+      "type": "prompt",
+      "prompt": "Reproduce the reported bug"
+    },
+    {
+      "step": "identify_root_cause",
+      "type": "prompt",
+      "prompt": "Identify the root cause"
+    },
+    {
+      "step": "implement_fix",
+      "type": "prompt",
+      "prompt": "Implement and test the fix"
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "argo_workflow_registry.h"
+#include "argo_workflow_templates.h"
 #include "argo_init.h"
 #include "argo_error.h"
 
@@ -66,16 +67,44 @@ static int list_active_workflows(workflow_registry_t* registry) {
     return ARC_EXIT_SUCCESS;
 }
 
-/* List templates (stubbed for now) */
+/* List templates */
 static int list_templates(void) {
+    /* Discover templates */
+    workflow_template_collection_t* templates = workflow_templates_create();
+    if (!templates) {
+        fprintf(stderr, "Error: Failed to create template collection\n");
+        return ARC_EXIT_ERROR;
+    }
+
+    int result = workflow_templates_discover(templates);
+    if (result != ARGO_SUCCESS) {
+        fprintf(stderr, "Warning: Failed to discover templates\n");
+        workflow_templates_destroy(templates);
+        return ARC_EXIT_ERROR;
+    }
+
+    if (templates->count == 0) {
+        printf("\nNo templates found.\n");
+        printf("  System templates: workflows/templates/\n");
+        printf("  User templates:   ~/.argo/workflows/templates/\n\n");
+        workflow_templates_destroy(templates);
+        return ARC_EXIT_SUCCESS;
+    }
+
     printf("\nTEMPLATES:\n");
     printf("%-8s %-20s %-40s\n", "SCOPE", "NAME", "DESCRIPTION");
     printf("------------------------------------------------------------------------\n");
-    printf("%-8s %-20s %-40s\n", "system", "create_proposal", "Create GitHub issue/PR proposal");
-    printf("%-8s %-20s %-40s\n", "system", "fix_bug", "Debug and fix reported issues");
-    printf("%-8s %-20s %-40s\n", "system", "refactor", "Code refactoring workflow");
+
+    for (int i = 0; i < templates->count; i++) {
+        workflow_template_t* tmpl = &templates->templates[i];
+        printf("%-8s %-20s %-40s\n",
+               tmpl->is_system ? "system" : "user",
+               tmpl->name,
+               tmpl->description);
+    }
+
     printf("\n");
-    printf("Note: Template discovery not yet implemented\n\n");
+    workflow_templates_destroy(templates);
     return ARC_EXIT_SUCCESS;
 }
 

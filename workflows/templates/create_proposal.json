@@ -1,0 +1,16 @@
+{
+  "workflow_name": "create_proposal",
+  "description": "Create GitHub issue/PR proposal",
+  "steps": [
+    {
+      "step": "analyze_requirements",
+      "type": "prompt",
+      "prompt": "Analyze the feature requirements"
+    },
+    {
+      "step": "create_proposal",
+      "type": "prompt",
+      "prompt": "Create a detailed proposal document"
+    }
+  ]
+}

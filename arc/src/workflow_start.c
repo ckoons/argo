@@ -7,6 +7,7 @@
 #include "arc_context.h"
 #include "arc_error.h"
 #include "argo_workflow_registry.h"
+#include "argo_workflow_templates.h"
 #include "argo_init.h"
 #include "argo_error.h"
 
@@ -30,6 +31,43 @@ int arc_workflow_start(int argc, char** argv) {
         fprintf(stderr, "Error: Failed to initialize argo\n");
         return ARC_EXIT_ERROR;
     }
+
+    /* Validate template exists */
+    workflow_template_collection_t* templates = workflow_templates_create();
+    if (!templates) {
+        fprintf(stderr, "Error: Failed to create template collection\n");
+        argo_exit();
+        return ARC_EXIT_ERROR;
+    }
+
+    result = workflow_templates_discover(templates);
+    if (result != ARGO_SUCCESS) {
+        fprintf(stderr, "Error: Failed to discover templates\n");
+        workflow_templates_destroy(templates);
+        argo_exit();
+        return ARC_EXIT_ERROR;
+    }
+
+    workflow_template_t* template = workflow_templates_find(templates, template_name);
+    if (!template) {
+        fprintf(stderr, "Error: Template not found: %s\n", template_name);
+        fprintf(stderr, "  Try: arc workflow list template\n");
+        workflow_templates_destroy(templates);
+        argo_exit();
+        return ARC_EXIT_ERROR;
+    }
+
+    /* Validate template file */
+    result = workflow_template_validate(template->path);
+    if (result != ARGO_SUCCESS) {
+        fprintf(stderr, "Error: Template is invalid: %s\n", template_name);
+        fprintf(stderr, "  Path: %s\n", template->path);
+        workflow_templates_destroy(templates);
+        argo_exit();
+        return ARC_EXIT_ERROR;
+    }
+
+    workflow_templates_destroy(templates);
 
     /* Load workflow registry */
     workflow_registry_t* registry = workflow_registry_create(WORKFLOW_REGISTRY_PATH);
