@@ -279,12 +279,44 @@ int workflow_exec_get_state(const char* workflow_id,
         }
     }
 
-    /* TODO: Query actual execution state from process */
-    /* For now, return basic info */
-    strcpy(state->current_step, "Unknown (executor integration pending)");
-    state->step_number = 0;
-    state->total_steps = 0;
-    strcpy(state->last_checkpoint, "Not available");
+    /* Try to read checkpoint file for execution state */
+    char checkpoint_path[512];
+    const char* home = getenv("HOME");
+    if (home) {
+        snprintf(checkpoint_path, sizeof(checkpoint_path),
+                "%s/.argo/workflows/checkpoints/%s.json", home, workflow_id);
+
+        FILE* cp_file = fopen(checkpoint_path, "r");
+        if (cp_file) {
+            char buffer[512];
+            size_t bytes = fread(buffer, 1, sizeof(buffer) - 1, cp_file);
+            fclose(cp_file);
+            buffer[bytes] = '\0';
+
+            /* Extract state from checkpoint */
+            const char* step_str = strstr(buffer, "\"current_step\":");
+            const char* total_str = strstr(buffer, "\"total_steps\":");
+
+            if (step_str && total_str) {
+                sscanf(step_str + 15, "%d", &state->step_number);
+                sscanf(total_str + 15, "%d", &state->total_steps);
+                snprintf(state->current_step, sizeof(state->current_step),
+                        "Step %d/%d", state->step_number + 1, state->total_steps);
+                snprintf(state->last_checkpoint, sizeof(state->last_checkpoint),
+                        "%s", checkpoint_path);
+            } else {
+                strcpy(state->current_step, "Running");
+                state->step_number = 0;
+                state->total_steps = 0;
+                strcpy(state->last_checkpoint, "No checkpoint available");
+            }
+        } else {
+            strcpy(state->current_step, "Running (no checkpoint)");
+            state->step_number = 0;
+            state->total_steps = 0;
+            strcpy(state->last_checkpoint, "No checkpoint file");
+        }
+    }
 
     return ARGO_SUCCESS;
 }

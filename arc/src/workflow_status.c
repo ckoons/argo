@@ -48,9 +48,36 @@ static void show_workflow_status(workflow_instance_t* wf) {
     printf("  Total Time:     %s\n", duration);
     printf("  Logs:           ~/.argo/logs/%s.log\n", wf->id);
 
-    /* TODO: Add execution details when executor integration is complete */
-    printf("\n  Note: Execution details not yet available\n");
-    printf("        (workflow executor integration pending)\n");
+    /* Check for checkpoint file */
+    char checkpoint_path[512];
+    const char* home = getenv("HOME");
+    if (home) {
+        snprintf(checkpoint_path, sizeof(checkpoint_path),
+                "%s/.argo/workflows/checkpoints/%s.json", home, wf->id);
+
+        FILE* cp_file = fopen(checkpoint_path, "r");
+        if (cp_file) {
+            char buffer[512];
+            size_t bytes = fread(buffer, 1, sizeof(buffer) - 1, cp_file);
+            fclose(cp_file);
+            buffer[bytes] = '\0';
+
+            /* Extract current_step from checkpoint */
+            const char* step_str = strstr(buffer, "\"current_step\":");
+            const char* total_str = strstr(buffer, "\"total_steps\":");
+            const char* paused_str = strstr(buffer, "\"is_paused\": true");
+
+            if (step_str && total_str) {
+                int current_step, total_steps;
+                sscanf(step_str + 15, "%d", &current_step);
+                sscanf(total_str + 15, "%d", &total_steps);
+                printf("  Progress:       Step %d/%d\n", current_step + 1, total_steps);
+                if (paused_str) {
+                    printf("  State:          PAUSED\n");
+                }
+            }
+        }
+    }
 }
 
 /* arc workflow status command handler */
