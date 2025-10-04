@@ -10,6 +10,7 @@
 #include "argo_config.h"
 #include "argo_globals.h"  /* Cleanup function declarations */
 #include "argo_shutdown.h"
+#include "argo_shared_services.h"
 #include "argo_error.h"
 #include "argo_log.h"
 
@@ -32,6 +33,25 @@ int argo_init(void) {
         argo_exit();  /* Cleanup previously initialized subsystems */
         return result;
     }
+
+    /* Step 3: Initialize shared services */
+    shared_services_t* services = shared_services_create();
+    if (!services) {
+        LOG_ERROR("Failed to create shared services");
+        argo_exit();
+        return E_SYSTEM_MEMORY;
+    }
+
+    result = shared_services_start(services);
+    if (result != ARGO_SUCCESS) {
+        LOG_ERROR("Failed to start shared services");
+        shared_services_destroy(services);
+        argo_exit();
+        return result;
+    }
+
+    /* Register for cleanup on shutdown */
+    argo_set_shared_services(services);
 
     LOG_INFO("Argo initialization complete");
     return ARGO_SUCCESS;

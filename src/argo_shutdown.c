@@ -11,6 +11,7 @@
 #include "argo_workflow.h"
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
+#include "argo_shared_services.h"
 #include "argo_init.h"
 #include "argo_log.h"
 
@@ -27,12 +28,14 @@ static struct {
     int registry_count;
     lifecycle_manager_t* lifecycles[MAX_LIFECYCLES];
     int lifecycle_count;
+    shared_services_t* shared_services;
     pthread_mutex_t mutex;
     int initialized;
 } shutdown_tracker = {
     .workflow_count = 0,
     .registry_count = 0,
     .lifecycle_count = 0,
+    .shared_services = NULL,
     .mutex = PTHREAD_MUTEX_INITIALIZER,
     .initialized = 0
 };
@@ -147,15 +150,30 @@ void argo_unregister_lifecycle(lifecycle_manager_t* lifecycle) {
     pthread_mutex_unlock(&shutdown_tracker.mutex);
 }
 
+/* Set shared services for cleanup tracking */
+void argo_set_shared_services(shared_services_t* services) {
+    pthread_mutex_lock(&shutdown_tracker.mutex);
+    shutdown_tracker.shared_services = services;
+    if (services) {
+        LOG_DEBUG("Registered shared services for cleanup tracking");
+    }
+    pthread_mutex_unlock(&shutdown_tracker.mutex);
+}
+
 /* Cleanup all tracked objects (called by argo_exit()) */
 void argo_shutdown_cleanup(void) {
     /* Copy tracked objects and clear counts while holding mutex */
     workflow_controller_t* workflows_to_cleanup[MAX_WORKFLOWS];
     lifecycle_manager_t* lifecycles_to_cleanup[MAX_LIFECYCLES];
     ci_registry_t* registries_to_cleanup[MAX_REGISTRIES];
+    shared_services_t* shared_services_to_cleanup = NULL;
     int workflow_count, lifecycle_count, registry_count;
 
     pthread_mutex_lock(&shutdown_tracker.mutex);
+
+    /* Copy shared services pointer and clear tracker */
+    shared_services_to_cleanup = shutdown_tracker.shared_services;
+    shutdown_tracker.shared_services = NULL;
 
     /* Copy workflow pointers and clear tracker */
     workflow_count = shutdown_tracker.workflow_count;
@@ -181,6 +199,13 @@ void argo_shutdown_cleanup(void) {
     pthread_mutex_unlock(&shutdown_tracker.mutex);
 
     /* Now destroy objects without holding mutex (avoids deadlock) */
+
+    /* Cleanup shared services first (stops background thread) */
+    if (shared_services_to_cleanup) {
+        LOG_INFO("Stopping shared services background thread");
+        shared_services_stop(shared_services_to_cleanup);
+        shared_services_destroy(shared_services_to_cleanup);
+    }
 
     /* Cleanup workflows */
     if (workflow_count > 0) {
