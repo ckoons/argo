@@ -14,6 +14,7 @@
 #include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_json.h"
+#include "argo_file_utils.h"
 
 /* Helper: Extract integer field from JSON */
 static int extract_int_field(const char* json, const char* field_name, int* out_value) {
@@ -213,27 +214,15 @@ workflow_controller_t* workflow_restore_from_file(ci_registry_t* registry,
         return NULL;
     }
 
-    FILE* fp = fopen(filepath, "r");
-    if (!fp) {
+    /* Read file */
+    char* json = NULL;
+    size_t file_size = 0;
+    int result = file_read_all(filepath, &json, &file_size);
+    if (result != ARGO_SUCCESS) {
         argo_report_error(E_SYSTEM_FILE, "workflow_restore_from_file",
                          ERR_MSG_RESTORE_FAILED);
         return NULL;
     }
-
-    /* Read file */
-    fseek(fp, 0, SEEK_END);
-    long size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    char* json = malloc(size + 1);
-    if (!json) {
-        fclose(fp);
-        return NULL;
-    }
-
-    size_t read_size = fread(json, 1, size, fp);
-    json[read_size] = '\0';
-    fclose(fp);
 
     /* Create new workflow */
     workflow_controller_t* workflow = workflow_create(registry, lifecycle, "restored");

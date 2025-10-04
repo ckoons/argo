@@ -487,26 +487,10 @@ bool ollama_get_streaming(ci_provider_t* provider) {
     return ctx->use_streaming;
 }
 
-/* Default query - uses streaming by default */
-int ollama_query_default(ci_provider_t* provider, const char* prompt,
-                        ci_stream_callback callback, void* userdata) {
-    if (!provider || !provider->context) {
-        return -1;
-    }
-
-    ollama_context_t* ctx = (ollama_context_t*)provider->context;
-
-    /* Use streaming if enabled (default) */
-    if (ctx->use_streaming && provider->stream) {
-        return provider->stream(provider, prompt, callback, userdata);
-    } else if (provider->query) {
-        /* Fall back to non-streaming, but need to adapt callback */
-        /* This would require a wrapper - for now just use streaming */
-        return provider->stream(provider, prompt, callback, userdata);
-    }
-
-    return E_INTERNAL_NOTIMPL;
-}
+/* REMOVED: ollama_query_default() - unreachable dead code
+ * This function was never called as all paths use ci_query_to_stream() wrapper
+ * or direct streaming. The fallback logic here was never exercised.
+ */
 
 /* Connect to Ollama server */
 static int connect_to_ollama(const char* host, int port) {

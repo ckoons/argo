@@ -60,7 +60,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_shared_services.c \
                $(SRC_DIR)/argo_workflow_registry.c \
                $(SRC_DIR)/argo_workflow_templates.c \
-               $(SRC_DIR)/argo_orchestrator_api.c
+               $(SRC_DIR)/argo_orchestrator_api.c \
+               $(SRC_DIR)/argo_file_utils.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -132,9 +133,12 @@ CONCURRENT_WORKFLOWS_TEST_TARGET = $(BUILD_DIR)/test_concurrent_workflows
 ENV_PRECEDENCE_TEST_TARGET = $(BUILD_DIR)/test_env_precedence
 SHARED_SERVICES_TEST_TARGET = $(BUILD_DIR)/test_shared_services
 WORKFLOW_REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_workflow_registry
+HTTP_TEST_TARGET = $(BUILD_DIR)/test_http
+JSON_TEST_TARGET = $(BUILD_DIR)/test_json
+CLAUDE_PROVIDERS_TEST_TARGET = $(BUILD_DIR)/test_claude_providers
 
 # Default target
-all: directories $(CORE_LIB) $(EXECUTOR_BINARY) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(EXECUTOR_BINARY) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(HTTP_TEST_TARGET) $(JSON_TEST_TARGET) $(CLAUDE_PROVIDERS_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -321,8 +325,20 @@ $(SHARED_SERVICES_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_shared_services.o $
 $(WORKFLOW_REGISTRY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow_registry.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build HTTP test executable
+$(HTTP_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_http.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build JSON test executable
+$(JSON_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_json.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build Claude providers test executable
+$(CLAUDE_PROVIDERS_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_claude_providers.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry test-http test-json test-claude-providers
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -462,6 +478,27 @@ test-workflow-registry: $(WORKFLOW_REGISTRY_TEST_TARGET)
 	@echo "Workflow Registry Tests"
 	@echo "=========================================="
 	@./$(WORKFLOW_REGISTRY_TEST_TARGET)
+
+test-http: $(HTTP_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "HTTP Operations Tests"
+	@echo "=========================================="
+	@./$(HTTP_TEST_TARGET)
+
+test-json: $(JSON_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "JSON Parsing Tests"
+	@echo "=========================================="
+	@./$(JSON_TEST_TARGET)
+
+test-claude-providers: $(CLAUDE_PROVIDERS_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Claude Provider Tests"
+	@echo "=========================================="
+	@./$(CLAUDE_PROVIDERS_TEST_TARGET)
 
 test-api: $(API_TEST_TARGET)
 	@echo ""
@@ -770,13 +807,13 @@ clean-all: clean clean-arc clean-ui
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
-        test-session test-env test-api test-api-calls test-harnesses count-core \
-        clean distclean check debug update-models harnesses harness-init-basic \
-        harness-env-inspect harness-reinit harness-init-error harness-socket \
-        harness-terminal harness-workflow-context harness-control-flow \
-        harness-ci-interactive harness-loop harness-persona harness-workflow-chain \
-        arc ui ui-argo-term all-components test-arc test-ui test-all-components \
-        count count-summary count-report count-snapshot count-json \
+        test-session test-env test-api test-api-calls test-harnesses test-http \
+        test-json test-claude-providers count-core clean distclean check debug \
+        update-models harnesses harness-init-basic harness-env-inspect harness-reinit \
+        harness-init-error harness-socket harness-terminal harness-workflow-context \
+        harness-control-flow harness-ci-interactive harness-loop harness-persona \
+        harness-workflow-chain arc ui ui-argo-term all-components test-arc test-ui \
+        test-all-components count count-summary count-report count-snapshot count-json \
         clean-arc clean-ui clean-all
 
 # Build just the scripts

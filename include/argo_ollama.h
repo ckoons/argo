@@ -43,8 +43,4 @@ int ollama_get_model_info(const char* model_name, ci_model_config_t* config);
 void ollama_set_streaming(ci_provider_t* provider, bool enabled);
 bool ollama_get_streaming(ci_provider_t* provider);
 
-/* Default query function - uses streaming by default */
-int ollama_query_default(ci_provider_t* provider, const char* prompt,
-                        ci_stream_callback callback, void* userdata);
-
 #endif /* ARGO_OLLAMA_H */

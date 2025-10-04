@@ -13,6 +13,7 @@
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
+#include "argo_file_utils.h"
 
 /* Save registry state to file */
 int registry_save_state(ci_registry_t* registry, const char* filepath) {
@@ -61,32 +62,20 @@ int registry_load_state(ci_registry_t* registry, const char* filepath) {
     ARGO_CHECK_NULL(registry);
     ARGO_CHECK_NULL(filepath);
 
-    FILE* fp = fopen(filepath, "r");
-    if (!fp) {
+    /* Read entire file */
+    char* json = NULL;
+    size_t file_size = 0;
+    int result = file_read_all(filepath, &json, &file_size);
+    if (result != ARGO_SUCCESS) {
         /* File not existing is not an error for load */
         LOG_DEBUG("Registry state file not found: %s", filepath);
         return ARGO_SUCCESS;
     }
 
-    /* Read entire file */
-    fseek(fp, 0, SEEK_END);
-    long size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    if (size <= 0) {
-        fclose(fp);
+    if (file_size == 0) {
+        free(json);
         return ARGO_SUCCESS;
     }
-
-    char* json = malloc(size + 1);
-    if (!json) {
-        fclose(fp);
-        return E_SYSTEM_MEMORY;
-    }
-
-    size_t read_size = fread(json, 1, size, fp);
-    json[read_size] = '\0';
-    fclose(fp);
 
     /* Parse JSON to extract CI entries */
     const char* entries_start = strstr(json, "\"entries\":");

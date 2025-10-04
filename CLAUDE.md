@@ -298,10 +298,8 @@ These functions are intentionally minimal. They perform null checks and return s
 **Incomplete Implementations** (return E_INTERNAL_NOTIMPL):
 - `argo_claude.c`:
   - `claude_stream()` - Streaming not supported by CLI (intentional limitation)
-- `argo_ollama.c`:
-  - `ollama_query_default()` - Has fallback to streaming (never actually called)
 
-These represent actual limitations or unreachable code paths, not future work.
+This represents an actual limitation, not future work.
 
 ## JSON Builder Pattern (Future)
 

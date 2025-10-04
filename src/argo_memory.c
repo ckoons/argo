@@ -11,6 +11,7 @@
 #include "argo_error.h"
 #include "argo_log.h"
 #include "argo_json.h"
+#include "argo_file_utils.h"
 
 /* Static ID counter */
 static uint32_t g_next_memory_id = 1;
@@ -443,32 +444,20 @@ ci_memory_digest_t* memory_load_from_file(const char* filepath,
                                          size_t context_limit) {
     if (!filepath) return NULL;
 
-    FILE* fp = fopen(filepath, "r");
-    if (!fp) {
+    /* Read entire file */
+    char* json = NULL;
+    size_t file_size = 0;
+    int result = file_read_all(filepath, &json, &file_size);
+    if (result != ARGO_SUCCESS) {
         argo_report_error(E_SYSTEM_FILE, "memory_load_from_file", filepath);
         return NULL;
     }
 
-    /* Read entire file */
-    fseek(fp, 0, SEEK_END);
-    long size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    if (size <= 0) {
-        fclose(fp);
+    if (file_size == 0) {
+        free(json);
         argo_report_error(E_SYSTEM_FILE, "memory_load_from_file", "File is empty");
         return NULL;
     }
-
-    char* json = malloc(size + 1);
-    if (!json) {
-        fclose(fp);
-        return NULL;
-    }
-
-    size_t read_size = fread(json, 1, size, fp);
-    json[read_size] = '\0';
-    fclose(fp);
 
     /* Parse JSON */
     ci_memory_digest_t* digest = memory_digest_from_json(json, context_limit);

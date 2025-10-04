@@ -78,6 +78,120 @@ int build_ai_prompt_with_persona(workflow_persona_t* persona,
     return ARGO_SUCCESS;
 }
 
+/* Helper: Generate conversational question using AI */
+static int generate_conversational_question(ci_provider_t* provider,
+                                           workflow_persona_t* persona,
+                                           const char* question,
+                                           char* output,
+                                           size_t output_size) {
+    if (!provider || !question || !output) {
+        return E_INVALID_PARAMS;
+    }
+
+    /* Build AI prompt to generate conversational question */
+    char ai_prompt[STEP_AI_PROMPT_BUFFER_SIZE];
+    snprintf(ai_prompt, sizeof(ai_prompt),
+            "You are %s, a %s. Your communication style is: %s.\n\n"
+            "Present this question to the user in a natural, conversational way that matches your persona:\n\n%s\n\n"
+            "Respond with ONLY the question itself, no additional commentary.",
+            persona ? persona->name : "Assistant",
+            persona ? persona->role : "helper",
+            persona ? persona->style : "friendly",
+            question);
+
+    /* Query AI using callback */
+    char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
+    response_capture_t capture = {
+        .buffer = response,
+        .buffer_size = sizeof(response),
+        .bytes_written = 0
+    };
+
+    int result = provider->query(provider, ai_prompt, capture_response_callback, &capture);
+    if (result == ARGO_SUCCESS && capture.bytes_written > 0) {
+        snprintf(output, output_size, "%s", response);
+        return ARGO_SUCCESS;
+    }
+
+    /* Fallback to original question */
+    snprintf(output, output_size, "%s", question);
+    return E_CI_TIMEOUT;  /* Query failed, use timeout as closest match */
+}
+
+/* Helper: Format question with persona */
+static void format_question_with_persona(workflow_persona_t* persona,
+                                         int question_num,
+                                         const char* question,
+                                         char* output,
+                                         size_t output_size) {
+    if (persona && persona->name[0] != '\0') {
+        snprintf(output, output_size, "\n[%s] %d. %s ", persona->name, question_num, question);
+    } else {
+        snprintf(output, output_size, "\n%d. %s ", question_num, question);
+    }
+}
+
+/* Helper: Execute one question iteration in series */
+static int execute_series_iteration(workflow_controller_t* workflow,
+                                    workflow_persona_t* persona,
+                                    const char* json,
+                                    jsmntok_t* tokens,
+                                    int question_token,
+                                    int question_num,
+                                    const char* save_to) {
+    /* Get question text */
+    int q_idx = workflow_json_find_field(json, tokens, question_token, "question");
+    if (q_idx < 0) {
+        return ARGO_SUCCESS;  /* Skip missing questions */
+    }
+
+    char question[STEP_PROMPT_BUFFER_SIZE];
+    workflow_json_extract_string(json, &tokens[q_idx], question, sizeof(question));
+
+    /* Generate conversational question or use template */
+    char final_question[STEP_OUTPUT_BUFFER_SIZE];
+    if (workflow->provider && persona) {
+        char conversational[STEP_CI_RESPONSE_BUFFER_SIZE];
+        if (generate_conversational_question(workflow->provider, persona, question,
+                                           conversational, sizeof(conversational)) == ARGO_SUCCESS) {
+            format_question_with_persona(persona, question_num, conversational,
+                                        final_question, sizeof(final_question));
+        } else {
+            format_question_with_persona(persona, question_num, question,
+                                        final_question, sizeof(final_question));
+        }
+    } else {
+        format_question_with_persona(persona, question_num, question,
+                                    final_question, sizeof(final_question));
+    }
+
+    printf("%s", final_question);
+    fflush(stdout);
+
+    /* Read answer */
+    char answer[STEP_INPUT_BUFFER_SIZE];
+    if (fgets(answer, sizeof(answer), stdin)) {
+        size_t len = strlen(answer);
+        if (len > 0 && answer[len - 1] == '\n') {
+            answer[len - 1] = '\0';
+        }
+
+        /* Get question ID and save answer */
+        int id_idx = workflow_json_find_field(json, tokens, question_token, "id");
+        if (id_idx >= 0) {
+            char id[STEP_SAVE_TO_BUFFER_SIZE];
+            workflow_json_extract_string(json, &tokens[id_idx], id, sizeof(id));
+
+            /* Build context path: save_to.id */
+            char full_path[STEP_SAVE_TO_BUFFER_SIZE * 2];
+            snprintf(full_path, sizeof(full_path), "%s.%s", save_to, id);
+            workflow_context_set(workflow->context, full_path, answer);
+        }
+    }
+
+    return ARGO_SUCCESS;
+}
+
 /* Step: ci_ask */
 int step_ci_ask(workflow_controller_t* workflow,
                 const char* json, jsmntok_t* tokens, int step_index) {
@@ -316,9 +430,7 @@ int step_ci_ask_series(workflow_controller_t* workflow,
         return E_INPUT_NULL;
     }
 
-    workflow_context_t* ctx = workflow->context;
-
-    /* Find persona field (optional) */
+    /* Find persona */
     workflow_persona_t* persona = NULL;
     int persona_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PERSONA);
     if (persona_idx >= 0) {
@@ -332,12 +444,11 @@ int step_ci_ask_series(workflow_controller_t* workflow,
         }
     }
 
-    /* Show persona greeting if available */
+    /* Show greeting and intro */
     if (persona && persona->greeting[0] != '\0') {
         printf("\n%s\n", persona->greeting);
     }
 
-    /* Find optional intro field */
     int intro_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_INTRO);
     if (intro_idx >= 0) {
         char intro[STEP_PROMPT_BUFFER_SIZE];
@@ -383,81 +494,10 @@ int step_ci_ask_series(workflow_controller_t* workflow,
             continue;
         }
 
-        /* Get question text */
-        int q_idx = workflow_json_find_field(json, tokens, question_token, "question");
-        if (q_idx >= 0) {
-            char question[STEP_PROMPT_BUFFER_SIZE];
-            workflow_json_extract_string(json, &tokens[q_idx], question, sizeof(question));
+        execute_series_iteration(workflow, persona, json, tokens, question_token, i + 1, save_to);
 
-            /* Optionally use AI to present a more conversational question */
-            char final_question[STEP_OUTPUT_BUFFER_SIZE];
-            if (workflow->provider && persona) {
-                /* Build AI prompt to generate conversational question */
-                char ai_prompt[STEP_AI_PROMPT_BUFFER_SIZE];
-                snprintf(ai_prompt, sizeof(ai_prompt),
-                        "You are %s, a %s. Your communication style is: %s.\n\n"
-                        "Present this question to the user in a natural, conversational way that matches your persona:\n\n%s\n\n"
-                        "Respond with ONLY the question itself, no additional commentary.",
-                        persona->name, persona->role, persona->style, question);
-
-                /* Query AI using callback */
-                char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
-                response_capture_t capture = {
-                    .buffer = response,
-                    .buffer_size = sizeof(response),
-                    .bytes_written = 0
-                };
-
-                result = workflow->provider->query(workflow->provider, ai_prompt,
-                                                  capture_response_callback, &capture);
-
-                if (result == ARGO_SUCCESS && capture.bytes_written > 0) {
-                    /* Use AI-generated conversational question */
-                    snprintf(final_question, sizeof(final_question), "\n[%s] %d. %s ",
-                            persona->name, i + 1, response);
-                } else {
-                    /* Fall back to template question */
-                    snprintf(final_question, sizeof(final_question), "\n[%s] %d. %s ",
-                            persona->name, i + 1, question);
-                }
-            } else {
-                /* No AI provider - use template question directly */
-                if (persona && persona->name[0] != '\0') {
-                    snprintf(final_question, sizeof(final_question), "\n[%s] %d. %s ",
-                            persona->name, i + 1, question);
-                } else {
-                    snprintf(final_question, sizeof(final_question), "\n%d. %s ", i + 1, question);
-                }
-            }
-
-            printf("%s", final_question);
-            fflush(stdout);
-
-            /* Read answer */
-            char answer[STEP_INPUT_BUFFER_SIZE];
-            if (fgets(answer, sizeof(answer), stdin)) {
-                size_t len = strlen(answer);
-                if (len > 0 && answer[len - 1] == '\n') {
-                    answer[len - 1] = '\0';
-                }
-
-                /* Get question ID and save answer */
-                int id_idx = workflow_json_find_field(json, tokens, question_token, "id");
-                if (id_idx >= 0) {
-                    char id[STEP_SAVE_TO_BUFFER_SIZE];
-                    workflow_json_extract_string(json, &tokens[id_idx], id, sizeof(id));
-
-                    /* Build context path: save_to.id */
-                    char full_path[STEP_SAVE_TO_BUFFER_SIZE * 2];
-                    snprintf(full_path, sizeof(full_path), "%s.%s", save_to, id);
-                    workflow_context_set(ctx, full_path, answer);
-                }
-            }
-        }
-
-        /* Skip to next question */
-        int question_tokens = workflow_json_count_tokens(tokens, question_token);
-        question_token += question_tokens;
+        /* Move to next question */
+        question_token += workflow_json_count_tokens(tokens, question_token);
     }
 
     LOG_DEBUG("CI ask_series: persona=%s, completed %d questions, saved to '%s'",

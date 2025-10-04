@@ -13,6 +13,7 @@
 #include "argo_error.h"
 #include "argo_workflow_executor.h"
 #include "argo_output.h"
+#include "argo_file_utils.h"
 
 /* External library */
 #define JSMN_HEADER
@@ -93,16 +94,13 @@ static void get_checkpoint_path(const char* workflow_id, char* path, size_t path
 
 /* Load workflow template from JSON file */
 static int load_template(const char* template_path, workflow_state_t* state) {
-    FILE* file = fopen(template_path, "r");
-    if (!file) {
+    char* buffer = NULL;
+    size_t bytes_read = 0;
+    int load_result = file_read_all(template_path, &buffer, &bytes_read);
+    if (load_result != ARGO_SUCCESS) {
         LOG_WORKFLOW_ERROR("Failed to open template: %s\n", template_path);
         return -1;
     }
-
-    char buffer[TEMPLATE_BUFFER_SIZE];
-    size_t bytes_read = fread(buffer, 1, sizeof(buffer) - 1, file);
-    fclose(file);
-    buffer[bytes_read] = '\0';
 
     /* Parse JSON */
     jsmn_parser parser;
@@ -110,6 +108,7 @@ static int load_template(const char* template_path, workflow_state_t* state) {
     jsmn_init(&parser);
     int token_count = jsmn_parse(&parser, buffer, bytes_read, tokens, 256);
     if (token_count < 0) {
+        free(buffer);
         LOG_WORKFLOW_ERROR("Failed to parse template JSON\n");
         return -1;
     }
@@ -128,6 +127,7 @@ static int load_template(const char* template_path, workflow_state_t* state) {
     }
 
     if (steps_idx == -1 || tokens[steps_idx].type != JSMN_ARRAY) {
+        free(buffer);
         LOG_WORKFLOW_ERROR("No steps array found in template\n");
         return -1;
     }
@@ -173,6 +173,7 @@ static int load_template(const char* template_path, workflow_state_t* state) {
         }
     }
 
+    free(buffer);
     return 0;
 }
 

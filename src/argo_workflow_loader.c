@@ -12,6 +12,7 @@
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
+#include "argo_file_utils.h"
 
 /* Load workflow definition from file */
 workflow_definition_t* workflow_load_from_file(const char* path) {
@@ -20,33 +21,21 @@ workflow_definition_t* workflow_load_from_file(const char* path) {
         return NULL;
     }
 
-    FILE* fp = fopen(path, "r");
-    if (!fp) {
+    /* Read entire file */
+    char* json = NULL;
+    size_t file_size = 0;
+    int result = file_read_all(path, &json, &file_size);
+    if (result != ARGO_SUCCESS) {
         argo_report_error(E_SYSTEM_FILE, "workflow_load_from_file",
                          ERR_FMT_FAILED_TO_OPEN, path);
         return NULL;
     }
 
-    /* Read entire file */
-    fseek(fp, 0, SEEK_END);
-    long size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    if (size <= 0) {
-        fclose(fp);
+    if (file_size == 0) {
+        free(json);
         argo_report_error(E_SYSTEM_FILE, "workflow_load_from_file", WORKFLOW_ERR_FILE_EMPTY);
         return NULL;
     }
-
-    char* json = malloc(size + 1);
-    if (!json) {
-        fclose(fp);
-        return NULL;
-    }
-
-    size_t read_size = fread(json, 1, size, fp);
-    json[read_size] = '\0';
-    fclose(fp);
 
     /* Parse JSON */
     workflow_definition_t* def = workflow_definition_from_json(json);

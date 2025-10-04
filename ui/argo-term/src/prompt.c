@@ -121,9 +121,9 @@ int argo_term_expand_prompt(const char* format, char* output, size_t output_size
                     break;
 
                 case 'b':  /* workflow branch (placeholder) */
-                    /* TODO: Query registry for active_workflow->active_branch
-                     * Requires: registry interface, workflow context, arc switch
-                     * For now: always empty string */
+                    /* Future Enhancement: Query workflow registry for active branch name
+                     * Requires: registry interface, workflow context, arc switch integration
+                     * Current: Returns empty string - enhancement planned for workflow context API */
                     break;
 
                 case 'F':  /* color start %F{color} */

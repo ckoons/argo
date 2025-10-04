@@ -25,6 +25,7 @@
 #include "argo_log.h"
 #include "argo_filesystem.h"
 #include "argo_claude.h"
+#include "argo_file_utils.h"
 
 /* Claude Code context structure */
 typedef struct claude_code_context {
@@ -146,34 +147,32 @@ static int write_prompt_file(claude_code_context_t* ctx, const char* prompt) {
 
 /* Read response file */
 static int read_response_file(claude_code_context_t* ctx) {
-    FILE* fp = fopen(ctx->response_file, "r");
-    if (!fp) {
+    char* file_content = NULL;
+    size_t file_size = 0;
+    int result = file_read_all(ctx->response_file, &file_content, &file_size);
+    if (result != ARGO_SUCCESS) {
         return E_SYSTEM_FILE;
     }
 
-    /* Read file into buffer */
-    fseek(fp, 0, SEEK_END);
-    long file_size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    if (file_size <= 0) {
-        fclose(fp);
+    if (file_size == 0) {
+        free(file_content);
         return E_PROTOCOL_FORMAT;
     }
 
     /* Ensure buffer capacity */
-    int result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
-                                       file_size + 1);
+    result = ensure_buffer_capacity(&ctx->response_content, &ctx->response_capacity,
+                                   file_size + 1);
     if (result != ARGO_SUCCESS) {
-        fclose(fp);
+        free(file_content);
         return result;
     }
 
-    size_t read = fread(ctx->response_content, 1, file_size, fp);
-    ctx->response_content[read] = '\0';
-    ctx->response_size = read;
+    /* Copy to context buffer */
+    memcpy(ctx->response_content, file_content, file_size);
+    ctx->response_content[file_size] = '\0';
+    ctx->response_size = file_size;
 
-    fclose(fp);
+    free(file_content);
     return ARGO_SUCCESS;
 }
 
