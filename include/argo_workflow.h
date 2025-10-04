@@ -28,6 +28,7 @@ typedef struct jsmntok jsmntok_t;
 #define EXECUTOR_DEFAULT_MAX_RETRIES 3
 #define EXECUTOR_DEFAULT_RETRY_DELAY_MS 1000
 #define EXECUTOR_DEFAULT_BACKOFF_MULTIPLIER 2
+#define EXECUTOR_MS_TO_USEC_FACTOR 1000
 
 /* Workflow phases */
 typedef enum {

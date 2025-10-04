@@ -46,14 +46,14 @@ static void test_sigterm_cleanup(void) {
         /* Install signal handlers */
         argo_install_signal_handlers();
 
-        /* Wait for signal (parent will kill us) */
-        sleep(10);
+        /* Wait for signal (pause suspends until signal received) */
+        pause();
 
         /* Should not reach here */
         exit(1);
     } else {
         /* Parent: wait a bit then send SIGTERM */
-        usleep(100000);  /* 100ms */
+        usleep(100000);  /* 100ms for child to set up */
         kill(pid, SIGTERM);
 
         int status;
@@ -81,11 +81,11 @@ static void test_sigint_cleanup(void) {
         (void)workflow;  /* Suppress unused warning */
 
         argo_install_signal_handlers();
-        sleep(10);
+        pause();
         exit(1);
     } else {
         /* Parent */
-        usleep(100000);
+        usleep(100000);  /* 100ms for child to set up */
         kill(pid, SIGINT);
 
         int status;

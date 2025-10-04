@@ -149,41 +149,62 @@ void argo_unregister_lifecycle(lifecycle_manager_t* lifecycle) {
 
 /* Cleanup all tracked objects (called by argo_exit()) */
 void argo_shutdown_cleanup(void) {
+    /* Copy tracked objects and clear counts while holding mutex */
+    workflow_controller_t* workflows_to_cleanup[MAX_WORKFLOWS];
+    lifecycle_manager_t* lifecycles_to_cleanup[MAX_LIFECYCLES];
+    ci_registry_t* registries_to_cleanup[MAX_REGISTRIES];
+    int workflow_count, lifecycle_count, registry_count;
+
     pthread_mutex_lock(&shutdown_tracker.mutex);
 
-    /* Cleanup in reverse order: workflows, lifecycles, registries */
+    /* Copy workflow pointers and clear tracker */
+    workflow_count = shutdown_tracker.workflow_count;
+    for (int i = 0; i < workflow_count; i++) {
+        workflows_to_cleanup[i] = shutdown_tracker.workflows[i];
+    }
+    shutdown_tracker.workflow_count = 0;
+
+    /* Copy lifecycle pointers and clear tracker */
+    lifecycle_count = shutdown_tracker.lifecycle_count;
+    for (int i = 0; i < lifecycle_count; i++) {
+        lifecycles_to_cleanup[i] = shutdown_tracker.lifecycles[i];
+    }
+    shutdown_tracker.lifecycle_count = 0;
+
+    /* Copy registry pointers and clear tracker */
+    registry_count = shutdown_tracker.registry_count;
+    for (int i = 0; i < registry_count; i++) {
+        registries_to_cleanup[i] = shutdown_tracker.registries[i];
+    }
+    shutdown_tracker.registry_count = 0;
+
+    pthread_mutex_unlock(&shutdown_tracker.mutex);
+
+    /* Now destroy objects without holding mutex (avoids deadlock) */
 
     /* Cleanup workflows */
-    if (shutdown_tracker.workflow_count > 0) {
-        LOG_INFO("Cleaning up %d active workflows", shutdown_tracker.workflow_count);
-        for (int i = shutdown_tracker.workflow_count - 1; i >= 0; i--) {
-            workflow_destroy(shutdown_tracker.workflows[i]);
-            shutdown_tracker.workflows[i] = NULL;
+    if (workflow_count > 0) {
+        LOG_INFO("Cleaning up %d active workflows", workflow_count);
+        for (int i = workflow_count - 1; i >= 0; i--) {
+            workflow_destroy(workflows_to_cleanup[i]);
         }
-        shutdown_tracker.workflow_count = 0;
     }
 
     /* Cleanup lifecycle managers */
-    if (shutdown_tracker.lifecycle_count > 0) {
-        LOG_INFO("Cleaning up %d active lifecycle managers", shutdown_tracker.lifecycle_count);
-        for (int i = shutdown_tracker.lifecycle_count - 1; i >= 0; i--) {
-            lifecycle_manager_destroy(shutdown_tracker.lifecycles[i]);
-            shutdown_tracker.lifecycles[i] = NULL;
+    if (lifecycle_count > 0) {
+        LOG_INFO("Cleaning up %d active lifecycle managers", lifecycle_count);
+        for (int i = lifecycle_count - 1; i >= 0; i--) {
+            lifecycle_manager_destroy(lifecycles_to_cleanup[i]);
         }
-        shutdown_tracker.lifecycle_count = 0;
     }
 
     /* Cleanup registries */
-    if (shutdown_tracker.registry_count > 0) {
-        LOG_INFO("Cleaning up %d active registries", shutdown_tracker.registry_count);
-        for (int i = shutdown_tracker.registry_count - 1; i >= 0; i--) {
-            registry_destroy(shutdown_tracker.registries[i]);
-            shutdown_tracker.registries[i] = NULL;
+    if (registry_count > 0) {
+        LOG_INFO("Cleaning up %d active registries", registry_count);
+        for (int i = registry_count - 1; i >= 0; i--) {
+            registry_destroy(registries_to_cleanup[i]);
         }
-        shutdown_tracker.registry_count = 0;
     }
-
-    pthread_mutex_unlock(&shutdown_tracker.mutex);
 }
 
 /* Install signal handlers for graceful shutdown */

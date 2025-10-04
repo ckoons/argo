@@ -26,9 +26,10 @@ Current: 4,460 meaningful lines (44% of budget)
 - ✅ **Workflow Context**: Variable storage with {placeholder} substitution for step data
 - ✅ **Session Lifecycle**: `run_workflow()` - complete create→execute→destroy
 - ✅ **Checkpoints**: Workflow pause/resume with state save/restore
-- ✅ **Testing**: 95/95 tests passing (100% pass rate)
+- ✅ **Testing**: 98/98 tests passing (100% pass rate)
 - ✅ **Initialization**: `argo_init()`/`argo_exit()` lifecycle management
 - ✅ **Test Harnesses**: 7 interactive test programs (workflow context, terminal, socket, etc.)
+- ✅ **Optional Features**: Metrics collection, dry-run mode (compile-time flags)
 
 ### Core Principles
 1. **"What you don't build, you don't debug"** - Reuse over rewrite
@@ -64,6 +65,61 @@ build/test_api_calls --yes-i-want-to-spend-money claude
 build/test_api_calls --yes-i-want-to-spend-money openai
 build/test_api_calls --yes-i-want-to-spend-money gemini
 ```
+
+## Optional Features
+
+Argo supports compile-time optional features for production monitoring and testing:
+
+### Metrics Collection
+
+Enable runtime metrics tracking with zero overhead when disabled:
+
+```bash
+# Build with metrics enabled
+make clean
+make ENABLE_METRICS=1
+
+# Print metrics from your application
+#include "argo_metrics.h"
+argo_metrics_print();
+```
+
+**Tracked Metrics:**
+- `workflows_started` - Total workflows initiated
+- `workflows_completed` - Successfully completed workflows
+- `workflows_failed` - Failed workflow executions
+- `tasks_assigned` - Tasks distributed to CIs
+- `tasks_completed` - Finished task count
+- `api_calls_made` - External API invocations
+- `api_failures` - Failed API calls
+- `registry_searches` - CI registry lookups
+- `heartbeats_received` - CI liveness confirmations
+- `messages_sent` - Inter-CI messages routed
+
+Metrics use atomic operations for thread-safe updates and are completely compiled out when `ENABLE_METRICS=1` is not set.
+
+### Dry-Run Mode
+
+Validate workflow JSON without executing steps:
+
+```bash
+# Build with dry-run support
+make clean
+make ENABLE_DRYRUN=1
+
+# In your code
+workflow_set_dryrun(workflow, 1);
+workflow_execute_all_steps(workflow);  // Validates without executing
+```
+
+Dry-run mode checks:
+- Step type validity
+- Required field presence
+- Variable placeholder resolution
+- Condition syntax
+- Target step existence
+
+Useful for CI/CD pipeline validation and workflow testing.
 
 ## Architecture
 

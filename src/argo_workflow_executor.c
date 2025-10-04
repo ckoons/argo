@@ -120,7 +120,7 @@ static void retry_sleep(int attempt, int base_delay_ms, int multiplier) {
     for (int i = 0; i < attempt; i++) {
         delay_ms *= multiplier;
     }
-    usleep(delay_ms * 1000);  /* Convert ms to microseconds */
+    usleep(delay_ms * EXECUTOR_MS_TO_USEC_FACTOR);
 }
 
 /* Helper: Update workflow step tracking */

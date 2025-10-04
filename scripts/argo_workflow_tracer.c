@@ -89,6 +89,17 @@ static void print_trace_dot(void) {
     printf("}\n");
 }
 
+/* Free trace list */
+static void free_trace(void) {
+    trace_entry_t* entry = trace_head;
+    while (entry) {
+        trace_entry_t* next = entry->next;
+        free(entry);
+        entry = next;
+    }
+    trace_head = trace_tail = NULL;
+}
+
 /* Main */
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -153,6 +164,7 @@ int main(int argc, char** argv) {
     }
 
 cleanup:
+    free_trace();
     if (workflow) workflow_destroy(workflow);
     if (lifecycle) lifecycle_manager_destroy(lifecycle);
     if (registry) registry_destroy(registry);

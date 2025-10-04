@@ -299,7 +299,7 @@ $(ENV_PRECEDENCE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_env_precedence.o $(S
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -404,6 +404,27 @@ test-thread-safety: $(THREAD_SAFETY_TEST_TARGET)
 	@echo "Thread Safety Tests"
 	@echo "=========================================="
 	@./$(THREAD_SAFETY_TEST_TARGET)
+
+test-shutdown-signals: $(SHUTDOWN_SIGNALS_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Shutdown Signal Tests"
+	@echo "=========================================="
+	@./$(SHUTDOWN_SIGNALS_TEST_TARGET)
+
+test-concurrent-workflows: $(CONCURRENT_WORKFLOWS_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Concurrent Workflow Tests"
+	@echo "=========================================="
+	@./$(CONCURRENT_WORKFLOWS_TEST_TARGET)
+
+test-env-precedence: $(ENV_PRECEDENCE_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Environment Precedence Tests"
+	@echo "=========================================="
+	@./$(ENV_PRECEDENCE_TEST_TARGET)
 
 test-api: $(API_TEST_TARGET)
 	@echo ""
