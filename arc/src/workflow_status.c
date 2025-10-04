@@ -8,6 +8,7 @@
 #include "arc_context.h"
 #include "arc_error.h"
 #include "argo_workflow_registry.h"
+#include "argo_workflow_executor.h"
 #include "argo_init.h"
 #include "argo_error.h"
 
@@ -63,14 +64,14 @@ static void show_workflow_status(workflow_instance_t* wf) {
             buffer[bytes] = '\0';
 
             /* Extract current_step from checkpoint */
-            const char* step_str = strstr(buffer, "\"current_step\":");
-            const char* total_str = strstr(buffer, "\"total_steps\":");
-            const char* paused_str = strstr(buffer, "\"is_paused\": true");
+            const char* step_str = strstr(buffer, JSON_CURRENT_STEP_FIELD);
+            const char* total_str = strstr(buffer, JSON_TOTAL_STEPS_FIELD);
+            const char* paused_str = strstr(buffer, JSON_IS_PAUSED_FIELD);
 
             if (step_str && total_str) {
                 int current_step, total_steps;
-                sscanf(step_str + 15, "%d", &current_step);
-                sscanf(total_str + 15, "%d", &total_steps);
+                sscanf(step_str + JSON_CURRENT_STEP_OFFSET, "%d", &current_step);
+                sscanf(total_str + JSON_TOTAL_STEPS_OFFSET, "%d", &total_steps);
                 printf("  Progress:       Step %d/%d\n", current_step + 1, total_steps);
                 if (paused_str) {
                     printf("  State:          PAUSED\n");

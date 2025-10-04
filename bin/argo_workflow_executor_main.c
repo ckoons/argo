@@ -11,29 +11,24 @@
 /* Project includes */
 #include "argo_json.h"
 #include "argo_error.h"
+#include "argo_workflow_executor.h"
 
 /* External library */
 #define JSMN_HEADER
 #include "jsmn.h"
 
-/* Checkpoint and state paths */
-#define CHECKPOINT_DIR ".argo/workflows/checkpoints"
-#define CHECKPOINT_PATH_MAX 512
-#define TEMPLATE_BUFFER_SIZE 8192
-#define MAX_WORKFLOW_STEPS 32
-
 /* Workflow step structure */
 typedef struct {
-    char step_name[128];
-    char step_type[64];
-    char prompt[512];
+    char step_name[STEP_NAME_MAX];
+    char step_type[STEP_TYPE_MAX];
+    char prompt[STEP_PROMPT_MAX];
 } workflow_step_t;
 
 /* Workflow state structure */
 typedef struct {
-    char workflow_id[128];
-    char template_path[256];
-    char branch[128];
+    char workflow_id[WORKFLOW_ID_MAX];
+    char template_path[TEMPLATE_PATH_MAX];
+    char branch[BRANCH_NAME_MAX];
     int current_step;
     int total_steps;
     bool is_paused;
@@ -123,7 +118,8 @@ static int load_template(const char* template_path, workflow_state_t* state) {
     for (int i = 0; i < token_count; i++) {
         if (tokens[i].type == JSMN_STRING) {
             int len = tokens[i].end - tokens[i].start;
-            if (len == 5 && strncmp(buffer + tokens[i].start, "steps", 5) == 0) {
+            if (len == JSON_FIELD_STEPS_LEN &&
+                strncmp(buffer + tokens[i].start, "steps", JSON_FIELD_STEPS_LEN) == 0) {
                 steps_idx = i + 1;
                 break;
             }
@@ -162,11 +158,14 @@ static int load_template(const char* template_path, workflow_state_t* state) {
             int val_len = tokens[current_token].end - tokens[current_token].start;
             const char* val = buffer + tokens[current_token].start;
 
-            if (key_len == 4 && strncmp(key, "step", 4) == 0) {
+            if (key_len == JSON_FIELD_STEP_LEN &&
+                strncmp(key, "step", JSON_FIELD_STEP_LEN) == 0) {
                 snprintf(step->step_name, sizeof(step->step_name), "%.*s", val_len, val);
-            } else if (key_len == 4 && strncmp(key, "type", 4) == 0) {
+            } else if (key_len == JSON_FIELD_TYPE_LEN &&
+                       strncmp(key, "type", JSON_FIELD_TYPE_LEN) == 0) {
                 snprintf(step->step_type, sizeof(step->step_type), "%.*s", val_len, val);
-            } else if (key_len == 6 && strncmp(key, "prompt", 6) == 0) {
+            } else if (key_len == JSON_FIELD_PROMPT_LEN &&
+                       strncmp(key, "prompt", JSON_FIELD_PROMPT_LEN) == 0) {
                 snprintf(step->prompt, sizeof(step->prompt), "%.*s", val_len, val);
             }
             current_token++;
@@ -221,9 +220,9 @@ static int load_checkpoint(workflow_state_t* state) {
     buffer[bytes_read] = '\0';
 
     /* Simple parsing - find current_step value */
-    const char* current_step_str = strstr(buffer, "\"current_step\":");
+    const char* current_step_str = strstr(buffer, JSON_CURRENT_STEP_FIELD);
     if (current_step_str) {
-        sscanf(current_step_str + 15, "%d", &state->current_step);
+        sscanf(current_step_str + JSON_CURRENT_STEP_OFFSET, "%d", &state->current_step);
     }
 
     return 0;
@@ -241,7 +240,7 @@ static void execute_step(workflow_step_t* step, int step_num, int total_steps) {
     fprintf(stdout, "Executing...\n");
 
     /* Simulate step execution */
-    sleep(2);
+    sleep(STEP_EXECUTION_DELAY_SEC);
 
     fprintf(stdout, "Step completed successfully\n");
 }
@@ -256,7 +255,7 @@ static void check_pause_state(workflow_state_t* state) {
     }
 
     while (pause_requested && !shutdown_requested) {
-        sleep(1);
+        sleep(PAUSE_POLL_DELAY_SEC);
     }
 
     if (state->is_paused && !pause_requested) {

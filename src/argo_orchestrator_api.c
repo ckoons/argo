@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include "argo_orchestrator_api.h"
+#include "argo_workflow_executor.h"
 #include "argo_error.h"
 #include "argo_log.h"
 
@@ -294,12 +295,12 @@ int workflow_exec_get_state(const char* workflow_id,
             buffer[bytes] = '\0';
 
             /* Extract state from checkpoint */
-            const char* step_str = strstr(buffer, "\"current_step\":");
-            const char* total_str = strstr(buffer, "\"total_steps\":");
+            const char* step_str = strstr(buffer, JSON_CURRENT_STEP_FIELD);
+            const char* total_str = strstr(buffer, JSON_TOTAL_STEPS_FIELD);
 
             if (step_str && total_str) {
-                sscanf(step_str + 15, "%d", &state->step_number);
-                sscanf(total_str + 15, "%d", &state->total_steps);
+                sscanf(step_str + JSON_CURRENT_STEP_OFFSET, "%d", &state->step_number);
+                sscanf(total_str + JSON_TOTAL_STEPS_OFFSET, "%d", &state->total_steps);
                 snprintf(state->current_step, sizeof(state->current_step),
                         "Step %d/%d", state->step_number + 1, state->total_steps);
                 snprintf(state->last_checkpoint, sizeof(state->last_checkpoint),
