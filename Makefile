@@ -57,7 +57,8 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_workflow_steps_advanced.c \
                $(SRC_DIR)/argo_workflow_persona.c \
                $(SRC_DIR)/argo_shutdown.c \
-               $(SRC_DIR)/argo_shared_services.c
+               $(SRC_DIR)/argo_shared_services.c \
+               $(SRC_DIR)/argo_workflow_registry.c
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -124,9 +125,10 @@ SHUTDOWN_SIGNALS_TEST_TARGET = $(BUILD_DIR)/test_shutdown_signals
 CONCURRENT_WORKFLOWS_TEST_TARGET = $(BUILD_DIR)/test_concurrent_workflows
 ENV_PRECEDENCE_TEST_TARGET = $(BUILD_DIR)/test_env_precedence
 SHARED_SERVICES_TEST_TARGET = $(BUILD_DIR)/test_shared_services
+WORKFLOW_REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_workflow_registry
 
 # Default target
-all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(SCRIPT_TARGETS)
+all: directories $(CORE_LIB) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -304,8 +306,12 @@ $(ENV_PRECEDENCE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_env_precedence.o $(S
 $(SHARED_SERVICES_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_shared_services.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build workflow registry test executable
+$(WORKFLOW_REGISTRY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow_registry.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -438,6 +444,13 @@ test-shared-services: $(SHARED_SERVICES_TEST_TARGET)
 	@echo "Shared Services Tests"
 	@echo "=========================================="
 	@./$(SHARED_SERVICES_TEST_TARGET)
+
+test-workflow-registry: $(WORKFLOW_REGISTRY_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Workflow Registry Tests"
+	@echo "=========================================="
+	@./$(WORKFLOW_REGISTRY_TEST_TARGET)
 
 test-api: $(API_TEST_TARGET)
 	@echo ""

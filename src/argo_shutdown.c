@@ -12,6 +12,7 @@
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
 #include "argo_shared_services.h"
+#include "argo_workflow_registry.h"
 #include "argo_init.h"
 #include "argo_log.h"
 
@@ -29,6 +30,7 @@ static struct {
     lifecycle_manager_t* lifecycles[MAX_LIFECYCLES];
     int lifecycle_count;
     shared_services_t* shared_services;
+    workflow_registry_t* workflow_registry;
     pthread_mutex_t mutex;
     int initialized;
 } shutdown_tracker = {
@@ -36,6 +38,7 @@ static struct {
     .registry_count = 0,
     .lifecycle_count = 0,
     .shared_services = NULL,
+    .workflow_registry = NULL,
     .mutex = PTHREAD_MUTEX_INITIALIZER,
     .initialized = 0
 };
@@ -160,6 +163,16 @@ void argo_set_shared_services(shared_services_t* services) {
     pthread_mutex_unlock(&shutdown_tracker.mutex);
 }
 
+/* Set workflow registry for cleanup tracking */
+void argo_set_workflow_registry(workflow_registry_t* registry) {
+    pthread_mutex_lock(&shutdown_tracker.mutex);
+    shutdown_tracker.workflow_registry = registry;
+    if (registry) {
+        LOG_DEBUG("Registered workflow registry for cleanup tracking");
+    }
+    pthread_mutex_unlock(&shutdown_tracker.mutex);
+}
+
 /* Cleanup all tracked objects (called by argo_exit()) */
 void argo_shutdown_cleanup(void) {
     /* Copy tracked objects and clear counts while holding mutex */
@@ -167,6 +180,7 @@ void argo_shutdown_cleanup(void) {
     lifecycle_manager_t* lifecycles_to_cleanup[MAX_LIFECYCLES];
     ci_registry_t* registries_to_cleanup[MAX_REGISTRIES];
     shared_services_t* shared_services_to_cleanup = NULL;
+    workflow_registry_t* workflow_registry_to_cleanup = NULL;
     int workflow_count, lifecycle_count, registry_count;
 
     pthread_mutex_lock(&shutdown_tracker.mutex);
@@ -174,6 +188,10 @@ void argo_shutdown_cleanup(void) {
     /* Copy shared services pointer and clear tracker */
     shared_services_to_cleanup = shutdown_tracker.shared_services;
     shutdown_tracker.shared_services = NULL;
+
+    /* Copy workflow registry pointer and clear tracker */
+    workflow_registry_to_cleanup = shutdown_tracker.workflow_registry;
+    shutdown_tracker.workflow_registry = NULL;
 
     /* Copy workflow pointers and clear tracker */
     workflow_count = shutdown_tracker.workflow_count;
@@ -200,7 +218,13 @@ void argo_shutdown_cleanup(void) {
 
     /* Now destroy objects without holding mutex (avoids deadlock) */
 
-    /* Cleanup shared services first (stops background thread) */
+    /* Cleanup workflow registry first (saves any pending changes) */
+    if (workflow_registry_to_cleanup) {
+        LOG_INFO("Cleaning up workflow registry");
+        workflow_registry_destroy(workflow_registry_to_cleanup);
+    }
+
+    /* Cleanup shared services (stops background thread) */
     if (shared_services_to_cleanup) {
         LOG_INFO("Stopping shared services background thread");
         shared_services_stop(shared_services_to_cleanup);

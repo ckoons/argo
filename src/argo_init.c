@@ -11,8 +11,12 @@
 #include "argo_globals.h"  /* Cleanup function declarations */
 #include "argo_shutdown.h"
 #include "argo_shared_services.h"
+#include "argo_workflow_registry.h"
 #include "argo_error.h"
 #include "argo_log.h"
+
+/* Registry path */
+#define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
 
 /* Initialize Argo library */
 int argo_init(void) {
@@ -52,6 +56,24 @@ int argo_init(void) {
 
     /* Register for cleanup on shutdown */
     argo_set_shared_services(services);
+
+    /* Step 4: Initialize workflow registry */
+    workflow_registry_t* registry = workflow_registry_create(WORKFLOW_REGISTRY_PATH);
+    if (!registry) {
+        LOG_ERROR("Failed to create workflow registry");
+        argo_exit();
+        return E_SYSTEM_MEMORY;
+    }
+
+    /* Load existing workflows if file exists */
+    result = workflow_registry_load(registry);
+    if (result != ARGO_SUCCESS) {
+        LOG_WARN("Failed to load workflow registry (file may not exist yet)");
+        /* Not fatal - continue with empty registry */
+    }
+
+    /* Register for cleanup on shutdown */
+    argo_set_workflow_registry(registry);
 
     LOG_INFO("Argo initialization complete");
     return ARGO_SUCCESS;

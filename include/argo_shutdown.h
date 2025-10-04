@@ -14,6 +14,7 @@ typedef struct workflow_controller workflow_controller_t;
 typedef struct ci_registry ci_registry_t;
 typedef struct lifecycle_manager lifecycle_manager_t;
 typedef struct shared_services shared_services_t;
+typedef struct workflow_registry workflow_registry_t;
 
 /* Register active objects for cleanup tracking */
 void argo_register_workflow(workflow_controller_t* workflow);
@@ -26,6 +27,7 @@ void argo_register_lifecycle(lifecycle_manager_t* lifecycle);
 void argo_unregister_lifecycle(lifecycle_manager_t* lifecycle);
 
 void argo_set_shared_services(shared_services_t* services);
+void argo_set_workflow_registry(workflow_registry_t* registry);
 
 /* Cleanup all tracked objects (called by argo_exit()) */
 void argo_shutdown_cleanup(void);
