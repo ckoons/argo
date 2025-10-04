@@ -32,7 +32,6 @@ static int tests_failed = 0;
     } while(0)
 
 /* Test HTTP request creation */
-__attribute__((unused))
 static void test_http_request_creation(void) {
     TEST("HTTP request creation");
 
@@ -59,7 +58,6 @@ static void test_http_request_creation(void) {
 }
 
 /* Test HTTP header addition */
-__attribute__((unused))
 static void test_http_header_addition(void) {
     TEST("HTTP header addition");
 
@@ -113,7 +111,6 @@ static void test_http_header_addition(void) {
 }
 
 /* Test HTTP body setting */
-__attribute__((unused))
 static void test_http_body_setting(void) {
     TEST("HTTP body setting");
 
@@ -149,7 +146,6 @@ static void test_http_body_setting(void) {
 }
 
 /* Test URL parsing */
-__attribute__((unused))
 static void test_url_parsing(void) {
     TEST("URL parsing");
 
@@ -190,7 +186,6 @@ static void test_url_parsing(void) {
 }
 
 /* Test URL parsing with default HTTPS port */
-__attribute__((unused))
 static void test_url_parsing_default_port(void) {
     TEST("URL parsing with default port");
 
@@ -295,7 +290,6 @@ static void test_http_status_codes(void) {
 }
 
 /* Test null parameter handling */
-__attribute__((unused))
 static void test_null_parameter_handling(void) {
     TEST("Null parameter handling");
 
@@ -324,20 +318,16 @@ int main(void) {
     printf("HTTP Operations Test Suite\n");
     printf("==========================================\n\n");
 
-    /* Note: Many HTTP functions not fully implemented yet */
-    /* Only testing constants and basic validation */
-
+    /* HTTP implementation tests */
+    test_http_request_creation();
+    test_http_header_addition();
+    test_http_body_setting();
+    test_url_parsing();
+    test_url_parsing_default_port();
+    /* test_http_response_cleanup(); - May crash, needs investigation */
     test_http_status_codes();
     test_url_encoding();
-    /* test_url_parsing(); - function not implemented */
-    /* test_url_parsing_default_port(); - function not implemented */
-    /* test_null_parameter_handling(); - functions not implemented */
-
-    /* Tests requiring full HTTP implementation (may segfault if not implemented) */
-    /* test_http_request_creation(); */
-    /* test_http_header_addition(); */
-    /* test_http_body_setting(); */
-    /* test_http_response_cleanup(); */
+    test_null_parameter_handling();
 
     /* Print summary */
     printf("\n");

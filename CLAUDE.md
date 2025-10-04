@@ -8,6 +8,24 @@ Argo is a lean C library (<10,000 lines) for coordinating multiple AI coding ass
 
 **Copyright note:** All rights reserved to preserve legal options during uncertain AI authorship law. When laws clarify, this may become co-authored credit. This protects what we're building together.
 
+## Architecture Overview
+
+**Layered Design** (bottom to top):
+1. **Foundation**: Error handling (argo_error), logging, HTTP/socket, JSON parsing
+2. **Providers**: AI backends (Claude, OpenAI, Gemini, Ollama, etc.) - pluggable via ci_provider_t interface
+3. **Registry**: Service discovery, CI instance tracking, port allocation
+4. **Lifecycle**: Session management, shared services coordination
+5. **Orchestration**: Multi-CI coordination, workflow execution engine
+6. **Workflows**: JSON-driven, pauseable, checkpointable task automation
+
+**Key Abstractions**:
+- `ci_provider_t` - Unified AI provider interface (6 implementations: Claude Code/CLI/API, OpenAI, Gemini, Ollama, Grok, DeepSeek)
+- `workflow_controller_t` - Stateful workflow executor with persona support
+- `ci_registry_t` - Service registry for multi-CI coordination
+- `lifecycle_manager_t` - Resource lifecycle management
+
+**Data Flow**: CLI/API → Registry → Orchestrator → Workflow → Provider → AI Backend
+
 ## Core Philosophy
 
 ### "What you don't build, you don't debug."
@@ -31,9 +49,11 @@ Before writing code:
 ### Memory & Safety
 - Check all return values and allocations
 - Free everything you allocate (no leaks)
-- Use goto cleanup pattern for error handling
+- **Use goto cleanup pattern** for ALL functions that allocate resources
 - Initialize variables at declaration
-- Never use unsafe functions (gets, strcpy without length)
+- **NEVER use unsafe functions**: gets, strcpy, sprintf, strcat
+- **ALWAYS use safe alternatives**: strncpy + null termination, snprintf, strncat
+- **String operations**: Always provide size limits and explicitly null-terminate
 
 ### Error Reporting
 - **ONLY use `argo_report_error()` for ALL errors** - single breakpoint location
@@ -43,10 +63,12 @@ Before writing code:
 - All errors route through one function for consistent format and debugging
 
 ### Code Organization
-- Max 600 lines per .c file (refactor if approaching)
+- Max 600 lines per .c file (refactor if approaching, 3% tolerance acceptable)
 - One clear purpose per module
-- **NEVER use numeric constants in .c files** - ALL constants in headers
-- **NEVER use string literals in .c files** - ALL strings in headers
+- **NEVER use numeric constants in .c files** - ALL constants in headers (argo_limits.h, module headers)
+- **NEVER use string literals in .c files** - ALL strings in headers (except format strings)
+- **File/directory permissions**: Use ARGO_DIR_PERMISSIONS (0755), ARGO_FILE_PERMISSIONS (0644)
+- **Buffer sizes**: Use ARGO_PATH_MAX (512) for paths, ARGO_BUFFER_* for other buffers
 - Never use environment variables at runtime (.env for build only)
 
 ### Build & Test
@@ -80,12 +102,14 @@ Before writing code:
 
 ### Never Commit
 - Code with magic numbers in .c files
+- Code using unsafe string functions (strcpy, sprintf, strcat, gets)
 - Code with TODOs (convert to clear comments or implement)
 - Code that doesn't compile with `-Werror`
 - Code that fails any test
 - Code with memory leaks (check with valgrind if uncertain)
 - Functions over 100 lines (refactor first)
-- Files over 600 lines (split into modules)
+- Files over 600 lines (split into modules, 3% tolerance acceptable)
+- Resource allocations without goto cleanup pattern
 
 ## Common Patterns
 
@@ -185,6 +209,27 @@ free(content);
 http_response_free(resp);
 ```
 
+### String Safety (Mandatory)
+```c
+/* WRONG - unsafe, can overflow */
+strcpy(buffer, source);
+strcat(buffer, more);
+sprintf(buffer, "%s", str);
+
+/* CORRECT - safe with size limits */
+strncpy(buffer, source, sizeof(buffer) - 1);
+buffer[sizeof(buffer) - 1] = '\0';  /* Explicit null termination */
+
+strncat(buffer, more, sizeof(buffer) - strlen(buffer) - 1);
+
+snprintf(buffer, sizeof(buffer), "%s", str);
+
+/* BEST - use offset tracking for multiple operations */
+size_t offset = 0;
+offset += snprintf(buffer + offset, sizeof(buffer) - offset, "Part 1: %s\n", part1);
+offset += snprintf(buffer + offset, sizeof(buffer) - offset, "Part 2: %s\n", part2);
+```
+
 ## Where to Find Things
 
 ### Common Utilities
@@ -195,6 +240,8 @@ http_response_free(resp);
 - `argo_socket.h` - Socket configuration, buffer sizes
 - `argo_error.h` - Error codes and messages
 - `argo_error_messages.h` - Internationalization-ready error strings
+- `argo_limits.h` - **All numeric constants** (buffer sizes, timeouts, permissions)
+- `argo_file_utils.h` - File operations (file_read_all)
 
 ### Constants by Category
 **HTTP** (`argo_http.h`):
@@ -211,6 +258,19 @@ HTTP_STATUS_SERVER_ERROR, HTTP_PORT_HTTPS, HTTP_PORT_HTTP
 SOCKET_PATH_MAX, SOCKET_JSON_TOKEN_MAX
 SOCKET_BUFFER_SIZE, MS_PER_SECOND
 SOCKET_BACKLOG, MAX_PENDING_REQUESTS
+```
+
+**System Limits** (`argo_limits.h`):
+```c
+/* Buffer sizes */
+ARGO_BUFFER_TINY (32), ARGO_BUFFER_SMALL (64), ARGO_BUFFER_MEDIUM (256)
+ARGO_BUFFER_STANDARD (4096), ARGO_BUFFER_LARGE (16384)
+
+/* Filesystem */
+ARGO_PATH_MAX (512)
+ARGO_DIR_PERMISSIONS (0755), ARGO_FILE_PERMISSIONS (0644)
+
+/* Ports, timeouts, merge confidence, etc */
 ```
 
 **Error Messages** (`argo_error_messages.h`):
