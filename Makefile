@@ -674,6 +674,51 @@ $(HARNESS_WORKFLOW_CHAIN): tests/harness_workflow_chain.c $(CORE_LIB)
 	@echo "Building harness_workflow_chain..."
 	@$(CC) $(CFLAGS) tests/harness_workflow_chain.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
+# Component builds
+arc: $(CORE_LIB)
+	@$(MAKE) -C arc
+
+ui: arc
+	@$(MAKE) -C ui/argo-term
+
+ui-argo-term: arc
+	@$(MAKE) -C ui/argo-term
+
+all-components: $(CORE_LIB) arc ui
+
+# Component tests
+test-arc: arc
+	@$(MAKE) -C arc test
+
+test-ui: ui
+	@$(MAKE) -C ui/argo-term test
+
+test-all-components: test test-arc test-ui
+
+# Component counting
+count: count-summary
+
+count-summary:
+	@./scripts/count_summary.sh
+
+count-report:
+	@./scripts/count_report.sh
+
+count-snapshot:
+	@./scripts/count_snapshot.sh
+
+count-json:
+	@./scripts/count_report.sh --json
+
+# Component cleaning
+clean-arc:
+	@$(MAKE) -C arc clean
+
+clean-ui:
+	@$(MAKE) -C ui/argo-term clean
+
+clean-all: clean clean-arc clean-ui
+
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
@@ -681,7 +726,10 @@ $(HARNESS_WORKFLOW_CHAIN): tests/harness_workflow_chain.c $(CORE_LIB)
         clean distclean check debug update-models harnesses harness-init-basic \
         harness-env-inspect harness-reinit harness-init-error harness-socket \
         harness-terminal harness-workflow-context harness-control-flow \
-        harness-ci-interactive harness-loop harness-persona harness-workflow-chain
+        harness-ci-interactive harness-loop harness-persona harness-workflow-chain \
+        arc ui ui-argo-term all-components test-arc test-ui test-all-components \
+        count count-summary count-report count-snapshot count-json \
+        clean-arc clean-ui clean-all
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
