@@ -25,5 +25,6 @@ test_*
 Thumbs.db
 
 # Local configuration
-.arc/
+.arc/*
+!.arc/README.md
 *.local

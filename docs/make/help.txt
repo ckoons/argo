@@ -1,0 +1,84 @@
+Argo Project Makefile Help
+==========================
+
+Usage: make [target] [OPTIONS]
+
+QUICK START
+-----------
+  make                 # Build argo core library only
+  make all-components  # Build everything (argo + arc + ui)
+  make test-quick      # Run all tests (98 tests)
+  make count           # Show component size summary
+
+CORE TARGETS
+------------
+  all                  Build argo core library and tests (default)
+  clean                Remove build artifacts
+  clean-all            Remove all artifacts (core + components)
+  distclean            Deep clean (includes .argo/ runtime)
+
+COMPONENT BUILDS
+----------------
+  arc                  Build arc CLI
+  ui                   Build argo-term UI
+  ui-argo-term         Build argo-term UI (explicit)
+  all-components       Build all components
+
+TESTING
+-------
+  test-quick           Run all unit tests (fast, no external deps)
+  test-all-components  Run all tests (core + arc + ui)
+  test-arc             Run arc CLI tests
+  test-ui              Run argo-term UI tests
+
+Individual test targets:
+  test-registry        Registry and messaging tests
+  test-memory          Memory management tests
+  test-lifecycle       CI lifecycle tests
+  test-workflow        Workflow orchestration tests
+  test-providers       Provider system tests
+  (and more - see 'make help test' for full list)
+
+SIZE TRACKING
+-------------
+  count                Show size summary table
+  count-report         Detailed component analysis
+  count-snapshot       Save historical snapshot
+  count-json           JSON output for automation
+
+OPTIONAL FEATURES
+-----------------
+  make ENABLE_DRYRUN=1    # Build with dry-run mode
+  make ENABLE_METRICS=1   # Build with metrics tracking
+
+UTILITY SCRIPTS
+---------------
+  scripts              Build utility scripts only
+  update-models        Update model defaults from providers
+
+MEMORY TESTING
+--------------
+  test-valgrind        Run valgrind leak detection
+  test-asan            Build and run with AddressSanitizer
+  test-asan-full       Full ASAN test suite
+
+DEVELOPMENT
+-----------
+  check                Check code style and file sizes
+  count-core           Original core counting (diet-aware)
+  debug                Print Makefile variables
+
+HELP SYSTEM
+-----------
+  make help            Show this help
+  make help <target>   Show help for specific target
+
+Examples:
+  make clean && make test-quick
+  make all-components
+  make count-report
+  make ENABLE_METRICS=1 test-quick
+
+For component-specific help:
+  cd arc && make help
+  cd ui/argo-term && make help

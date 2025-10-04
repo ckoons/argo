@@ -1,0 +1,101 @@
+Argo Component Size Tracking
+============================
+
+COUNTING SYSTEM
+---------------
+Argo uses a multi-component budget system. Only src/*.c files count
+against budget. Headers and tests are tracked separately (info only).
+
+Component Budgets:
+  argo (core)    10,000 lines
+  arc (CLI)       5,000 lines
+  argo-term (UI)  3,000 lines
+  ----------------
+  TOTAL          18,000 lines
+
+COUNTING TARGETS
+----------------
+  count                Show size summary table
+  count-report         Detailed analysis with file breakdown
+  count-snapshot       Save historical snapshot
+  count-json           JSON output for CI/automation
+  count-core           Original argo core counting (diet-aware)
+
+SIZE SUMMARY (count)
+--------------------
+  make count
+
+Output:
+  Component      Budget    Used     %      Status
+  ------------------------------------------------
+  argo           10,000    7,053   70%    ✓ Healthy
+  arc             5,000        0    0%    ✓ Ready
+  argo-term       3,000        0    0%    ✓ Ready
+  ------------------------------------------------
+  TOTAL          18,000    7,053   39%
+
+DETAILED REPORT (count-report)
+-------------------------------
+  make count-report
+
+Shows:
+  - Source lines (counts against budget)
+  - Header lines (info only)
+  - Test lines (info only)
+  - Top 5 largest files per component
+  - Deployment scenarios (minimal/CLI/full)
+
+HISTORICAL TRACKING (count-snapshot)
+------------------------------------
+  make count-snapshot
+
+Saves JSON snapshots to .argo/metrics/history/:
+  - YYYY-MM-DD-argo.json
+  - YYYY-MM-DD-arc.json
+  - YYYY-MM-DD-argo-term.json
+  - YYYY-MM-DD-combined.json
+
+Updates .argo/metrics/latest.json (symlink to today's combined)
+
+JSON OUTPUT (count-json)
+------------------------
+  make count-json
+
+Outputs JSON for CI/automation:
+  {
+    "timestamp": 1234567890,
+    "components": [
+      {
+        "component": "argo",
+        "budget": {"limit": 10000, "used": 7053, ...}
+      }
+    ]
+  }
+
+COMPONENT-SPECIFIC COUNTING
+---------------------------
+From component directory:
+  cd arc && make count
+  cd ui/argo-term && make count
+
+Manual counting:
+  ./scripts/count_component.sh . --budget 10000
+  ./scripts/count_component.sh arc --budget 5000
+  ./scripts/count_component.sh ui/argo-term --budget 3000
+
+WHAT COUNTS
+-----------
+Against budget:
+  ✓ src/*.c files only
+  ✓ Diet-aware (excludes comments, blank lines, logs, prints)
+
+Info only (not against budget):
+  • include/*.h files
+  • tests/*.c files
+  • scripts/*.c files
+
+Examples:
+  make count                        # Quick status
+  make count-report > status.txt    # Detailed report
+  make count-snapshot               # Daily snapshot
+  make count-json | jq .            # JSON output

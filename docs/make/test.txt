@@ -1,0 +1,67 @@
+Argo Testing Targets
+====================
+
+QUICK TEST SUITE (test-quick)
+------------------------------
+Runs all core tests with no external dependencies (98 tests):
+
+  make test-quick
+
+Individual test modules:
+  test-registry              CI registry and messaging (8 tests)
+  test-memory                Memory management (10 tests)
+  test-lifecycle             CI lifecycle and state (7 tests)
+  test-providers             Provider system (9 tests)
+  test-messaging             Inter-CI messaging (8 tests)
+  test-workflow              Workflow orchestration (13 tests)
+  test-integration           Integration tests (10 tests)
+  test-persistence           State persistence (4 tests)
+  test-workflow-loader       JSON workflow loading (5 tests)
+  test-session               Session management (8 tests)
+  test-env                   Environment utilities (14 tests)
+  test-thread-safety         Thread safety (3 tests)
+  test-shutdown-signals      Graceful shutdown (2 tests)
+  test-concurrent-workflows  Concurrent execution (2 tests)
+  test-env-precedence        Config file precedence (3 tests)
+
+COMPONENT TESTS
+---------------
+  test-arc                   Arc CLI tests
+  test-ui                    Argo-term UI tests
+  test-all-components        All tests (core + arc + ui)
+
+API TESTS (Costs Money!)
+------------------------
+  test-api                   Test API provider availability
+  test-api-calls             Make actual API calls (EXPENSIVE!)
+  test-api-live              All tests including live APIs
+
+MEMORY LEAK DETECTION
+---------------------
+  test-valgrind              Valgrind leak detection
+                             (requires valgrind installed)
+
+  test-asan                  AddressSanitizer build and test
+                             (rebuilds with -fsanitize=address)
+
+  test-asan-full             Full ASAN suite (7 modules)
+                             (rebuilds with ASAN flags)
+
+TEST HARNESSES (Interactive)
+-----------------------------
+  test-harnesses             Run all interactive harnesses
+  harness-init-basic         Basic initialization test
+  harness-socket             Socket communication test
+  harness-workflow-context   Workflow context test
+  harness-reinit             Re-initialization test
+
+Examples:
+  make test-quick                    # Fast, safe
+  make test-memory test-workflow     # Specific modules
+  make test-asan                     # Memory leak check
+  make test-api                      # Check API availability
+
+IMPORTANT:
+  - test-api-calls requires API keys and COSTS MONEY
+  - Always run test-quick before committing
+  - Use test-asan to catch memory issues early

@@ -674,6 +674,16 @@ $(HARNESS_WORKFLOW_CHAIN): tests/harness_workflow_chain.c $(CORE_LIB)
 	@echo "Building harness_workflow_chain..."
 	@$(CC) $(CFLAGS) tests/harness_workflow_chain.c $(CORE_LIB) -o $@ $(LDFLAGS)
 
+# Help system
+help:
+	@cat docs/make/help.txt 2>/dev/null || echo "Help file not found: docs/make/help.txt"
+
+help-test:
+	@cat docs/make/test.txt 2>/dev/null || echo "Help file not found: docs/make/test.txt"
+
+help-count:
+	@cat docs/make/count.txt 2>/dev/null || echo "Help file not found: docs/make/count.txt"
+
 # Component builds
 arc: $(CORE_LIB)
 	@$(MAKE) -C arc
