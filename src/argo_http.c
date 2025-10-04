@@ -25,11 +25,17 @@ void http_cleanup(void) {
 
 /* Create new HTTP request */
 http_request_t* http_request_new(http_method_t method, const char* url) {
+    if (!url) return NULL;
+
     http_request_t* req = calloc(1, sizeof(http_request_t));
     if (!req) return NULL;
 
     req->method = method;
     req->url = strdup(url);
+    if (!req->url) {
+        free(req);
+        return NULL;
+    }
     req->timeout_seconds = HTTP_DEFAULT_TIMEOUT_SECONDS;
 
     return req;
@@ -238,6 +244,10 @@ void http_response_free(http_response_t* resp) {
 /* Parse URL */
 int http_parse_url(const char* url, char** host, int* port, char** path) {
     /* Simple URL parser */
+    if (!url || !host || !port || !path) {
+        return E_INPUT_NULL;
+    }
+
     const char* p = url;
 
     if (strncmp(p, "https://", 8) == 0) {

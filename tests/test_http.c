@@ -232,12 +232,39 @@ static void test_http_response_cleanup(void) {
 
     resp->status_code = HTTP_STATUS_OK;
     resp->body = strdup("{\"result\":\"success\"}");
+    if (!resp->body) {
+        free(resp);
+        FAIL("Failed to allocate body");
+        return;
+    }
     resp->body_len = strlen(resp->body);
 
     /* Add a header */
     http_header_t* header = calloc(1, sizeof(http_header_t));
+    if (!header) {
+        free(resp->body);
+        free(resp);
+        FAIL("Failed to allocate header");
+        return;
+    }
     header->name = strdup("Content-Type");
+    if (!header->name) {
+        free(header);
+        free(resp->body);
+        free(resp);
+        FAIL("Failed to allocate header name");
+        return;
+    }
     header->value = strdup("application/json");
+    if (!header->value) {
+        free(header->name);
+        free(header);
+        free(resp->body);
+        free(resp);
+        FAIL("Failed to allocate header value");
+        return;
+    }
+    header->next = NULL;  /* Initialize next pointer */
     resp->headers = header;
 
     /* Free should not crash */
@@ -324,7 +351,7 @@ int main(void) {
     test_http_body_setting();
     test_url_parsing();
     test_url_parsing_default_port();
-    /* test_http_response_cleanup(); - May crash, needs investigation */
+    /* test_http_response_cleanup(); - Causes segfault, needs deeper investigation */
     test_http_status_codes();
     test_url_encoding();
     test_null_parameter_handling();
