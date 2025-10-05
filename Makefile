@@ -6,6 +6,9 @@ CC = gcc
 CFLAGS = -Wall -Werror -Wextra -std=c11 -g -I./include
 LDFLAGS = -lpthread
 
+# Installation
+PREFIX ?= /usr/local
+
 # Optional features (enable with make ENABLE_DRYRUN=1 ENABLE_METRICS=1)
 ifdef ENABLE_DRYRUN
   CFLAGS += -DARGO_ENABLE_DRYRUN
@@ -819,6 +822,31 @@ clean-ui:
 
 clean-all: clean clean-arc clean-ui
 
+# Installation targets
+install:
+	install -d $(PREFIX)/bin
+	install -m 0755 bin/argo_workflow_executor $(PREFIX)/bin/argo
+
+install-arc:
+	$(MAKE) -C arc install PREFIX=$(PREFIX)
+
+install-term:
+	$(MAKE) -C ui/argo-term install PREFIX=$(PREFIX)
+
+install-all: install install-arc install-term
+
+# Uninstallation targets
+uninstall:
+	rm -f $(PREFIX)/bin/argo
+
+uninstall-arc:
+	$(MAKE) -C arc uninstall PREFIX=$(PREFIX)
+
+uninstall-term:
+	$(MAKE) -C ui/argo-term uninstall PREFIX=$(PREFIX)
+
+uninstall-all: uninstall uninstall-arc uninstall-term
+
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
@@ -829,7 +857,8 @@ clean-all: clean clean-arc clean-ui
         harness-control-flow harness-ci-interactive harness-loop harness-persona \
         harness-workflow-chain arc ui ui-argo-term all-components test-arc test-ui \
         test-all-components count count-summary count-report count-snapshot count-json \
-        clean-arc clean-ui clean-all
+        clean-arc clean-ui clean-all install install-arc install-term install-all \
+        uninstall uninstall-arc uninstall-term uninstall-all
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)

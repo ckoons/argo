@@ -6,6 +6,9 @@ CC = gcc
 CFLAGS = -Wall -Werror -Wextra -std=c11 -g -I./include -I../../include -I../../arc/include
 LDFLAGS = -lpthread -lncurses
 
+# Installation
+PREFIX ?= /usr/local
+
 # Directories
 SRC_DIR = src
 INC_DIR = include
@@ -28,7 +31,7 @@ TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%,$(TEST_SOURCES))
 # Main target
 TARGET = argo-term
 
-.PHONY: all clean test directories count
+.PHONY: all clean test directories count install uninstall
 
 # Default target
 all: directories $(TARGET)
@@ -77,6 +80,14 @@ count:
 # Clean build artifacts
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
+
+# Installation targets
+install:
+	install -d $(PREFIX)/bin
+	install -m 0755 $(TARGET) $(PREFIX)/bin/argo-term
+
+uninstall:
+	rm -f $(PREFIX)/bin/argo-term
 
 # Debug
 debug:
