@@ -521,6 +521,18 @@ test-claude-providers: $(CLAUDE_PROVIDERS_TEST_TARGET)
 test-arc: arc
 	@$(MAKE) -C arc test-arc
 
+test-arc-workflow: arc
+	@$(MAKE) -C arc test-arc-workflow
+
+test-arc-background: arc
+	@$(MAKE) -C arc test-arc-background
+
+test-arc-full: arc
+	@$(MAKE) -C arc test-arc-full
+
+test-arc-all: arc
+	@$(MAKE) -C arc test-arc-all
+
 test-api: $(API_TEST_TARGET)
 	@echo ""
 	@echo "=========================================="
@@ -864,7 +876,8 @@ uninstall-all: uninstall uninstall-arc uninstall-term
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
         test-session test-env test-api test-api-calls test-harnesses test-http \
-        test-json test-claude-providers test-arc count-core clean distclean check debug \
+        test-json test-claude-providers test-arc test-arc-workflow test-arc-background \
+        test-arc-full test-arc-all count-core clean distclean check debug \
         update-models harnesses harness-init-basic harness-env-inspect harness-reinit \
         harness-init-error harness-socket harness-terminal harness-workflow-context \
         harness-control-flow harness-ci-interactive harness-loop harness-persona \

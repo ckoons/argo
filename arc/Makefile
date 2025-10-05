@@ -34,7 +34,7 @@ TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%,$(TEST_SOURCES))
 # Main target
 TARGET = arc
 
-.PHONY: all clean test test-arc-unit test-arc-cli test-arc test-arc-full directories count install uninstall
+.PHONY: all clean test test-arc-unit test-arc-cli test-arc test-arc-workflow test-arc-background test-arc-full test-arc-all directories count install uninstall
 
 # Default target
 all: directories $(TARGET)
@@ -91,9 +91,37 @@ test-arc: test-arc-unit test-arc-cli
 # Backward compatibility (run standard tests)
 test: test-arc
 
-# Full arc testing (placeholder for workflow tests later)
-test-arc-full: test-arc
-	@echo "Full arc tests complete (workflow tests not yet implemented)"
+# Workflow integration tests (manual/nightly)
+test-arc-workflow: $(TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Arc Workflow Integration Tests"
+	@echo "=========================================="
+	@cd $(TEST_DIR) && ./test_arc_workflows.sh
+
+# Background/attach tests (manual only)
+test-arc-background: $(TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Arc Background Process Tests"
+	@echo "=========================================="
+	@cd $(TEST_DIR) && ./test_arc_background.sh
+
+# Full arc testing (unit + cli + workflow)
+test-arc-full: test-arc test-arc-workflow
+	@echo ""
+	@echo "=========================================="
+	@echo "Full Arc Tests Complete"
+	@echo "=========================================="
+	@echo ""
+
+# All arc tests (including background - manual only)
+test-arc-all: test-arc-full test-arc-background
+	@echo ""
+	@echo "=========================================="
+	@echo "All Arc Tests Complete (Pyramid Built!)"
+	@echo "=========================================="
+	@echo ""
 
 # Count component size
 count:
