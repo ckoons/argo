@@ -144,18 +144,32 @@ int registry_broadcast_message(ci_registry_t* registry,
 /* Create message */
 ci_message_t* message_create(const char* from, const char* to,
                             const char* type, const char* content) {
+    ci_message_t* msg = NULL;
+
     if (!from || !to || !type || !content) return NULL;
 
-    ci_message_t* msg = calloc(1, sizeof(ci_message_t));
+    msg = calloc(1, sizeof(ci_message_t));
     if (!msg) return NULL;
 
     strncpy(msg->from, from, REGISTRY_NAME_MAX - 1);
     strncpy(msg->to, to, REGISTRY_NAME_MAX - 1);
     msg->timestamp = time(NULL);
+
     msg->type = strdup(type);
+    if (!msg->type) goto cleanup;
+
     msg->content = strdup(content);
+    if (!msg->content) goto cleanup;
 
     return msg;
+
+cleanup:
+    if (msg) {
+        free(msg->type);
+        free(msg->content);
+        free(msg);
+    }
+    return NULL;
 }
 
 /* Destroy message */

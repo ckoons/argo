@@ -207,7 +207,7 @@ int workflow_context_substitute(workflow_context_t* ctx,
                     argo_report_error(E_INPUT_TOO_LARGE, "workflow_context_substitute", "output buffer too small");
                     return E_INPUT_TOO_LARGE;
                 }
-                strcpy(dst, value);
+                memcpy(dst, value, value_len);
                 dst += value_len;
                 remaining -= value_len;
             } else {
