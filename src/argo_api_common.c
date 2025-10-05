@@ -136,13 +136,21 @@ int api_allocate_response_buffer(char** buffer, size_t* capacity, size_t size) {
 int api_augment_prompt_with_memory(ci_memory_digest_t* memory_digest,
                                    const char* prompt,
                                    char** out_augmented) {
+    int result = ARGO_SUCCESS;
+    char* augmented = NULL;
+
     ARGO_CHECK_NULL(prompt);
     ARGO_CHECK_NULL(out_augmented);
 
     /* If no memory digest, just return a copy of the prompt */
     if (!memory_digest) {
-        *out_augmented = strdup(prompt);
-        return *out_augmented ? ARGO_SUCCESS : E_SYSTEM_MEMORY;
+        augmented = strdup(prompt);
+        if (!augmented) {
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
+        }
+        *out_augmented = augmented;
+        return ARGO_SUCCESS;
     }
 
     /* Calculate size needed for augmented prompt */
@@ -171,11 +179,12 @@ int api_augment_prompt_with_memory(ci_memory_digest_t* memory_digest,
 
     /* Allocate buffer with overhead */
     size_t total_size = prompt_size + memory_context_size + MEMORY_BUFFER_OVERHEAD;
-    char* augmented = malloc(total_size);
+    augmented = malloc(total_size);
     if (!augmented) {
         argo_report_error(E_SYSTEM_MEMORY, "api_augment_prompt_with_memory",
                          ERR_MSG_MEMORY_ALLOC_FAILED);
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
     /* Build augmented prompt */
@@ -251,8 +260,11 @@ int api_augment_prompt_with_memory(ci_memory_digest_t* memory_digest,
     written = snprintf(pos, remaining, "## Current Task\n%s", prompt);
 
     *out_augmented = augmented;
+    augmented = NULL;  /* Transfer ownership */
     LOG_DEBUG("Augmented prompt with memory context (%zu bytes added)",
               total_size - prompt_size);
 
-    return ARGO_SUCCESS;
+cleanup:
+    free(augmented);
+    return result;
 }

@@ -204,15 +204,52 @@ Do not commit code with:
 5. **Review**: Address all review comments
 6. **Tests**: Ensure CI passes (if applicable)
 
+## Memory & String Safety Checklists
+
+### Memory Safety Review Checklist
+
+Before committing, verify:
+- [ ] ALL malloc/calloc/strdup return values checked
+- [ ] ALL allocations have corresponding frees
+- [ ] goto cleanup pattern used for functions with allocations
+- [ ] Variables initialized at declaration
+- [ ] strdup() failures checked (can return NULL)
+- [ ] realloc() success verified before using new pointer
+- [ ] Ownership transfers clear (pointer set to NULL)
+- [ ] No uninitialized pointer returns
+- [ ] NULL checks on all pointer parameters
+
+### String Safety Review Checklist
+
+Before committing, verify:
+- [ ] NO unsafe functions (gets, strcpy, sprintf, strcat)
+- [ ] Only safe alternatives (strncpy, snprintf, strncat)
+- [ ] Size limits provided (sizeof(buffer) - 1)
+- [ ] Explicit null termination after strncpy
+- [ ] snprintf used (never sprintf)
+- [ ] Offset tracking for multiple operations
+- [ ] Buffer sizes checked before concatenation
+- [ ] String lengths validated
+
+### Resource Safety Review Checklist
+
+Before committing, verify:
+- [ ] All file handles closed (fclose)
+- [ ] All sockets closed
+- [ ] All mutexes unlocked
+- [ ] All memory freed
+- [ ] Cleanup in reverse order of allocation
+- [ ] goto cleanup for consistent cleanup
+
 ## Code Review Focus Areas
 
 Reviewers should pay special attention to:
 
-1. **Memory safety**: Proper allocations, frees, no leaks
-2. **Error handling**: All error paths properly handled
-3. **Resource cleanup**: goto cleanup pattern used correctly
-4. **Constants**: No magic numbers or string literals
-5. **String operations**: Safe functions, null termination
+1. **Memory safety**: Use Memory Safety Checklist above
+2. **String safety**: Use String Safety Checklist above
+3. **Error handling**: All error paths properly handled
+4. **Resource cleanup**: goto cleanup pattern used correctly
+5. **Constants**: No magic numbers or string literals
 6. **Testing**: Adequate test coverage
 7. **Documentation**: Clear comments for complex logic
 8. **Simplicity**: Code is as simple as possible

@@ -93,22 +93,29 @@ merge_conflict_t* merge_add_conflict(merge_negotiation_t* negotiation,
                                     int line_end,
                                     const char* content_a,
                                     const char* content_b) {
+    merge_conflict_t* conflict = NULL;
+
     if (!negotiation || !file || !content_a || !content_b) {
         argo_report_error(E_INPUT_NULL, "merge_add_conflict", ERR_MSG_NULL_POINTER);
         return NULL;
     }
 
-    merge_conflict_t* conflict = calloc(1, sizeof(merge_conflict_t));
+    conflict = calloc(1, sizeof(merge_conflict_t));
     if (!conflict) {
         argo_report_error(E_SYSTEM_MEMORY, "merge_add_conflict", ERR_MSG_MEMORY_ALLOC_FAILED);
-        return NULL;
+        goto cleanup;
     }
 
     strncpy(conflict->file, file, sizeof(conflict->file) - 1);
     conflict->line_start = line_start;
     conflict->line_end = line_end;
+
     conflict->content_a = strdup(content_a);
+    if (!conflict->content_a) goto cleanup;
+
     conflict->content_b = strdup(content_b);
+    if (!conflict->content_b) goto cleanup;
+
     conflict->resolution = NULL;
 
     /* Add to list */
@@ -120,6 +127,14 @@ merge_conflict_t* merge_add_conflict(merge_negotiation_t* negotiation,
              file, line_start, line_end);
 
     return conflict;
+
+cleanup:
+    if (conflict) {
+        free(conflict->content_a);
+        free(conflict->content_b);
+        free(conflict);
+    }
+    return NULL;
 }
 
 /* CI proposes resolution for conflict */
@@ -128,6 +143,9 @@ int merge_propose_resolution(merge_negotiation_t* negotiation,
                             merge_conflict_t* conflict,
                             const char* resolution,
                             int confidence) {
+    int result = ARGO_SUCCESS;
+    merge_proposal_t* proposal = NULL;
+
     if (!negotiation || !ci_name || !conflict || !resolution) {
         return E_INVALID_PARAMS;
     }
@@ -137,14 +155,20 @@ int merge_propose_resolution(merge_negotiation_t* negotiation,
         confidence = MERGE_DEFAULT_CONFIDENCE;
     }
 
-    merge_proposal_t* proposal = calloc(1, sizeof(merge_proposal_t));
+    proposal = calloc(1, sizeof(merge_proposal_t));
     if (!proposal) {
         argo_report_error(E_SYSTEM_MEMORY, "merge_propose_resolution", ERR_MSG_MEMORY_ALLOC_FAILED);
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
     strncpy(proposal->ci_name, ci_name, sizeof(proposal->ci_name) - 1);
     proposal->proposed_resolution = strdup(resolution);
+    if (!proposal->proposed_resolution) {
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
+    }
+
     proposal->confidence = confidence;
     proposal->proposed_at = time(NULL);
 
@@ -152,19 +176,29 @@ int merge_propose_resolution(merge_negotiation_t* negotiation,
     proposal->next = negotiation->proposals;
     negotiation->proposals = proposal;
     negotiation->proposal_count++;
+    proposal = NULL;  /* Ownership transferred */
 
     /* If this is the first or highest confidence proposal, update conflict resolution */
     if (!conflict->resolution ||
         (negotiation->proposals->next &&
-         proposal->confidence > ((merge_proposal_t*)negotiation->proposals->next)->confidence)) {
+         confidence > ((merge_proposal_t*)negotiation->proposals->next)->confidence)) {
         free(conflict->resolution);
         conflict->resolution = strdup(resolution);
+        if (!conflict->resolution) {
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
+        }
         negotiation->resolved_count++;
     }
 
     LOG_INFO("CI %s proposed resolution (confidence: %d%%)", ci_name, confidence);
 
-    return ARGO_SUCCESS;
+cleanup:
+    if (result != ARGO_SUCCESS && proposal) {
+        free(proposal->proposed_resolution);
+        free(proposal);
+    }
+    return result;
 }
 
 /* Select best proposal based on confidence */

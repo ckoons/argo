@@ -102,13 +102,35 @@ Before writing code:
 - Prefer editing existing files over creating new ones
 
 ### Memory & Safety
-- Check all return values and allocations
-- Free everything you allocate (no leaks)
-- **Use goto cleanup pattern** for ALL functions that allocate resources
-- Initialize variables at declaration
-- **NEVER use unsafe functions**: gets, strcpy, sprintf, strcat
-- **ALWAYS use safe alternatives**: strncpy + null termination, snprintf, strncat
-- **String operations**: Always provide size limits and explicitly null-terminate
+
+**Memory Safety Checklist**:
+- [ ] Check ALL return values (malloc, calloc, strdup, fopen, etc.)
+- [ ] Free everything you allocate (no leaks)
+- [ ] **Use goto cleanup pattern** for ALL functions that allocate resources
+- [ ] Initialize ALL variables at declaration
+- [ ] Check for strdup() failures (it can return NULL)
+- [ ] Verify realloc() success before using new pointer
+- [ ] Transfer ownership clearly (set pointer to NULL after transfer)
+- [ ] Never return uninitialized pointers
+- [ ] NULL-check all pointer parameters at function entry
+
+**String Safety Checklist**:
+- [ ] **NEVER use unsafe functions**: gets, strcpy, sprintf, strcat
+- [ ] **ALWAYS use safe alternatives**: strncpy + null termination, snprintf, strncat
+- [ ] Always provide size limits (sizeof(buffer) - 1 for strncpy)
+- [ ] Explicitly null-terminate after strncpy
+- [ ] Use snprintf, never sprintf
+- [ ] Track offset for multiple string operations
+- [ ] Check buffer sizes before concatenation
+- [ ] Validate string lengths don't exceed buffer capacity
+
+**Resource Safety Checklist**:
+- [ ] Close all file handles (fclose)
+- [ ] Close all sockets
+- [ ] Unlock all mutexes
+- [ ] Free all allocated memory
+- [ ] Clean up in reverse order of allocation
+- [ ] Use goto cleanup for consistent cleanup path
 
 ### Error Reporting
 - **ONLY use `argo_report_error()` for ALL errors** - single breakpoint location
