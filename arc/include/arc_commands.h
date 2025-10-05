@@ -9,6 +9,7 @@
 
 /* Environment utilities */
 const char* arc_get_effective_environment(int argc, char** argv);
+const char* arc_get_environment_for_creation(int argc, char** argv);
 
 /* Command handlers */
 int arc_cmd_help(int argc, char** argv);

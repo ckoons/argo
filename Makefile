@@ -349,7 +349,7 @@ $(CLAUDE_PROVIDERS_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_claude_providers.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry test-http test-json test-api-common test-claude-providers
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry test-http test-json test-api-common test-claude-providers test-arc
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -517,6 +517,9 @@ test-claude-providers: $(CLAUDE_PROVIDERS_TEST_TARGET)
 	@echo "Claude Provider Tests"
 	@echo "=========================================="
 	@./$(CLAUDE_PROVIDERS_TEST_TARGET)
+
+test-arc: arc
+	@$(MAKE) -C arc test-arc
 
 test-api: $(API_TEST_TARGET)
 	@echo ""
@@ -861,7 +864,7 @@ uninstall-all: uninstall uninstall-arc uninstall-term
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
         test-session test-env test-api test-api-calls test-harnesses test-http \
-        test-json test-claude-providers count-core clean distclean check debug \
+        test-json test-claude-providers test-arc count-core clean distclean check debug \
         update-models harnesses harness-init-basic harness-env-inspect harness-reinit \
         harness-init-error harness-socket harness-terminal harness-workflow-context \
         harness-control-flow harness-ci-interactive harness-loop harness-persona \

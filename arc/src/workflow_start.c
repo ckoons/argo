@@ -27,11 +27,8 @@ int arc_workflow_start(int argc, char** argv) {
     const char* instance_name = argv[1];
     const char* branch = (argc >= 3) ? argv[2] : "main";
 
-    /* Get effective environment (--env flag or ARC_ENV or default to 'dev') */
-    const char* environment = arc_get_effective_environment(argc, argv);
-    if (!environment) {
-        environment = "dev";  /* Default when no filter is set */
-    }
+    /* Get environment for workflow creation (defaults to 'dev') */
+    const char* environment = arc_get_environment_for_creation(argc, argv);
 
     /* Initialize argo */
     int result = argo_init();

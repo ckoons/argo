@@ -30,6 +30,12 @@ const char* arc_get_effective_environment(int argc, char** argv) {
     return NULL;
 }
 
+/* Get environment for workflow creation (defaults to 'dev' if not set) */
+const char* arc_get_environment_for_creation(int argc, char** argv) {
+    const char* env = arc_get_effective_environment(argc, argv);
+    return env ? env : "dev";
+}
+
 /* Set workflow context (outputs special directive for shell wrapper) */
 void arc_context_set(const char* workflow_name) {
     if (!workflow_name) {
