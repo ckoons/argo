@@ -29,7 +29,7 @@ All files must include the copyright header:
 - **Naming**: snake_case for all functions and variables
 - **Line length**: Reasonable (no hard limit, use judgment)
 - **Function size**: Keep under 100 lines
-- **File size**: Maximum 600 lines per .c file (3% tolerance acceptable)
+- **File size**: See File Size Limits section below
 
 ### Memory Safety
 
@@ -106,6 +106,29 @@ argo_report_error(E_SYSTEM_MEMORY, "function_name", "additional context");
 - `ARGO_BUFFER_*` - various buffer sizes
 
 See `include/argo_limits.h` for complete list.
+
+## File Size Limits
+
+**Hard Limits:**
+- **Maximum 630 total lines** (no exceptions - must refactor)
+- **Maximum 600 code lines** (no exceptions - must refactor)
+
+**Refactoring Guidance:**
+- Files **over 550 total lines** should be reviewed for logical splitting opportunities
+- Files **600-629 total lines** acceptable only if:
+  - Code lines < 600 AND
+  - File cannot be reasonably split for logical reasons (<5% tolerance)
+
+**Line Counting:**
+- **Total lines**: Everything in the file (includes comments, blanks, preprocessor)
+- **Code lines**: Excludes blank lines, comments (lines starting with `/`, `*`), and preprocessor directives (`#`)
+
+**Check file sizes:**
+```bash
+./scripts/count_core.sh
+```
+
+The script shows both total and code line counts with percentages and status indicators.
 
 ## Testing Requirements
 
