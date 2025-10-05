@@ -7,7 +7,7 @@ CFLAGS = -Wall -Werror -Wextra -std=c11 -g -I./include -I../../include -I../../a
 LDFLAGS = -lpthread -lncurses
 
 # Installation
-PREFIX ?= /usr/local
+PREFIX ?= $(HOME)/.local
 
 # Directories
 SRC_DIR = src

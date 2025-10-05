@@ -7,7 +7,7 @@ CFLAGS = -Wall -Werror -Wextra -std=c11 -g -I./include
 LDFLAGS = -lpthread
 
 # Installation
-PREFIX ?= /usr/local
+PREFIX ?= $(HOME)/.local
 
 # Optional features (enable with make ENABLE_DRYRUN=1 ENABLE_METRICS=1)
 ifdef ENABLE_DRYRUN
@@ -834,6 +834,16 @@ install-term:
 	$(MAKE) -C ui/argo-term install PREFIX=$(PREFIX)
 
 install-all: install install-arc install-term
+	@if ! echo $$PATH | grep -q "$(HOME)/.local/bin"; then \
+		echo ""; \
+		echo "⚠️  $(HOME)/.local/bin is not in your PATH"; \
+		echo "   Add this to your ~/.bashrc or ~/.zshrc:"; \
+		echo ""; \
+		echo "   export PATH=\"\$$HOME/.local/bin:\$$PATH\""; \
+		echo ""; \
+		echo "   Or run: ./scripts/setup_path.sh --auto"; \
+		echo ""; \
+	fi
 
 # Uninstallation targets
 uninstall:
