@@ -19,13 +19,19 @@
 int arc_workflow_start(int argc, char** argv) {
     if (argc < 2) {
         LOG_USER_ERROR("template and instance name required\n");
-        LOG_USER_INFO("Usage: arc workflow start [template] [instance]\n");
+        LOG_USER_INFO("Usage: arc workflow start [template] [instance] [branch] [--env <env>]\n");
         return ARC_EXIT_ERROR;
     }
 
     const char* template_name = argv[0];
     const char* instance_name = argv[1];
     const char* branch = (argc >= 3) ? argv[2] : "main";
+
+    /* Get effective environment (--env flag or ARC_ENV or default to 'dev') */
+    const char* environment = arc_get_effective_environment(argc, argv);
+    if (!environment) {
+        environment = "dev";  /* Default when no filter is set */
+    }
 
     /* Initialize argo */
     int result = argo_init();
@@ -88,7 +94,7 @@ int arc_workflow_start(int argc, char** argv) {
     }
 
     /* Add workflow to registry */
-    result = workflow_registry_add_workflow(registry, template_name, instance_name, branch);
+    result = workflow_registry_add_workflow(registry, template_name, instance_name, branch, environment);
     if (result == E_DUPLICATE) {
         LOG_USER_ERROR("Workflow already exists: %s_%s\n", template_name, instance_name);
         LOG_USER_INFO("  Try: arc workflow list\n");
@@ -120,7 +126,7 @@ int arc_workflow_start(int argc, char** argv) {
     }
 
     /* Print confirmation */
-    LOG_USER_SUCCESS("Started workflow: %s\n", workflow_id);
+    LOG_USER_SUCCESS("Started workflow: %s (environment: %s)\n", workflow_id, environment);
     LOG_USER_INFO("Logs: ~/.argo/logs/%s.log\n", workflow_id);
 
     /* Cleanup */

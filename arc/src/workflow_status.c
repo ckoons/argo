@@ -45,6 +45,7 @@ static void show_workflow_status(workflow_instance_t* wf) {
     LOG_USER_STATUS("  Template:       %s\n", wf->template_name);
     LOG_USER_STATUS("  Instance:       %s\n", wf->instance_name);
     LOG_USER_STATUS("  Branch:         %s\n", wf->active_branch);
+    LOG_USER_STATUS("  Environment:    %s\n", wf->environment);
     LOG_USER_STATUS("  Status:         %s\n", workflow_status_string(wf->status));
     LOG_USER_STATUS("  Created:        %s\n", created_time);
     LOG_USER_STATUS("  Total Time:     %s\n", duration);

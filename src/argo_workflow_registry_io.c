@@ -104,6 +104,17 @@ static int parse_workflow_entry(const char* json, jsmntok_t* tokens,
                                     wf->active_branch, sizeof(wf->active_branch));
     }
 
+    /* Extract environment */
+    field_idx = workflow_json_find_field(json, tokens, token_idx, "environment");
+    if (field_idx >= 0) {
+        workflow_json_extract_string(json, &tokens[field_idx],
+                                    wf->environment, sizeof(wf->environment));
+    } else {
+        /* Default to 'dev' if not specified (backward compatibility) */
+        strncpy(wf->environment, "dev", sizeof(wf->environment) - 1);
+        wf->environment[sizeof(wf->environment) - 1] = '\0';
+    }
+
     /* Extract status */
     field_idx = workflow_json_find_field(json, tokens, token_idx, "status");
     if (field_idx >= 0) {
@@ -301,6 +312,7 @@ int workflow_registry_save(workflow_registry_t* registry) {
         fprintf(file, "      \"template\": \"%s\",\n", wf->template_name);
         fprintf(file, "      \"instance\": \"%s\",\n", wf->instance_name);
         fprintf(file, "      \"branch\": \"%s\",\n", wf->active_branch);
+        fprintf(file, "      \"environment\": \"%s\",\n", wf->environment);
         fprintf(file, "      \"status\": \"%s\",\n",
                 workflow_status_string(wf->status));
         fprintf(file, "      \"created_at\": %ld,\n", (long)wf->created_at);

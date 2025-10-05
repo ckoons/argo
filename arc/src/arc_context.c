@@ -2,11 +2,32 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "arc_context.h"
+#include "arc_commands.h"
 
 /* Get current workflow context from environment */
 const char* arc_context_get(void) {
     return getenv(ARC_CONTEXT_ENV_VAR);
+}
+
+/* Get effective environment (--env flag, then ARC_ENV, then NULL for all) */
+const char* arc_get_effective_environment(int argc, char** argv) {
+    /* Check for --env flag */
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "--env") == 0 && i + 1 < argc) {
+            return argv[i + 1];
+        }
+    }
+
+    /* Check ARC_ENV environment variable */
+    const char* arc_env = getenv("ARC_ENV");
+    if (arc_env && arc_env[0] != '\0') {
+        return arc_env;
+    }
+
+    /* No filter - show all environments */
+    return NULL;
 }
 
 /* Set workflow context (outputs special directive for shell wrapper) */

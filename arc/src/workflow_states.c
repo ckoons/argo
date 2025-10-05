@@ -17,8 +17,8 @@
 
 /* arc states command handler - show status of ALL workflows */
 int arc_workflow_states(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
+    /* Get effective environment filter */
+    const char* environment = arc_get_effective_environment(argc, argv);
 
     /* Initialize argo */
     int result = argo_init();
@@ -43,10 +43,10 @@ int arc_workflow_states(int argc, char** argv) {
         return ARC_EXIT_ERROR;
     }
 
-    /* Get all workflows */
+    /* Get workflows (filtered by environment if specified) */
     workflow_instance_t* workflows;
     int count;
-    result = workflow_registry_list(registry, &workflows, &count);
+    result = workflow_registry_list_filtered(registry, environment, &workflows, &count);
     if (result != ARGO_SUCCESS || count == 0) {
         LOG_USER_INFO("No active workflows\n");
         workflow_registry_destroy(registry);
@@ -57,7 +57,11 @@ int arc_workflow_states(int argc, char** argv) {
     /* Print header */
     printf("\n");
     printf("========================================\n");
-    printf("Active Workflow States (%d workflows)\n", count);
+    if (environment) {
+        printf("Active Workflow States (%s environment: %d workflows)\n", environment, count);
+    } else {
+        printf("Active Workflow States (all environments: %d workflows)\n", count);
+    }
     printf("========================================\n");
     printf("\n");
 
@@ -97,6 +101,7 @@ int arc_workflow_states(int argc, char** argv) {
         printf("  Template:     %s\n", wf->template_name);
         printf("  Instance:     %s\n", wf->instance_name);
         printf("  Branch:       %s\n", wf->active_branch);
+        printf("  Environment:  %s\n", wf->environment);
         printf("  Status:       %s (%s)\n", workflow_status_string(wf->status), running_str);
         printf("  PID:          %d\n", (int)wf->pid);
         printf("  Last Active:  %s\n", age_str);

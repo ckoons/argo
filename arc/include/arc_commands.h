@@ -7,6 +7,9 @@
 #define ARC_EXIT_SUCCESS 0
 #define ARC_EXIT_ERROR 1
 
+/* Environment utilities */
+const char* arc_get_effective_environment(int argc, char** argv);
+
 /* Command handlers */
 int arc_cmd_help(int argc, char** argv);
 int arc_cmd_switch(int argc, char** argv);

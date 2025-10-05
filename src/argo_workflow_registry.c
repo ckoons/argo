@@ -50,7 +50,8 @@ void workflow_registry_destroy(workflow_registry_t* registry) {
 int workflow_registry_add_workflow(workflow_registry_t* registry,
                                    const char* template_name,
                                    const char* instance_name,
-                                   const char* initial_branch) {
+                                   const char* initial_branch,
+                                   const char* environment) {
     if (!registry || !template_name || !instance_name) {
         return E_INVALID_PARAMS;
     }
@@ -79,6 +80,8 @@ int workflow_registry_add_workflow(workflow_registry_t* registry,
     strncpy(wf->instance_name, instance_name, sizeof(wf->instance_name) - 1);
     strncpy(wf->active_branch, initial_branch ? initial_branch : "main",
             sizeof(wf->active_branch) - 1);
+    strncpy(wf->environment, environment ? environment : "dev",
+            sizeof(wf->environment) - 1);
 
     wf->status = WORKFLOW_STATUS_ACTIVE;
     wf->created_at = time(NULL);
@@ -87,8 +90,9 @@ int workflow_registry_add_workflow(workflow_registry_t* registry,
 
     registry->workflow_count++;
 
-    LOG_INFO("Added workflow: %s (template=%s, instance=%s, branch=%s)",
-             wf->id, wf->template_name, wf->instance_name, wf->active_branch);
+    LOG_INFO("Added workflow: %s (template=%s, instance=%s, branch=%s, env=%s)",
+             wf->id, wf->template_name, wf->instance_name, wf->active_branch,
+             wf->environment);
 
     return workflow_registry_schedule_save(registry);
 }
@@ -191,6 +195,37 @@ int workflow_registry_list(workflow_registry_t* registry,
 
     *workflows = registry->workflows;
     *count = registry->workflow_count;
+
+    return ARGO_SUCCESS;
+}
+
+/* List workflows filtered by environment */
+int workflow_registry_list_filtered(workflow_registry_t* registry,
+                                    const char* environment,
+                                    workflow_instance_t** workflows,
+                                    int* count) {
+    if (!registry || !workflows || !count) {
+        return E_INVALID_PARAMS;
+    }
+
+    /* If no environment filter, return all workflows */
+    if (!environment) {
+        return workflow_registry_list(registry, workflows, count);
+    }
+
+    /* Allocate temporary buffer for filtered results */
+    static workflow_instance_t filtered[WORKFLOW_REGISTRY_MAX_WORKFLOWS];
+    int filtered_count = 0;
+
+    /* Filter workflows by environment */
+    for (int i = 0; i < registry->workflow_count; i++) {
+        if (strcmp(registry->workflows[i].environment, environment) == 0) {
+            filtered[filtered_count++] = registry->workflows[i];
+        }
+    }
+
+    *workflows = filtered;
+    *count = filtered_count;
 
     return ARGO_SUCCESS;
 }

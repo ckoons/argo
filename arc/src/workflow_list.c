@@ -26,12 +26,12 @@ static void format_duration(time_t seconds, char* buffer, size_t size) {
 }
 
 /* List active workflows */
-static int list_active_workflows(workflow_registry_t* registry) {
+static int list_active_workflows(workflow_registry_t* registry, const char* environment) {
     const char* context = arc_context_get();
     workflow_instance_t* workflows;
     int count;
 
-    int result = workflow_registry_list(registry, &workflows, &count);
+    int result = workflow_registry_list_filtered(registry, environment, &workflows, &count);
     if (result != ARGO_SUCCESS) {
         return ARC_EXIT_ERROR;
     }
@@ -116,6 +116,9 @@ int arc_workflow_list(int argc, char** argv) {
         filter = argv[0];
     }
 
+    /* Get effective environment filter */
+    const char* environment = arc_get_effective_environment(argc, argv);
+
     /* Initialize argo */
     int result = argo_init();
     if (result != ARGO_SUCCESS) {
@@ -147,7 +150,7 @@ int arc_workflow_list(int argc, char** argv) {
     }
 
     /* Active workflows only OR all (active + templates) */
-    int exit_code = list_active_workflows(registry);
+    int exit_code = list_active_workflows(registry, environment);
 
     /* If no filter OR filter is not "active", also show templates */
     if (!filter || strcmp(filter, "active") != 0) {

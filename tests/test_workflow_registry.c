@@ -42,7 +42,8 @@ static void test_add_workflow(void) {
     int result = workflow_registry_add_workflow(registry,
                                                 "create_proposal",
                                                 "my_feature",
-                                                "main");
+                                                "main",
+                                                "test");
     if (result != ARGO_SUCCESS) {
         printf("✗ (add failed: %d)\n", result);
         workflow_registry_destroy(registry);
@@ -70,7 +71,7 @@ static void test_get_workflow(void) {
         return;
     }
 
-    workflow_registry_add_workflow(registry, "create_proposal", "my_feature", "main");
+    workflow_registry_add_workflow(registry, "create_proposal", "my_feature", "main", "test");
 
     workflow_instance_t* wf = workflow_registry_get_workflow(registry,
                                                              "create_proposal_my_feature");
@@ -110,7 +111,7 @@ static void test_update_branch(void) {
         return;
     }
 
-    workflow_registry_add_workflow(registry, "create_proposal", "my_feature", "main");
+    workflow_registry_add_workflow(registry, "create_proposal", "my_feature", "main", "test");
 
     int result = workflow_registry_update_branch(registry,
                                                  "create_proposal_my_feature",
@@ -146,7 +147,7 @@ static void test_set_status(void) {
         return;
     }
 
-    workflow_registry_add_workflow(registry, "create_proposal", "my_feature", "main");
+    workflow_registry_add_workflow(registry, "create_proposal", "my_feature", "main", "test");
 
     int result = workflow_registry_set_status(registry,
                                               "create_proposal_my_feature",
@@ -182,8 +183,8 @@ static void test_remove_workflow(void) {
         return;
     }
 
-    workflow_registry_add_workflow(registry, "create_proposal", "my_feature", "main");
-    workflow_registry_add_workflow(registry, "fix_bug", "issue_123", "main");
+    workflow_registry_add_workflow(registry, "create_proposal", "my_feature", "main", "test");
+    workflow_registry_add_workflow(registry, "fix_bug", "issue_123", "main", "test");
 
     if (workflow_registry_count(registry) != 2) {
         printf("✗ (count not 2)\n");
@@ -230,9 +231,9 @@ static void test_list_workflows(void) {
         return;
     }
 
-    workflow_registry_add_workflow(registry, "create_proposal", "feature1", "main");
-    workflow_registry_add_workflow(registry, "fix_bug", "issue_123", "main");
-    workflow_registry_add_workflow(registry, "refactor", "cleanup", "develop");
+    workflow_registry_add_workflow(registry, "create_proposal", "feature1", "main", "test");
+    workflow_registry_add_workflow(registry, "fix_bug", "issue_123", "main", "test");
+    workflow_registry_add_workflow(registry, "refactor", "cleanup", "develop", "test");
 
     workflow_instance_t* workflows;
     int count;
@@ -261,8 +262,8 @@ static void test_persistence(void) {
         return;
     }
 
-    workflow_registry_add_workflow(registry1, "create_proposal", "my_feature", "main");
-    workflow_registry_add_workflow(registry1, "fix_bug", "issue_123", "develop");
+    workflow_registry_add_workflow(registry1, "create_proposal", "my_feature", "main", "test");
+    workflow_registry_add_workflow(registry1, "fix_bug", "issue_123", "develop", "test");
     workflow_registry_save(registry1);
     workflow_registry_destroy(registry1);
 

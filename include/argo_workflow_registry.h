@@ -14,6 +14,7 @@
 #define WORKFLOW_REGISTRY_INSTANCE_MAX 64
 #define WORKFLOW_REGISTRY_BRANCH_MAX 64
 #define WORKFLOW_REGISTRY_PATH_MAX 512
+#define WORKFLOW_REGISTRY_ENVIRONMENT_MAX 32
 
 /* Batched write timeouts */
 #define WORKFLOW_REGISTRY_IDLE_TIMEOUT_SEC 5
@@ -32,6 +33,7 @@ typedef struct workflow_instance {
     char template_name[WORKFLOW_REGISTRY_TEMPLATE_MAX];
     char instance_name[WORKFLOW_REGISTRY_INSTANCE_MAX];
     char active_branch[WORKFLOW_REGISTRY_BRANCH_MAX];
+    char environment[WORKFLOW_REGISTRY_ENVIRONMENT_MAX]; /* test/dev/stage/prod */
     workflow_status_t status;
     time_t created_at;
     time_t last_active;
@@ -69,7 +71,8 @@ int workflow_registry_schedule_save(workflow_registry_t* registry);
 int workflow_registry_add_workflow(workflow_registry_t* registry,
                                    const char* template_name,
                                    const char* instance_name,
-                                   const char* initial_branch);
+                                   const char* initial_branch,
+                                   const char* environment);
 
 int workflow_registry_remove_workflow(workflow_registry_t* registry,
                                       const char* workflow_id);
@@ -89,6 +92,11 @@ int workflow_registry_set_status(workflow_registry_t* registry,
 int workflow_registry_list(workflow_registry_t* registry,
                           workflow_instance_t** workflows,
                           int* count);
+
+int workflow_registry_list_filtered(workflow_registry_t* registry,
+                                    const char* environment,
+                                    workflow_instance_t** workflows,
+                                    int* count);
 
 workflow_instance_t* workflow_registry_get_active(workflow_registry_t* registry);
 
