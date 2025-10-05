@@ -412,6 +412,8 @@ static int handle_client_data(int fd, int index) {
 }
 
 static int parse_json_message(const char* json, ci_message_t* msg) {
+    int result = ARGO_SUCCESS;
+
     ARGO_CHECK_NULL(json);
     ARGO_CHECK_NULL(msg);
 
@@ -445,13 +447,27 @@ static int parse_json_message(const char* json, ci_message_t* msg) {
         } else if (strncmp(json + tokens[i].start, "content", len) == 0) {
             int val_len = tokens[i+1].end - tokens[i+1].start;
             msg->content = strndup(json + tokens[i+1].start, val_len);
+            if (!msg->content) {
+                result = E_SYSTEM_MEMORY;
+                goto cleanup;
+            }
         }
     }
 
     msg->timestamp = time(NULL);
     msg->type = strdup("request");  /* Default type */
+    if (!msg->type) {
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
+    }
 
     return ARGO_SUCCESS;
+
+cleanup:
+    free(msg->content);
+    free(msg->type);
+    memset(msg, 0, sizeof(*msg));
+    return result;
 }
 
 static void check_request_timeouts(void) {

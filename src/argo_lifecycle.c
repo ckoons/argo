@@ -83,16 +83,27 @@ static int add_transition(ci_lifecycle_t* ci,
                          ci_status_t from_status,
                          ci_status_t to_status,
                          const char* reason) {
-    lifecycle_transition_t* trans = calloc(1, sizeof(lifecycle_transition_t));
+    int result = ARGO_SUCCESS;
+    lifecycle_transition_t* trans = NULL;
+
+    trans = calloc(1, sizeof(lifecycle_transition_t));
     if (!trans) {
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
     trans->timestamp = time(NULL);
     trans->from_status = from_status;
     trans->to_status = to_status;
     trans->event = event;
-    trans->reason = reason ? strdup(reason) : NULL;
+
+    if (reason) {
+        trans->reason = strdup(reason);
+        if (!trans->reason) {
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
+        }
+    }
 
     /* Add to front of list */
     trans->next = ci->transitions;
@@ -100,6 +111,13 @@ static int add_transition(ci_lifecycle_t* ci,
     ci->transition_count++;
 
     return ARGO_SUCCESS;
+
+cleanup:
+    if (trans) {
+        free(trans->reason);
+        free(trans);
+    }
+    return result;
 }
 
 /* Create CI lifecycle */
@@ -107,6 +125,9 @@ int lifecycle_create_ci(lifecycle_manager_t* manager,
                        const char* ci_name,
                        const char* role,
                        const char* model) {
+    int result = ARGO_SUCCESS;
+    ci_lifecycle_t* ci = NULL;
+
     ARGO_CHECK_NULL(manager);
     ARGO_CHECK_NULL(ci_name);
     ARGO_CHECK_NULL(role);
@@ -132,9 +153,10 @@ int lifecycle_create_ci(lifecycle_manager_t* manager,
     }
 
     /* Create lifecycle */
-    ci_lifecycle_t* ci = calloc(1, sizeof(ci_lifecycle_t));
+    ci = calloc(1, sizeof(ci_lifecycle_t));
     if (!ci) {
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
     strncpy(ci->ci_name, ci_name, REGISTRY_NAME_MAX - 1);
@@ -146,14 +168,13 @@ int lifecycle_create_ci(lifecycle_manager_t* manager,
     /* Add to registry */
     int port = registry_allocate_port(manager->registry, role);
     if (port < 0) {
-        free(ci);
-        return E_PROTOCOL_QUEUE;
+        result = E_PROTOCOL_QUEUE;
+        goto cleanup;
     }
 
-    int result = registry_add_ci(manager->registry, ci_name, role, model, port);
+    result = registry_add_ci(manager->registry, ci_name, role, model, port);
     if (result != ARGO_SUCCESS) {
-        free(ci);
-        return result;
+        goto cleanup;
     }
 
     /* Add transition */
@@ -164,6 +185,10 @@ int lifecycle_create_ci(lifecycle_manager_t* manager,
 
     LOG_INFO("Created CI lifecycle: %s (role=%s, model=%s)", ci_name, role, model);
     return ARGO_SUCCESS;
+
+cleanup:
+    free(ci);
+    return result;
 }
 
 /* Start CI */
@@ -302,6 +327,9 @@ int lifecycle_transition(lifecycle_manager_t* manager,
 int lifecycle_assign_task(lifecycle_manager_t* manager,
                          const char* ci_name,
                          const char* task_description) {
+    int result = ARGO_SUCCESS;
+    char* new_task = NULL;
+
     ARGO_CHECK_NULL(manager);
     ARGO_CHECK_NULL(ci_name);
 
@@ -315,13 +343,26 @@ int lifecycle_assign_task(lifecycle_manager_t* manager,
         return E_CI_INVALID;
     }
 
+    if (task_description) {
+        new_task = strdup(task_description);
+        if (!new_task) {
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
+        }
+    }
+
     free(ci->current_task);
-    ci->current_task = task_description ? strdup(task_description) : NULL;
+    ci->current_task = new_task;
+    new_task = NULL;  /* Transfer ownership */
     ci->task_start_time = time(NULL);
 
     return lifecycle_transition(manager, ci_name,
                                LIFECYCLE_EVENT_TASK_ASSIGNED,
                                task_description);
+
+cleanup:
+    free(new_task);
+    return result;
 }
 
 /* Complete task */
@@ -395,6 +436,9 @@ int lifecycle_check_heartbeats(lifecycle_manager_t* manager) {
 int lifecycle_report_error(lifecycle_manager_t* manager,
                           const char* ci_name,
                           const char* error_message) {
+    int result = ARGO_SUCCESS;
+    char* new_error = NULL;
+
     ARGO_CHECK_NULL(manager);
     ARGO_CHECK_NULL(ci_name);
 
@@ -403,15 +447,28 @@ int lifecycle_report_error(lifecycle_manager_t* manager,
         return E_INPUT_INVALID;
     }
 
+    if (error_message) {
+        new_error = strdup(error_message);
+        if (!new_error) {
+            result = E_SYSTEM_MEMORY;
+            goto cleanup;
+        }
+    }
+
     ci->error_count++;
     free(ci->last_error);
-    ci->last_error = error_message ? strdup(error_message) : NULL;
+    ci->last_error = new_error;
+    new_error = NULL;  /* Transfer ownership */
 
     argo_report_error(E_CI_INVALID, ci_name, "%s", error_message ? error_message : "unknown");
 
     return lifecycle_transition(manager, ci_name,
                                LIFECYCLE_EVENT_ERROR,
                                error_message);
+
+cleanup:
+    free(new_error);
+    return result;
 }
 
 /* Get CI lifecycle */

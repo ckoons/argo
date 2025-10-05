@@ -361,13 +361,32 @@ provider_message_t* provider_message_create(const char* type,
     provider_message_t* msg = calloc(1, sizeof(provider_message_t));
     if (!msg) return NULL;
 
-    msg->type = type ? strdup(type) : NULL;
-    msg->ci_name = ci_name ? strdup(ci_name) : NULL;
-    msg->content = content ? strdup(content) : NULL;
+    if (type) {
+        msg->type = strdup(type);
+        if (!msg->type) goto cleanup;
+    }
+
+    if (ci_name) {
+        msg->ci_name = strdup(ci_name);
+        if (!msg->ci_name) goto cleanup;
+    }
+
+    if (content) {
+        msg->content = strdup(content);
+        if (!msg->content) goto cleanup;
+    }
+
     msg->timestamp = time(NULL);
     msg->sequence = 0;
 
     return msg;
+
+cleanup:
+    free(msg->type);
+    free(msg->ci_name);
+    free(msg->content);
+    free(msg);
+    return NULL;
 }
 
 /* Destroy message */
@@ -415,9 +434,11 @@ char* provider_message_to_json(const provider_message_t* message) {
 
 /* Parse message from JSON */
 provider_message_t* provider_message_from_json(const char* json) {
+    provider_message_t* msg = NULL;
+
     if (!json) return NULL;
 
-    provider_message_t* msg = calloc(1, sizeof(provider_message_t));
+    msg = calloc(1, sizeof(provider_message_t));
     if (!msg) return NULL;
 
     /* Simple extraction - find fields */
@@ -434,6 +455,7 @@ provider_message_t* provider_message_from_json(const char* json) {
                 strncpy(buffer, type_start, len);
                 buffer[len] = '\0';
                 msg->type = strdup(buffer);
+                if (!msg->type) goto cleanup;
             }
         }
     }
@@ -449,6 +471,7 @@ provider_message_t* provider_message_from_json(const char* json) {
                 strncpy(buffer, ci_start, len);
                 buffer[len] = '\0';
                 msg->ci_name = strdup(buffer);
+                if (!msg->ci_name) goto cleanup;
             }
         }
     }
@@ -464,6 +487,7 @@ provider_message_t* provider_message_from_json(const char* json) {
                 strncpy(buffer, content_start, len);
                 buffer[len] = '\0';
                 msg->content = strdup(buffer);
+                if (!msg->content) goto cleanup;
             }
         }
     }
@@ -481,6 +505,15 @@ provider_message_t* provider_message_from_json(const char* json) {
     }
 
     return msg;
+
+cleanup:
+    if (msg) {
+        free(msg->type);
+        free(msg->ci_name);
+        free(msg->content);
+        free(msg);
+    }
+    return NULL;
 }
 
 /* Print status */
