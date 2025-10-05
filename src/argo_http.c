@@ -43,13 +43,18 @@ http_request_t* http_request_new(http_method_t method, const char* url) {
 
 /* Add header to request */
 void http_request_add_header(http_request_t* req, const char* name, const char* value) {
+    http_header_t* header = NULL;
+
     if (!req || !name || !value) return;
 
-    http_header_t* header = calloc(1, sizeof(http_header_t));
-    if (!header) return;
+    header = calloc(1, sizeof(http_header_t));
+    if (!header) goto cleanup;
 
     header->name = strdup(name);
+    if (!header->name) goto cleanup;
+
     header->value = strdup(value);
+    if (!header->value) goto cleanup;
 
     if (!req->headers) {
         req->headers = header;
@@ -57,6 +62,14 @@ void http_request_add_header(http_request_t* req, const char* name, const char* 
         http_header_t* h = req->headers;
         while (h->next) h = h->next;
         h->next = header;
+    }
+    return;
+
+cleanup:
+    if (header) {
+        free(header->name);
+        free(header->value);
+        free(header);
     }
 }
 
@@ -94,12 +107,20 @@ void http_request_free(http_request_t* req) {
 
 /* Read HTTP response from curl pipe and parse status code */
 static int read_http_response(FILE* fp, http_response_t** resp) {
-    if (!fp || !resp) return E_INPUT_NULL;
+    int result = ARGO_SUCCESS;
+    char* response_buf = NULL;
+    http_response_t* new_resp = NULL;
+
+    if (!fp || !resp) {
+        result = E_INPUT_NULL;
+        goto cleanup;
+    }
 
     /* Read response */
-    char* response_buf = malloc(HTTP_RESPONSE_BUFFER_SIZE);
+    response_buf = malloc(HTTP_RESPONSE_BUFFER_SIZE);
     if (!response_buf) {
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
     size_t response_size = 0;
     size_t response_capacity = HTTP_RESPONSE_BUFFER_SIZE;
@@ -109,8 +130,8 @@ static int read_http_response(FILE* fp, http_response_t** resp) {
             response_capacity *= 2;
             char* new_buf = realloc(response_buf, response_capacity);
             if (!new_buf) {
-                free(response_buf);
-                return E_SYSTEM_MEMORY;
+                result = E_SYSTEM_MEMORY;
+                goto cleanup;
             }
             response_buf = new_buf;
         }
@@ -131,17 +152,27 @@ static int read_http_response(FILE* fp, http_response_t** resp) {
     }
 
     /* Create response */
-    *resp = calloc(1, sizeof(http_response_t));
-    if (!*resp) {
-        free(response_buf);
-        return E_SYSTEM_MEMORY;
+    new_resp = calloc(1, sizeof(http_response_t));
+    if (!new_resp) {
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
-    (*resp)->status_code = status_code;
-    (*resp)->body = response_buf;
-    (*resp)->body_len = response_size;
+    new_resp->status_code = status_code;
+    new_resp->body = response_buf;
+    new_resp->body_len = response_size;
 
-    return ARGO_SUCCESS;
+    *resp = new_resp;
+    response_buf = NULL;  /* Transfer ownership */
+    new_resp = NULL;
+
+cleanup:
+    free(response_buf);
+    if (new_resp) {
+        free(new_resp->body);
+        free(new_resp);
+    }
+    return result;
 }
 
 /* Execute HTTP request using curl */
@@ -243,9 +274,14 @@ void http_response_free(http_response_t* resp) {
 
 /* Parse URL */
 int http_parse_url(const char* url, char** host, int* port, char** path) {
+    int result = ARGO_SUCCESS;
+    char* parsed_host = NULL;
+    char* parsed_path = NULL;
+
     /* Simple URL parser */
     if (!url || !host || !port || !path) {
-        return E_INPUT_NULL;
+        result = E_INPUT_NULL;
+        goto cleanup;
     }
 
     const char* p = url;
@@ -257,7 +293,8 @@ int http_parse_url(const char* url, char** host, int* port, char** path) {
         p += 7;
         *port = HTTP_PORT_HTTP;
     } else {
-        return -1;
+        result = E_INVALID_PARAMS;
+        goto cleanup;
     }
 
     const char* slash = strchr(p, '/');
@@ -273,13 +310,30 @@ int http_parse_url(const char* url, char** host, int* port, char** path) {
         host_len = strlen(p);
     }
 
-    *host = strndup(p, host_len);
-
-    if (slash) {
-        *path = strdup(slash);
-    } else {
-        *path = strdup("/");
+    parsed_host = strndup(p, host_len);
+    if (!parsed_host) {
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
-    return 0;
+    if (slash) {
+        parsed_path = strdup(slash);
+    } else {
+        parsed_path = strdup("/");
+    }
+
+    if (!parsed_path) {
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
+    }
+
+    *host = parsed_host;
+    *path = parsed_path;
+    parsed_host = NULL;  /* Transfer ownership */
+    parsed_path = NULL;
+
+cleanup:
+    free(parsed_host);
+    free(parsed_path);
+    return result;
 }

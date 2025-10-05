@@ -12,19 +12,74 @@ Argo is a lean C library (<10,000 lines) for coordinating multiple AI coding ass
 
 **Layered Design** (bottom to top):
 1. **Foundation**: Error handling (argo_error), logging, HTTP/socket, JSON parsing
+   - `argo_error.c` - Centralized error reporting with `argo_report_error()`
+   - `argo_http.c` - HTTP client (curl-based, with goto cleanup patterns)
+   - `argo_socket.c` - Unix socket communication for CI coordination
+   - `argo_json.c` - JSON parsing utilities
+   - `argo_limits.h` - ALL numeric constants (buffer sizes, permissions, timeouts)
+
 2. **Providers**: AI backends (Claude, OpenAI, Gemini, Ollama, etc.) - pluggable via ci_provider_t interface
+   - API providers: `argo_claude_api.c`, `argo_openai_api.c`, `argo_gemini_api.c`, `argo_grok_api.c`, `argo_deepseek_api.c`, `argo_openrouter.c`
+   - Local providers: `argo_ollama.c` (HTTP), `argo_claude.c` (CLI), `argo_claude_code.c` (CLI)
+   - Common utilities: `argo_api_common.c` (HTTP POST, buffer allocation, memory augmentation)
+
 3. **Registry**: Service discovery, CI instance tracking, port allocation
+   - `argo_registry.c` - Core registry operations
+   - `argo_registry_messaging.c` - Inter-CI communication
+   - `argo_registry_persistence.c` - Registry state persistence
+
 4. **Lifecycle**: Session management, shared services coordination
+   - `argo_lifecycle.c` - Resource lifecycle management
+   - `argo_session.c` - Session tracking
+   - `argo_shared_services.c` - Background task management
+
 5. **Orchestration**: Multi-CI coordination, workflow execution engine
+   - `argo_orchestrator.c` - Multi-CI coordination
+   - `argo_workflow.c` - Core workflow engine
+   - `argo_workflow_executor.c` - Workflow execution
+   - `argo_merge.c` - Code merge conflict resolution
+
 6. **Workflows**: JSON-driven, pauseable, checkpointable task automation
+   - `argo_workflow_loader.c` - Load workflows from JSON
+   - `argo_workflow_checkpoint.c` - Save/restore workflow state
+   - `argo_workflow_steps_*.c` - Step type implementations
+   - `argo_workflow_persona.c` - Persona-based behavior
 
 **Key Abstractions**:
-- `ci_provider_t` - Unified AI provider interface (6 implementations: Claude Code/CLI/API, OpenAI, Gemini, Ollama, Grok, DeepSeek)
+- `ci_provider_t` - Unified AI provider interface with 9 implementations:
+  - Claude: Code (CLI), CLI, API
+  - OpenAI API, Gemini API, Grok API, DeepSeek API
+  - Ollama (local HTTP), OpenRouter (multi-model API)
 - `workflow_controller_t` - Stateful workflow executor with persona support
 - `ci_registry_t` - Service registry for multi-CI coordination
 - `lifecycle_manager_t` - Resource lifecycle management
+- `ci_memory_digest_t` - Memory management with context limits
 
-**Data Flow**: CLI/API → Registry → Orchestrator → Workflow → Provider → AI Backend
+**Data Flow**:
+```
+User Request
+    ↓
+Registry (service discovery)
+    ↓
+Orchestrator (coordination)
+    ↓
+Workflow Controller (execution)
+    ↓
+Provider Interface (ci_provider_t)
+    ↓
+AI Backend (Claude/OpenAI/Gemini/etc)
+    ↓
+Response Processing
+    ↓
+Memory Management (optional)
+```
+
+**Module Dependencies**:
+- Foundation modules have no dependencies on higher layers
+- Providers depend only on Foundation
+- Registry/Lifecycle depend on Foundation + Providers
+- Orchestration depends on Registry + Lifecycle
+- Workflows depend on all layers
 
 ## Core Philosophy
 
@@ -344,6 +399,127 @@ When uncertain:
 - Ask Casey rather than guess
 - Simple solution over clever solution
 - Working code over perfect code
+
+## Provider Implementation Guide
+
+### Provider Types
+
+**API Providers** (HTTP-based):
+- Claude API, OpenAI API, Gemini API, Grok API, DeepSeek API, OpenRouter
+- Use `argo_api_common.c` utilities
+- Authentication via bearer tokens or custom headers
+- JSON request/response handling
+
+**Local Providers** (process/socket based):
+- Ollama (local HTTP server on port 11434)
+- Claude CLI/Code (process execution)
+
+### Adding a New API Provider
+
+1. **Create provider file**: `src/argo_newprovider_api.c`
+2. **Include copyright header**
+3. **Define context structure**:
+```c
+typedef struct {
+    ci_provider_t provider;        /* Base provider (MUST be first) */
+    char model[256];               /* Model name */
+    char api_key[512];             /* API key */
+    char* response_content;        /* Response buffer */
+    size_t response_capacity;      /* Buffer capacity */
+    /* Provider-specific fields */
+} newprovider_context_t;
+```
+
+4. **Implement required functions**:
+```c
+static int newprovider_init(ci_provider_t* provider);
+static int newprovider_connect(ci_provider_t* provider);
+static int newprovider_query(ci_provider_t* provider, const char* prompt, char** response);
+static int newprovider_stream(ci_provider_t* provider, const char* prompt,
+                               ci_stream_callback callback, void* userdata);
+static void newprovider_cleanup(ci_provider_t* provider);
+```
+
+5. **Create provider constructor**:
+```c
+ci_provider_t* newprovider_create_provider(const char* model) {
+    newprovider_context_t* ctx = calloc(1, sizeof(newprovider_context_t));
+    if (!ctx) return NULL;
+
+    init_provider_base(&ctx->provider, ctx, newprovider_init, newprovider_connect,
+                      newprovider_query, newprovider_stream, newprovider_cleanup);
+
+    strncpy(ctx->model, model ? model : "default-model", sizeof(ctx->model) - 1);
+    strncpy(ctx->provider.name, "provider-name", sizeof(ctx->provider.name) - 1);
+    strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
+
+    ctx->provider.supports_streaming = true;
+    ctx->provider.max_context = 128000;  /* Provider's context window */
+
+    return &ctx->provider;
+}
+```
+
+6. **Implement query function** using `argo_api_common.c`:
+```c
+static int newprovider_query(ci_provider_t* provider, const char* prompt, char** response) {
+    ARGO_CHECK_NULL(prompt);
+    ARGO_CHECK_NULL(response);
+    ARGO_GET_CONTEXT(provider, newprovider_context_t, ctx);
+
+    /* Build JSON request */
+    char json_body[API_JSON_BODY_SIZE];
+    snprintf(json_body, sizeof(json_body),
+            "{\"model\":\"%s\",\"prompt\":\"%s\"}",
+            ctx->model, prompt);
+
+    /* Setup authentication */
+    api_auth_config_t auth = {
+        .type = API_AUTH_BEARER,
+        .value = ctx->api_key
+    };
+
+    /* Make HTTP request */
+    http_response_t* resp = NULL;
+    int result = api_http_post_json(API_URL, json_body, &auth, NULL, &resp);
+    if (result != ARGO_SUCCESS) return result;
+
+    /* Extract response content */
+    const char* field_path[] = {"response", "text"};
+    char* content = NULL;
+    size_t len = 0;
+    result = json_extract_nested_string(resp->body, field_path, 2, &content, &len);
+
+    if (result == ARGO_SUCCESS) {
+        result = ensure_buffer_capacity(&ctx->response_content,
+                                       &ctx->response_capacity, len + 1);
+        if (result == ARGO_SUCCESS) {
+            memcpy(ctx->response_content, content, len);
+            ctx->response_content[len] = '\0';
+            *response = ctx->response_content;
+        }
+    }
+
+    free(content);
+    http_response_free(resp);
+    return result;
+}
+```
+
+7. **Add to Makefile** and test
+
+### Provider Checklist
+
+- [ ] Copyright header on all files
+- [ ] Context structure with `ci_provider_t` as first field
+- [ ] All 5 required functions implemented
+- [ ] `supports_streaming` set correctly
+- [ ] `max_context` set to provider's limit
+- [ ] API key loaded from environment
+- [ ] Error handling with `argo_report_error()`
+- [ ] Memory cleanup in cleanup function
+- [ ] goto cleanup pattern for allocations
+- [ ] Test file created (`tests/test_newprovider.c`)
 
 ## Incomplete Features & Future Work
 

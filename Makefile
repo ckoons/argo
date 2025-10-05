@@ -135,6 +135,7 @@ SHARED_SERVICES_TEST_TARGET = $(BUILD_DIR)/test_shared_services
 WORKFLOW_REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_workflow_registry
 HTTP_TEST_TARGET = $(BUILD_DIR)/test_http
 JSON_TEST_TARGET = $(BUILD_DIR)/test_json
+API_COMMON_TEST_TARGET = $(BUILD_DIR)/test_api_common
 CLAUDE_PROVIDERS_TEST_TARGET = $(BUILD_DIR)/test_claude_providers
 
 # Default target
@@ -333,12 +334,16 @@ $(HTTP_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_http.o $(STUB_OBJECTS)
 $(JSON_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_json.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
+# Build API common test executable
+$(API_COMMON_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_api_common.o $(STUB_OBJECTS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
 # Build Claude providers test executable
 $(CLAUDE_PROVIDERS_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_claude_providers.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry test-http test-json test-claude-providers
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry test-http test-json test-api-common test-claude-providers
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -492,6 +497,13 @@ test-json: $(JSON_TEST_TARGET)
 	@echo "JSON Parsing Tests"
 	@echo "=========================================="
 	@./$(JSON_TEST_TARGET)
+
+test-api-common: $(API_COMMON_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "API Common Utilities Tests"
+	@echo "=========================================="
+	@./$(API_COMMON_TEST_TARGET)
 
 test-claude-providers: $(CLAUDE_PROVIDERS_TEST_TARGET)
 	@echo ""
