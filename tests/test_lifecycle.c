@@ -160,7 +160,7 @@ static void test_transitions(void) {
     lifecycle_start_ci(manager, "test-ci");
 
     /* Transition to READY */
-    int result = lifecycle_transition(manager, "test-ci",
+    int result = lifecycle_transition_internal(manager, "test-ci",
                                      LIFECYCLE_EVENT_READY, "Initialized");
     if (result != ARGO_SUCCESS) {
         FAIL("Failed to transition to READY");
@@ -198,7 +198,7 @@ static void test_task_assignment(void) {
 
     lifecycle_create_ci(manager, "test-ci", "builder", "gpt-4o");
     lifecycle_start_ci(manager, "test-ci");
-    lifecycle_transition(manager, "test-ci", LIFECYCLE_EVENT_READY, NULL);
+    lifecycle_transition_internal(manager, "test-ci", LIFECYCLE_EVENT_READY, NULL);
 
     /* Assign task */
     int result = lifecycle_assign_task(manager, "test-ci", "Build project");

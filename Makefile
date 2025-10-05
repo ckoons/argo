@@ -34,7 +34,9 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_registry_persistence.c \
                $(SRC_DIR)/argo_memory.c \
                $(SRC_DIR)/argo_lifecycle.c \
+               $(SRC_DIR)/argo_lifecycle_monitoring.c \
                $(SRC_DIR)/argo_provider.c \
+               $(SRC_DIR)/argo_provider_messaging.c \
                $(SRC_DIR)/argo_workflow.c \
                $(SRC_DIR)/argo_workflow_executor.c \
                $(SRC_DIR)/argo_workflow_checkpoint.c \
@@ -59,6 +61,7 @@ CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
                $(SRC_DIR)/argo_shutdown.c \
                $(SRC_DIR)/argo_shared_services.c \
                $(SRC_DIR)/argo_workflow_registry.c \
+               $(SRC_DIR)/argo_workflow_registry_io.c \
                $(SRC_DIR)/argo_workflow_templates.c \
                $(SRC_DIR)/argo_orchestrator_api.c \
                $(SRC_DIR)/argo_file_utils.c

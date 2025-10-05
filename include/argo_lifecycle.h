@@ -91,7 +91,7 @@ int lifecycle_stop_ci(lifecycle_manager_t* manager,
 int lifecycle_restart_ci(lifecycle_manager_t* manager, const char* ci_name);
 
 /* Status transitions */
-int lifecycle_transition(lifecycle_manager_t* manager,
+int lifecycle_transition_internal(lifecycle_manager_t* manager,
                         const char* ci_name,
                         lifecycle_event_t event,
                         const char* reason);
