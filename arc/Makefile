@@ -23,6 +23,9 @@ ARGO_CORE = $(PARENT_BUILD)/libargo_core.a
 SOURCES = $(wildcard $(SRC_DIR)/*.c)
 OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
 
+# Objects without main (for test linking)
+TEST_OBJECTS_LIB = $(filter-out $(BUILD_DIR)/main.o,$(OBJECTS))
+
 # Test files
 TEST_SOURCES = $(wildcard $(TEST_DIR)/*.c)
 TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%.o,$(TEST_SOURCES))
@@ -31,7 +34,7 @@ TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%,$(TEST_SOURCES))
 # Main target
 TARGET = arc
 
-.PHONY: all clean test directories count install uninstall
+.PHONY: all clean test test-arc-unit test-arc-cli test-arc test-arc-full directories count install uninstall
 
 # Default target
 all: directories $(TARGET)
@@ -54,24 +57,43 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 $(BUILD_DIR)/test_%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Build test executables
-$(BUILD_DIR)/test_%: $(BUILD_DIR)/test_%.o $(OBJECTS) $(ARGO_CORE)
-	$(CC) $< $(OBJECTS) $(ARGO_CORE) -o $@ $(LDFLAGS)
+# Build test executables (exclude main.o to avoid duplicate main)
+$(BUILD_DIR)/test_%: $(BUILD_DIR)/test_%.o $(TEST_OBJECTS_LIB) $(ARGO_CORE)
+	$(CC) $< $(TEST_OBJECTS_LIB) $(ARGO_CORE) -o $@ $(LDFLAGS)
 
-# Run tests
-test: $(TEST_TARGETS)
+# Unit tests (C tests)
+test-arc-unit: $(TEST_TARGETS)
 	@echo ""
 	@echo "=========================================="
-	@echo "Arc CLI Tests"
+	@echo "Arc Unit Tests"
 	@echo "=========================================="
 	@for test in $(TEST_TARGETS); do \
 		echo "Running $$test..."; \
 		./$$test || exit 1; \
 	done
+
+# CLI tests (bash script)
+test-arc-cli: $(TARGET)
 	@echo ""
 	@echo "=========================================="
-	@echo "All Arc tests passed"
+	@echo "Arc CLI Tests"
 	@echo "=========================================="
+	@cd $(TEST_DIR) && ./test_arc_cli.sh
+
+# Standard arc testing (unit + cli)
+test-arc: test-arc-unit test-arc-cli
+	@echo ""
+	@echo "=========================================="
+	@echo "All Arc Tests Passed"
+	@echo "=========================================="
+	@echo ""
+
+# Backward compatibility (run standard tests)
+test: test-arc
+
+# Full arc testing (placeholder for workflow tests later)
+test-arc-full: test-arc
+	@echo "Full arc tests complete (workflow tests not yet implemented)"
 
 # Count component size
 count:
