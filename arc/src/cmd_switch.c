@@ -13,17 +13,17 @@
 
 #define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
 
-/* arc switch command handler */
+/* arc switch command handler - sets active workflow and attaches */
 int arc_cmd_switch(int argc, char** argv) {
     if (argc < 1 || !argv[0]) {
-        LOG_USER_ERROR("workflow name required\n");
-        LOG_USER_INFO("Usage: arc switch [workflow_name]\n");
+        LOG_USER_ERROR("workflow_id required\n");
+        LOG_USER_INFO("Usage: arc switch <workflow_id>\n");
         return ARC_EXIT_ERROR;
     }
 
-    const char* workflow_name = argv[0];
+    const char* workflow_id = argv[0];
 
-    /* Initialize argo (needed to access registry) */
+    /* Initialize argo */
     int result = argo_init();
     if (result != ARGO_SUCCESS) {
         LOG_USER_ERROR("Failed to initialize argo\n");
@@ -46,28 +46,31 @@ int arc_cmd_switch(int argc, char** argv) {
         return ARC_EXIT_ERROR;
     }
 
-    /* Validate workflow exists */
-    workflow_instance_t* workflow = workflow_registry_get_workflow(registry, workflow_name);
-    if (!workflow) {
-        LOG_USER_ERROR("Workflow not found: %s\n", workflow_name);
+    /* Verify workflow exists */
+    workflow_instance_t* wf = workflow_registry_get_workflow(registry, workflow_id);
+    if (!wf) {
+        LOG_USER_ERROR("Workflow not found: %s\n", workflow_id);
+        LOG_USER_INFO("Try: arc list\n");
         workflow_registry_destroy(registry);
         argo_exit();
         return ARC_EXIT_ERROR;
     }
 
     /* Update last_active timestamp */
-    workflow->last_active = time(NULL);
+    wf->last_active = time(NULL);
     workflow_registry_save(registry);
 
-    /* Set context */
-    arc_context_set(workflow_name);
+    /* Set ARGO_ACTIVE_WORKFLOW environment variable */
+    setenv("ARGO_ACTIVE_WORKFLOW", workflow_id, 1);
 
-    /* Print confirmation (not filtered by wrapper) */
-    LOG_USER_SUCCESS("Switched to workflow: %s\n", workflow_name);
+    LOG_USER_SUCCESS("Switched to workflow: %s\n", workflow_id);
+    LOG_USER_INFO("(Active workflow set for this terminal)\n");
 
-    /* Cleanup */
+    /* Cleanup registry */
     workflow_registry_destroy(registry);
     argo_exit();
 
-    return ARC_EXIT_SUCCESS;
+    /* Now attach to the workflow */
+    LOG_USER_INFO("\n");
+    return arc_workflow_attach(0, NULL);  /* No args, uses ARGO_ACTIVE_WORKFLOW */
 }

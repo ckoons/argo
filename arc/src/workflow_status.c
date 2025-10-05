@@ -86,9 +86,19 @@ static void show_workflow_status(workflow_instance_t* wf) {
 int arc_workflow_status(int argc, char** argv) {
     const char* workflow_name = NULL;
 
-    /* Get workflow name from arg or context */
+    /* Get workflow name from arg or environment */
     if (argc >= 1) {
         workflow_name = argv[0];
+    } else {
+        /* Try to get from ARGO_ACTIVE_WORKFLOW */
+        workflow_name = getenv("ARGO_ACTIVE_WORKFLOW");
+        if (!workflow_name) {
+            LOG_USER_ERROR("No workflow specified and no active workflow set\n");
+            LOG_USER_INFO("Usage: arc status <workflow_id>\n");
+            LOG_USER_INFO("   or: arc switch <workflow_id> (to set active workflow)\n");
+            LOG_USER_INFO("   or: arc states (to see all workflows)\n");
+            return ARC_EXIT_ERROR;
+        }
     }
 
     /* Initialize argo */

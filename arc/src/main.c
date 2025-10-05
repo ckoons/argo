@@ -23,6 +23,17 @@ int main(int argc, char** argv) {
         return arc_cmd_workflow(argc - 2, argv + 2);
     }
     else {
+        /* Try as workflow subcommand (e.g., 'arc status' -> 'arc workflow status') */
+        /* Known workflow subcommands: start, list, status, states, attach, pause, resume, abandon */
+        const char* cmd = argv[1];
+        if (strcmp(cmd, "start") == 0 || strcmp(cmd, "list") == 0 ||
+            strcmp(cmd, "status") == 0 || strcmp(cmd, "states") == 0 ||
+            strcmp(cmd, "attach") == 0 || strcmp(cmd, "pause") == 0 ||
+            strcmp(cmd, "resume") == 0 || strcmp(cmd, "abandon") == 0) {
+            /* Dispatch to workflow handler */
+            return arc_cmd_workflow(argc - 1, argv + 1);
+        }
+
         LOG_USER_ERROR("Unknown command: %s\n", argv[1]);
         LOG_USER_INFO("Use 'arc help' to see available commands.\n");
         return ARC_EXIT_ERROR;
