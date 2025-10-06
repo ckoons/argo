@@ -222,6 +222,14 @@ Before writing code:
 - **Buffer sizes**: Use ARGO_PATH_MAX (512) for paths, ARGO_BUFFER_* for other buffers
 - Never use environment variables at runtime (.env for build only)
 
+### When to Extract Common Patterns
+**Rule of 3** - Extract at 3rd usage, profit at 4+:
+- **2 USES**: Keep as-is (extraction overhead not justified yet)
+- **AT 3RD USAGE**: Extract (breakeven point)
+- **AT 4TH+ USAGE**: Significant savings (50%+)
+
+Wait until the 3rd usage appears before extracting. At 2 uses, the extraction overhead (helper function + configs) doesn't justify the savings. At 3 uses, it breaks even. At 4+, savings become significant.
+
 ### Build & Test
 - Compile with: `gcc -Wall -Werror -Wextra -std=c11`
 - Before committing: `make clean && make && make test-quick`

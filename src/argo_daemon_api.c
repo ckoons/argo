@@ -326,13 +326,18 @@ int api_workflow_pause(http_request_t* req, http_response_t* resp) {
         return ARGO_SUCCESS;
     }
 
+    /* Check if workflow has active process */
+    if (info->pid <= 0) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Workflow has no active process");
+        return E_SYSTEM_PROCESS;
+    }
+
     /* Send SIGSTOP to process */
-    if (info->pid > 0) {
-        if (kill(info->pid, SIGSTOP) != 0) {
-            workflow_registry_destroy(registry);
-            http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to pause workflow process");
-            return E_SYSTEM_PROCESS;
-        }
+    if (kill(info->pid, SIGSTOP) != 0) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to pause workflow process");
+        return E_SYSTEM_PROCESS;
     }
 
     /* Update status to suspended */
@@ -400,13 +405,18 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
         return ARGO_SUCCESS;
     }
 
+    /* Check if workflow has active process */
+    if (info->pid <= 0) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Workflow has no active process");
+        return E_SYSTEM_PROCESS;
+    }
+
     /* Send SIGCONT to process */
-    if (info->pid > 0) {
-        if (kill(info->pid, SIGCONT) != 0) {
-            workflow_registry_destroy(registry);
-            http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to resume workflow process");
-            return E_SYSTEM_PROCESS;
-        }
+    if (kill(info->pid, SIGCONT) != 0) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to resume workflow process");
+        return E_SYSTEM_PROCESS;
     }
 
     /* Update status to active */

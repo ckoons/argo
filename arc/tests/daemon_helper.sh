@@ -6,7 +6,8 @@
 
 # Daemon configuration
 DAEMON_PORT=${ARGO_DAEMON_PORT:-9876}
-DAEMON_BIN="../../bin/argo-daemon"
+# Use bin/argo-daemon (works from project root where tests run)
+DAEMON_BIN="bin/argo-daemon"
 DAEMON_LOG="/tmp/argo_test_daemon.log"
 DAEMON_PID_FILE="/tmp/argo_test_daemon.pid"
 
@@ -23,9 +24,16 @@ start_test_daemon() {
     fi
 
     # Check if daemon binary exists
-    if [[ ! -x "$DAEMON_BIN" ]]; then
+    if [[ ! -f "$DAEMON_BIN" ]]; then
         echo "ERROR: Daemon binary not found: $DAEMON_BIN"
+        echo "Current directory: $(pwd)"
         echo "Run 'make' from project root first"
+        return 1
+    fi
+
+    if [[ ! -x "$DAEMON_BIN" ]]; then
+        echo "ERROR: Daemon binary not executable: $DAEMON_BIN"
+        ls -la "$DAEMON_BIN"
         return 1
     fi
 
