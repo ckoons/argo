@@ -41,7 +41,7 @@ FOUNDATION_SOURCES = $(SRC_DIR)/argo_error.c \
                      $(SRC_DIR)/argo_config.c \
                      $(SRC_DIR)/argo_init.c
 
-# Daemon library sources (registry, lifecycle, orchestrator)
+# Daemon library sources (registry, lifecycle, orchestrator, HTTP server)
 DAEMON_SOURCES = $(SRC_DIR)/argo_registry.c \
                  $(SRC_DIR)/argo_registry_messaging.c \
                  $(SRC_DIR)/argo_registry_persistence.c \
@@ -55,7 +55,9 @@ DAEMON_SOURCES = $(SRC_DIR)/argo_registry.c \
                  $(SRC_DIR)/argo_workflow_registry.c \
                  $(SRC_DIR)/argo_workflow_registry_io.c \
                  $(SRC_DIR)/argo_workflow_templates.c \
-                 $(SRC_DIR)/argo_merge.c
+                 $(SRC_DIR)/argo_merge.c \
+                 $(SRC_DIR)/argo_http_server.c \
+                 $(SRC_DIR)/argo_daemon.c
 
 # Workflow library sources (workflow execution)
 WORKFLOW_SOURCES = $(SRC_DIR)/argo_workflow.c \
@@ -118,9 +120,11 @@ SCRIPT_SOURCES = $(SCRIPT_DIR)/argo_monitor.c \
 # Script executables
 SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
 
-# Workflow executor binary
+# Binaries
 EXECUTOR_BINARY = bin/argo_workflow_executor
 EXECUTOR_SOURCE = bin/argo_workflow_executor_main.c
+DAEMON_BINARY = bin/argo-daemon
+DAEMON_SOURCE = bin/argo_daemon_main.c
 
 # Test files
 TEST_SOURCES = $(TEST_DIR)/test_ci_providers.c
@@ -156,8 +160,8 @@ JSON_TEST_TARGET = $(BUILD_DIR)/test_json
 API_COMMON_TEST_TARGET = $(BUILD_DIR)/test_api_common
 CLAUDE_PROVIDERS_TEST_TARGET = $(BUILD_DIR)/test_claude_providers
 
-# Default target - build all three libraries
-all: directories $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) $(EXECUTOR_BINARY) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(HTTP_TEST_TARGET) $(JSON_TEST_TARGET) $(CLAUDE_PROVIDERS_TEST_TARGET) $(SCRIPT_TARGETS)
+# Default target - build libraries, binaries, and tests
+all: directories $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) $(EXECUTOR_BINARY) $(DAEMON_BINARY) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(HTTP_TEST_TARGET) $(JSON_TEST_TARGET) $(CLAUDE_PROVIDERS_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -267,6 +271,11 @@ $(WORKFLOW_LIB): $(WORKFLOW_OBJECTS)
 $(EXECUTOR_BINARY): $(EXECUTOR_SOURCE) $(CORE_LIB) $(WORKFLOW_LIB)
 	$(CC) $(CFLAGS) $< $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@echo "Built workflow executor: $@"
+
+# Build daemon binary (needs core + daemon + workflow)
+$(DAEMON_BINARY): $(DAEMON_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+	@echo "Built daemon: $@"
 
 # Build script executables
 $(BUILD_DIR)/%: $(SCRIPT_DIR)/%.c $(CORE_LIB)
@@ -643,6 +652,7 @@ count-core:
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f $(EXECUTOR_BINARY)
+	rm -f $(DAEMON_BINARY)
 	@for script in $(SCRIPT_TARGETS); do \
 		rm -f $(SCRIPT_DIR)/$$(basename $$script); \
 	done
