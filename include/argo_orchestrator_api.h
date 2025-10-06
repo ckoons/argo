@@ -38,36 +38,6 @@ int workflow_exec_start(const char* workflow_id,
                        const char* branch,
                        workflow_registry_t* registry);
 
-/* Pause workflow at next checkpoint
- *
- * Sends signal to workflow process to pause at next checkpoint.
- *
- * Parameters:
- *   workflow_id - Workflow identifier
- *   registry - Workflow registry
- *
- * Returns:
- *   ARGO_SUCCESS on success
- *   Error code on failure
- */
-int workflow_exec_pause(const char* workflow_id,
-                       workflow_registry_t* registry);
-
-/* Resume workflow from last checkpoint
- *
- * Sends signal to workflow process to resume execution.
- *
- * Parameters:
- *   workflow_id - Workflow identifier
- *   registry - Workflow registry
- *
- * Returns:
- *   ARGO_SUCCESS on success
- *   Error code on failure
- */
-int workflow_exec_resume(const char* workflow_id,
-                        workflow_registry_t* registry);
-
 /* Abandon workflow and cleanup
  *
  * Kills workflow process and removes from registry.
