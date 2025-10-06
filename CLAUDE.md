@@ -55,31 +55,39 @@ Argo is a lean C library (<10,000 lines) for coordinating multiple AI coding ass
 - `lifecycle_manager_t` - Resource lifecycle management
 - `ci_memory_digest_t` - Memory management with context limits
 
-**Data Flow**:
+**Data Flow (Daemon-Based Architecture)**:
 ```
-User Request
+arc CLI
+    ↓ (HTTP)
+argo-daemon (persistent service)
+    ├─ Registry (service discovery)
+    ├─ Lifecycle (resource management)
+    └─ Orchestrator (coordination)
+    ↓ (fork+exec)
+workflow_executor (per-workflow process)
     ↓
-Registry (service discovery)
-    ↓
-Orchestrator (coordination)
-    ↓
-Workflow Controller (execution)
+Workflow Controller (step execution)
     ↓
 Provider Interface (ci_provider_t)
     ↓
 AI Backend (Claude/OpenAI/Gemini/etc)
-    ↓
-Response Processing
-    ↓
-Memory Management (optional)
+    ↓ (HTTP)
+argo-daemon (progress reporting)
 ```
 
+**See:** [Daemon Architecture Documentation](docs/DAEMON_ARCHITECTURE.md) for detailed design.
+
+**Library Structure**:
+- **libargo_core.a** - Foundation (error, HTTP, JSON, providers)
+- **libargo_daemon.a** - Daemon services (registry, lifecycle, orchestrator, HTTP server)
+- **libargo_workflow.a** - Workflow execution (controller, steps, checkpoint)
+- **arc** - CLI (links core only, HTTP calls to daemon)
+
 **Module Dependencies**:
-- Foundation modules have no dependencies on higher layers
-- Providers depend only on Foundation
-- Registry/Lifecycle depend on Foundation + Providers
-- Orchestration depends on Registry + Lifecycle
-- Workflows depend on all layers
+- Core has no dependencies on higher layers
+- Daemon depends on Core
+- Workflow depends on Core (but NOT Daemon)
+- Daemon ↔ Workflow communicate via HTTP only
 
 ## Core Philosophy
 
