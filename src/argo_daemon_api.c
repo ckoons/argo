@@ -381,6 +381,58 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
     return ARGO_SUCCESS;
 }
 
+/* POST /api/workflow/progress/{id} - Report executor progress */
+int api_workflow_progress(http_request_t* req, http_response_t* resp) {
+    if (!req || !resp) {
+        http_response_set_error(resp, 500, "Internal server error");
+        return E_SYSTEM_MEMORY;
+    }
+
+    const char* workflow_id = extract_path_param(req->path, "/api/workflow/progress");
+    if (!workflow_id) {
+        http_response_set_error(resp, 400, "Missing workflow ID");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Parse JSON body for progress info */
+    if (!req->body) {
+        http_response_set_error(resp, 400, "Missing request body");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Simple JSON parsing for current_step and total_steps */
+    int current_step = 0;
+    int total_steps = 0;
+    char step_name[128] = {0};
+
+    const char* current_str = strstr(req->body, "\"current_step\"");
+    const char* total_str = strstr(req->body, "\"total_steps\"");
+    const char* name_str = strstr(req->body, "\"step_name\"");
+
+    if (current_str) {
+        sscanf(current_str, "\"current_step\":%d", &current_step);
+    }
+    if (total_str) {
+        sscanf(total_str, "\"total_steps\":%d", &total_steps);
+    }
+    if (name_str) {
+        sscanf(name_str, "\"step_name\":\"%127[^\"]\"", step_name);
+    }
+
+    /* Log progress (in production, would update registry or database) */
+    fprintf(stderr, "[PROGRESS] %s: step %d/%d (%s)\n",
+            workflow_id, current_step, total_steps, step_name);
+
+    /* Return success */
+    char response_json[256];
+    snprintf(response_json, sizeof(response_json),
+            "{\"status\":\"success\",\"workflow_id\":\"%s\"}",
+            workflow_id);
+
+    http_response_set_json(resp, 200, response_json);
+    return ARGO_SUCCESS;
+}
+
 /* GET /api/registry/ci - List CIs */
 int api_registry_list_ci(http_request_t* req, http_response_t* resp) {
     (void)req;  /* Unused */
@@ -414,6 +466,8 @@ int argo_daemon_register_api_routes(argo_daemon_t* daemon) {
                          "/api/workflow/resume", api_workflow_resume);
     http_server_add_route(daemon->http_server, HTTP_METHOD_DELETE,
                          "/api/workflow/abandon", api_workflow_abandon);
+    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
+                         "/api/workflow/progress", api_workflow_progress);
 
     /* Registry routes */
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,

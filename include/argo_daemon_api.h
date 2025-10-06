@@ -13,6 +13,9 @@ int api_workflow_pause(http_request_t* req, http_response_t* resp);
 int api_workflow_resume(http_request_t* req, http_response_t* resp);
 int api_workflow_abandon(http_request_t* req, http_response_t* resp);
 
+/* Executor progress reporting */
+int api_workflow_progress(http_request_t* req, http_response_t* resp);
+
 /* Registry API handlers */
 int api_registry_list_ci(http_request_t* req, http_response_t* resp);
 

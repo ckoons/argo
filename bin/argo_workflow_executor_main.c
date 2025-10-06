@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <curl/curl.h>
 
 /* Project includes */
 #include "argo_workflow.h"
@@ -18,6 +19,7 @@
 /* Global workflow for signal handling */
 static workflow_controller_t* g_workflow = NULL;
 static int g_should_stop = 0;
+static char g_workflow_id[256] = {0};
 
 /* Signal handler for graceful shutdown */
 static void signal_handler(int signum) {
@@ -28,6 +30,34 @@ static void signal_handler(int signum) {
         /* Pause - handle in main loop */
         fprintf(stderr, "Received pause signal\n");
     }
+}
+
+/* Report progress to daemon */
+static void report_progress(const char* workflow_id, int current_step, int total_steps, const char* step_name) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return;
+
+    char url[512];
+    char json_body[512];
+    snprintf(url, sizeof(url), "http://localhost:9876/api/workflow/progress/%s", workflow_id);
+    snprintf(json_body, sizeof(json_body),
+            "{\"current_step\":%d,\"total_steps\":%d,\"step_name\":\"%s\"}",
+            current_step, total_steps, step_name ? step_name : "");
+
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_body);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
+    curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);  /* Don't need response body */
+
+    curl_easy_perform(curl);  /* Ignore errors - progress reporting is best-effort */
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
 }
 
 int main(int argc, char** argv) {
@@ -44,6 +74,9 @@ int main(int argc, char** argv) {
     const char* workflow_id = argv[1];
     const char* template_path = argv[2];
     const char* branch = argv[3];
+
+    /* Save workflow_id for signal handlers and progress reporting */
+    strncpy(g_workflow_id, workflow_id, sizeof(g_workflow_id) - 1);
 
     printf("=========================================\n");
     printf("Argo Workflow Executor\n");
@@ -107,6 +140,10 @@ int main(int argc, char** argv) {
             result = E_INPUT_INVALID;
             break;
         }
+
+        /* Report progress to daemon */
+        report_progress(g_workflow_id, g_workflow->step_count, EXECUTOR_MAX_STEPS,
+                       g_workflow->current_step_id);
 
         /* Execute current step */
         printf("Executing step %d: %s\n", g_workflow->step_count + 1, g_workflow->current_step_id);

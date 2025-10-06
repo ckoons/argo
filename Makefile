@@ -4,7 +4,7 @@
 # Compiler and flags
 CC = gcc
 CFLAGS = -Wall -Werror -Wextra -std=c11 -g -I./include
-LDFLAGS = -lpthread
+LDFLAGS = -lpthread -lcurl
 
 # Installation
 PREFIX ?= $(HOME)/.local
