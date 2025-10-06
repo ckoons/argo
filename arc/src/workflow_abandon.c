@@ -5,13 +5,9 @@
 #include <string.h>
 #include "arc_commands.h"
 #include "arc_context.h"
-#include "argo_workflow_registry.h"
-#include "argo_orchestrator_api.h"
-#include "argo_init.h"
+#include "arc_http_client.h"
 #include "argo_error.h"
 #include "argo_output.h"
-
-#define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
 
 /* Get confirmation from user */
 static int get_confirmation(const char* workflow_name) {
@@ -40,62 +36,37 @@ int arc_workflow_abandon(int argc, char** argv) {
         }
     }
 
-    /* Initialize argo */
-    int result = argo_init();
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to initialize argo\n");
-        return ARC_EXIT_ERROR;
-    }
-
-    /* Load workflow registry */
-    workflow_registry_t* registry = workflow_registry_create(WORKFLOW_REGISTRY_PATH);
-    if (!registry) {
-        LOG_USER_ERROR("Failed to create workflow registry\n");
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
-    result = workflow_registry_load(registry);
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to load workflow registry\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
-    /* Get workflow */
-    workflow_instance_t* wf = workflow_registry_get_workflow(registry, workflow_name);
-    if (!wf) {
-        LOG_USER_ERROR("Workflow not found: %s\n", workflow_name);
-        LOG_USER_INFO("  Try: arc workflow list\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
     /* Get confirmation */
     if (!get_confirmation(workflow_name)) {
         LOG_USER_INFO("Abandon cancelled.\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
         return ARC_EXIT_SUCCESS;
     }
 
-    /* Kill workflow process */
-    result = workflow_exec_abandon(workflow_name, registry);
+    /* Build request URL */
+    char endpoint[512];
+    snprintf(endpoint, sizeof(endpoint), "/api/workflow/abandon/%s", workflow_name);
+
+    /* Send DELETE request to daemon */
+    arc_http_response_t* response = NULL;
+    int result = arc_http_delete(endpoint, &response);
     if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to terminate workflow process\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
+        LOG_USER_ERROR("Failed to connect to daemon: %s\n", arc_get_daemon_url());
+        LOG_USER_INFO("  Make sure daemon is running: argo-daemon\n");
         return ARC_EXIT_ERROR;
     }
 
-    /* Remove workflow from registry */
-    result = workflow_registry_remove_workflow(registry, workflow_name);
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to remove workflow from registry\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
+    /* Check HTTP status */
+    if (response->status_code == 404) {
+        LOG_USER_ERROR("Workflow not found: %s\n", workflow_name);
+        LOG_USER_INFO("  Try: arc workflow list\n");
+        arc_http_response_free(response);
+        return ARC_EXIT_ERROR;
+    } else if (response->status_code != 200) {
+        LOG_USER_ERROR("Failed to abandon workflow (HTTP %d)\n", response->status_code);
+        if (response->body) {
+            LOG_USER_INFO("  %s\n", response->body);
+        }
+        arc_http_response_free(response);
         return ARC_EXIT_ERROR;
     }
 
@@ -110,8 +81,7 @@ int arc_workflow_abandon(int argc, char** argv) {
     LOG_USER_INFO("Logs preserved: ~/.argo/logs/%s.log\n", workflow_name);
 
     /* Cleanup */
-    workflow_registry_destroy(registry);
-    argo_exit();
+    arc_http_response_free(response);
 
     return ARC_EXIT_SUCCESS;
 }
