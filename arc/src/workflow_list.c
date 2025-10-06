@@ -6,6 +6,7 @@
 #include <time.h>
 #include "arc_commands.h"
 #include "arc_context.h"
+#include "arc_constants.h"
 #include "argo_workflow_registry.h"
 #include "argo_workflow_templates.h"
 #include "argo_init.h"
@@ -16,12 +17,12 @@
 
 /* Format time duration */
 static void format_duration(time_t seconds, char* buffer, size_t size) {
-    if (seconds < 60) {
+    if (seconds < SECONDS_PER_MINUTE) {
         snprintf(buffer, size, "%lds", (long)seconds);
-    } else if (seconds < 3600) {
-        snprintf(buffer, size, "%ldm %lds", (long)(seconds / 60), (long)(seconds % 60));
+    } else if (seconds < SECONDS_PER_HOUR) {
+        snprintf(buffer, size, "%ldm %lds", (long)(seconds / SECONDS_PER_MINUTE), (long)(seconds % SECONDS_PER_MINUTE));
     } else {
-        snprintf(buffer, size, "%ldh %ldm", (long)(seconds / 3600), (long)((seconds % 3600) / 60));
+        snprintf(buffer, size, "%ldh %ldm", (long)(seconds / SECONDS_PER_HOUR), (long)((seconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE));
     }
 }
 

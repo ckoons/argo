@@ -7,6 +7,7 @@
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "arc_error.h"
+#include "arc_constants.h"
 #include "argo_workflow_registry.h"
 #include "argo_orchestrator_api.h"
 #include "argo_init.h"
@@ -86,14 +87,14 @@ int arc_workflow_states(int argc, char** argv) {
         time_t now = time(NULL);
         time_t age = now - wf->last_active;
         char age_str[64];
-        if (age < 60) {
+        if (age < SECONDS_PER_MINUTE) {
             snprintf(age_str, sizeof(age_str), "%lds ago", (long)age);
-        } else if (age < 3600) {
-            snprintf(age_str, sizeof(age_str), "%ldm ago", (long)(age / 60));
-        } else if (age < 86400) {
-            snprintf(age_str, sizeof(age_str), "%ldh ago", (long)(age / 3600));
+        } else if (age < SECONDS_PER_HOUR) {
+            snprintf(age_str, sizeof(age_str), "%ldm ago", (long)(age / SECONDS_PER_MINUTE));
+        } else if (age < SECONDS_PER_DAY) {
+            snprintf(age_str, sizeof(age_str), "%ldh ago", (long)(age / SECONDS_PER_HOUR));
         } else {
-            snprintf(age_str, sizeof(age_str), "%ldd ago", (long)(age / 86400));
+            snprintf(age_str, sizeof(age_str), "%ldd ago", (long)(age / SECONDS_PER_DAY));
         }
 
         /* Print workflow info */

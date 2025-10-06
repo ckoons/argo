@@ -10,13 +10,13 @@
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "arc_error.h"
+#include "arc_constants.h"
 #include "argo_workflow_registry.h"
 #include "argo_init.h"
 #include "argo_error.h"
 #include "argo_output.h"
 
 #define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
-#define READ_CHUNK_SIZE 4096
 
 /* Get cursor environment variable name for workflow */
 static void get_cursor_env_name(const char* workflow_id, char* env_name, size_t size) {
@@ -25,7 +25,7 @@ static void get_cursor_env_name(const char* workflow_id, char* env_name, size_t 
 
 /* Get cursor position for this terminal */
 static off_t get_cursor_position(const char* workflow_id) {
-    char env_name[128];
+    char env_name[ARC_ENV_NAME_MAX];
     get_cursor_env_name(workflow_id, env_name, sizeof(env_name));
 
     const char* cursor_str = getenv(env_name);
@@ -38,7 +38,7 @@ static off_t get_cursor_position(const char* workflow_id) {
 
 /* Set cursor position for this terminal */
 static void set_cursor_position(const char* workflow_id, off_t position) {
-    char env_name[128];
+    char env_name[ARC_ENV_NAME_MAX];
     char position_str[32];
 
     get_cursor_env_name(workflow_id, env_name, sizeof(env_name));
@@ -79,7 +79,7 @@ static int display_log_backlog(const char* log_path, off_t start_pos, off_t* end
     }
 
     /* Read and display from cursor to EOF */
-    char buffer[READ_CHUNK_SIZE];
+    char buffer[ARC_READ_CHUNK_SIZE];
     ssize_t bytes_read;
     off_t current_pos = start_pos;
 
@@ -126,7 +126,7 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
 
     LOG_USER_INFO("\n[Streaming output - Press Enter to detach]\n");
 
-    char buffer[READ_CHUNK_SIZE];
+    char buffer[ARC_READ_CHUNK_SIZE];
     char input_char;
     bool should_exit = false;
 

@@ -6,6 +6,7 @@
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "arc_error.h"
+#include "arc_constants.h"
 #include "argo_workflow_registry.h"
 #include "argo_workflow_templates.h"
 #include "argo_orchestrator_api.h"
@@ -100,7 +101,7 @@ int arc_workflow_start(int argc, char** argv) {
         argo_exit();
         return ARC_EXIT_ERROR;
     } else if (result != ARGO_SUCCESS) {
-        char context[128];
+        char context[ARC_CONTEXT_MAX];
         snprintf(context, sizeof(context), "Creating workflow %s_%s", template_name, instance_name);
         arc_report_error(result, context, "Check that the .argo directory is writable");
         workflow_registry_destroy(registry);
@@ -109,7 +110,7 @@ int arc_workflow_start(int argc, char** argv) {
     }
 
     /* Create workflow ID */
-    char workflow_id[128];
+    char workflow_id[ARC_WORKFLOW_ID_MAX];
     snprintf(workflow_id, sizeof(workflow_id), "%s_%s", template_name, instance_name);
 
     /* Start workflow execution */
