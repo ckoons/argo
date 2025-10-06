@@ -5,13 +5,12 @@
 #include <string.h>
 #include "arc_commands.h"
 #include "arc_context.h"
-#include "argo_workflow_registry.h"
-#include "argo_orchestrator_api.h"
-#include "argo_init.h"
+#include "arc_constants.h"
+#include "arc_http_client.h"
 #include "argo_error.h"
 #include "argo_output.h"
-
-#define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
+#include "argo_limits.h"
+#include "argo_http_server.h"
 
 /* arc workflow pause command handler */
 int arc_workflow_pause(int argc, char** argv) {
@@ -30,62 +29,31 @@ int arc_workflow_pause(int argc, char** argv) {
         }
     }
 
-    /* Initialize argo */
-    int result = argo_init();
+    /* Build endpoint URL */
+    char endpoint[ARGO_PATH_MAX];
+    snprintf(endpoint, sizeof(endpoint), "/api/workflow/pause/%s", workflow_name);
+
+    /* Send POST request to daemon */
+    arc_http_response_t* response = NULL;
+    int result = arc_http_post(endpoint, NULL, &response);
     if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to initialize argo\n");
+        LOG_USER_ERROR("Failed to connect to daemon: %s\n", arc_get_daemon_url());
+        LOG_USER_INFO("  Make sure daemon is running: argo-daemon\n");
         return ARC_EXIT_ERROR;
     }
 
-    /* Load workflow registry */
-    workflow_registry_t* registry = workflow_registry_create(WORKFLOW_REGISTRY_PATH);
-    if (!registry) {
-        LOG_USER_ERROR("Failed to create workflow registry\n");
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
-    result = workflow_registry_load(registry);
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to load workflow registry\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
-    /* Get workflow */
-    workflow_instance_t* wf = workflow_registry_get_workflow(registry, workflow_name);
-    if (!wf) {
+    /* Check HTTP status */
+    if (response->status_code == HTTP_STATUS_NOT_FOUND) {
         LOG_USER_ERROR("Workflow not found: %s\n", workflow_name);
         LOG_USER_INFO("  Try: arc workflow list\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
+        arc_http_response_free(response);
         return ARC_EXIT_ERROR;
-    }
-
-    /* Check if already paused */
-    if (wf->status == WORKFLOW_STATUS_SUSPENDED) {
-        LOG_USER_INFO("Workflow already paused: %s\n", workflow_name);
-        workflow_registry_destroy(registry);
-        argo_exit();
-        return ARC_EXIT_SUCCESS;
-    }
-
-    /* Send pause signal to workflow process */
-    result = workflow_exec_pause(workflow_name, registry);
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to pause workflow\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
-    /* Update status to suspended */
-    result = workflow_registry_set_status(registry, workflow_name, WORKFLOW_STATUS_SUSPENDED);
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to update workflow status\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
+    } else if (response->status_code != HTTP_STATUS_OK) {
+        LOG_USER_ERROR("Failed to pause workflow (HTTP %d)\n", response->status_code);
+        if (response->body) {
+            LOG_USER_INFO("  %s\n", response->body);
+        }
+        arc_http_response_free(response);
         return ARC_EXIT_ERROR;
     }
 
@@ -93,8 +61,7 @@ int arc_workflow_pause(int argc, char** argv) {
     LOG_USER_SUCCESS("Paused workflow: %s\n", workflow_name);
 
     /* Cleanup */
-    workflow_registry_destroy(registry);
-    argo_exit();
+    arc_http_response_free(response);
 
     return ARC_EXIT_SUCCESS;
 }

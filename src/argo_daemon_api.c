@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 /* Project includes */
 #include "argo_daemon_api.h"
@@ -292,13 +293,64 @@ int api_workflow_pause(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    /* For now, just return success - actual pause logic will be added */
+    /* Load registry */
+    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    if (!registry) {
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
+        return E_SYSTEM_MEMORY;
+    }
+
+    int result = workflow_registry_load(registry);
+    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
+        return result;
+    }
+
+    /* Get workflow info */
+    workflow_instance_t* info = workflow_registry_get_workflow(registry, workflow_id);
+    if (!info) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        return E_NOT_FOUND;
+    }
+
+    /* Check if already paused */
+    if (info->status == WORKFLOW_STATUS_SUSPENDED) {
+        workflow_registry_destroy(registry);
+        char response_json[ARGO_BUFFER_MEDIUM];
+        snprintf(response_json, sizeof(response_json),
+            "{\"status\":\"already_paused\",\"workflow_id\":\"%s\"}",
+            workflow_id);
+        http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+        return ARGO_SUCCESS;
+    }
+
+    /* Send SIGSTOP to process */
+    if (info->pid > 0) {
+        if (kill(info->pid, SIGSTOP) != 0) {
+            workflow_registry_destroy(registry);
+            http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to pause workflow process");
+            return E_SYSTEM_PROCESS;
+        }
+    }
+
+    /* Update status to suspended */
+    result = workflow_registry_set_status(registry, workflow_id, WORKFLOW_STATUS_SUSPENDED);
+    if (result != ARGO_SUCCESS) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to update workflow status");
+        return result;
+    }
+
+    /* Build success response */
     char response_json[ARGO_BUFFER_MEDIUM];
     snprintf(response_json, sizeof(response_json),
         "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"paused\"}",
         workflow_id);
 
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+    workflow_registry_destroy(registry);
     return ARGO_SUCCESS;
 }
 
@@ -315,13 +367,64 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    /* For now, just return success */
+    /* Load registry */
+    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    if (!registry) {
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
+        return E_SYSTEM_MEMORY;
+    }
+
+    int result = workflow_registry_load(registry);
+    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
+        return result;
+    }
+
+    /* Get workflow info */
+    workflow_instance_t* info = workflow_registry_get_workflow(registry, workflow_id);
+    if (!info) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        return E_NOT_FOUND;
+    }
+
+    /* Check if already running */
+    if (info->status == WORKFLOW_STATUS_ACTIVE) {
+        workflow_registry_destroy(registry);
+        char response_json[ARGO_BUFFER_MEDIUM];
+        snprintf(response_json, sizeof(response_json),
+            "{\"status\":\"already_running\",\"workflow_id\":\"%s\"}",
+            workflow_id);
+        http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+        return ARGO_SUCCESS;
+    }
+
+    /* Send SIGCONT to process */
+    if (info->pid > 0) {
+        if (kill(info->pid, SIGCONT) != 0) {
+            workflow_registry_destroy(registry);
+            http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to resume workflow process");
+            return E_SYSTEM_PROCESS;
+        }
+    }
+
+    /* Update status to active */
+    result = workflow_registry_set_status(registry, workflow_id, WORKFLOW_STATUS_ACTIVE);
+    if (result != ARGO_SUCCESS) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to update workflow status");
+        return result;
+    }
+
+    /* Build success response */
     char response_json[ARGO_BUFFER_MEDIUM];
     snprintf(response_json, sizeof(response_json),
         "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"resumed\"}",
         workflow_id);
 
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+    workflow_registry_destroy(registry);
     return ARGO_SUCCESS;
 }
 
