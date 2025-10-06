@@ -28,46 +28,54 @@ SCRIPT_DIR = scripts
 LOG_DIR = .argo/logs
 SESSION_DIR = .argo/sessions
 
-# Core library sources (no provider implementations)
-CORE_SOURCES = $(SRC_DIR)/argo_socket.c \
-               $(SRC_DIR)/argo_http.c \
-               $(SRC_DIR)/argo_error.c \
-               $(SRC_DIR)/argo_registry.c \
-               $(SRC_DIR)/argo_registry_messaging.c \
-               $(SRC_DIR)/argo_registry_persistence.c \
-               $(SRC_DIR)/argo_memory.c \
-               $(SRC_DIR)/argo_lifecycle.c \
-               $(SRC_DIR)/argo_lifecycle_monitoring.c \
-               $(SRC_DIR)/argo_provider.c \
-               $(SRC_DIR)/argo_provider_messaging.c \
-               $(SRC_DIR)/argo_workflow.c \
-               $(SRC_DIR)/argo_workflow_executor.c \
-               $(SRC_DIR)/argo_workflow_checkpoint.c \
-               $(SRC_DIR)/argo_workflow_loader.c \
-               $(SRC_DIR)/argo_merge.c \
-               $(SRC_DIR)/argo_orchestrator.c \
-               $(SRC_DIR)/argo_session.c \
-               $(SRC_DIR)/argo_json.c \
-               $(SRC_DIR)/argo_string_utils.c \
-               $(SRC_DIR)/argo_print_utils.c \
-               $(SRC_DIR)/argo_env_utils.c \
-               $(SRC_DIR)/argo_env_load.c \
-               $(SRC_DIR)/argo_init.c \
-               $(SRC_DIR)/argo_config.c \
-               $(SRC_DIR)/argo_workflow_context.c \
-               $(SRC_DIR)/argo_workflow_json.c \
-               $(SRC_DIR)/argo_workflow_conditions.c \
-               $(SRC_DIR)/argo_workflow_steps_basic.c \
-               $(SRC_DIR)/argo_workflow_steps_ci.c \
-               $(SRC_DIR)/argo_workflow_steps_advanced.c \
-               $(SRC_DIR)/argo_workflow_persona.c \
-               $(SRC_DIR)/argo_shutdown.c \
-               $(SRC_DIR)/argo_shared_services.c \
-               $(SRC_DIR)/argo_workflow_registry.c \
-               $(SRC_DIR)/argo_workflow_registry_io.c \
-               $(SRC_DIR)/argo_workflow_templates.c \
-               $(SRC_DIR)/argo_orchestrator_api.c \
-               $(SRC_DIR)/argo_file_utils.c
+# Foundation library sources (core utilities + providers)
+FOUNDATION_SOURCES = $(SRC_DIR)/argo_error.c \
+                     $(SRC_DIR)/argo_http.c \
+                     $(SRC_DIR)/argo_socket.c \
+                     $(SRC_DIR)/argo_json.c \
+                     $(SRC_DIR)/argo_string_utils.c \
+                     $(SRC_DIR)/argo_print_utils.c \
+                     $(SRC_DIR)/argo_env_utils.c \
+                     $(SRC_DIR)/argo_env_load.c \
+                     $(SRC_DIR)/argo_file_utils.c \
+                     $(SRC_DIR)/argo_config.c \
+                     $(SRC_DIR)/argo_init.c
+
+# Daemon library sources (registry, lifecycle, orchestrator)
+DAEMON_SOURCES = $(SRC_DIR)/argo_registry.c \
+                 $(SRC_DIR)/argo_registry_messaging.c \
+                 $(SRC_DIR)/argo_registry_persistence.c \
+                 $(SRC_DIR)/argo_lifecycle.c \
+                 $(SRC_DIR)/argo_lifecycle_monitoring.c \
+                 $(SRC_DIR)/argo_session.c \
+                 $(SRC_DIR)/argo_orchestrator.c \
+                 $(SRC_DIR)/argo_orchestrator_api.c \
+                 $(SRC_DIR)/argo_shutdown.c \
+                 $(SRC_DIR)/argo_shared_services.c \
+                 $(SRC_DIR)/argo_workflow_registry.c \
+                 $(SRC_DIR)/argo_workflow_registry_io.c \
+                 $(SRC_DIR)/argo_workflow_templates.c \
+                 $(SRC_DIR)/argo_merge.c
+
+# Workflow library sources (workflow execution)
+WORKFLOW_SOURCES = $(SRC_DIR)/argo_workflow.c \
+                   $(SRC_DIR)/argo_workflow_executor.c \
+                   $(SRC_DIR)/argo_workflow_checkpoint.c \
+                   $(SRC_DIR)/argo_workflow_loader.c \
+                   $(SRC_DIR)/argo_workflow_context.c \
+                   $(SRC_DIR)/argo_workflow_json.c \
+                   $(SRC_DIR)/argo_workflow_conditions.c \
+                   $(SRC_DIR)/argo_workflow_steps_basic.c \
+                   $(SRC_DIR)/argo_workflow_steps_ci.c \
+                   $(SRC_DIR)/argo_workflow_steps_advanced.c \
+                   $(SRC_DIR)/argo_workflow_persona.c \
+                   $(SRC_DIR)/argo_provider.c \
+                   $(SRC_DIR)/argo_provider_messaging.c \
+                   $(SRC_DIR)/argo_memory.c
+
+# Core library sources (foundation + providers for backwards compatibility)
+# This will be split into libargo_core.a eventually
+CORE_SOURCES = $(FOUNDATION_SOURCES)
 
 # Provider implementation sources
 PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
@@ -85,16 +93,20 @@ PROVIDER_SOURCES = $(SRC_DIR)/argo_ollama.c \
                    $(SRC_DIR)/argo_api_provider_common.c \
                    $(SRC_DIR)/argo_json.c
 
-# All sources
-SOURCES = $(CORE_SOURCES) $(PROVIDER_SOURCES)
+# All sources (for compatibility)
+SOURCES = $(FOUNDATION_SOURCES) $(DAEMON_SOURCES) $(WORKFLOW_SOURCES) $(PROVIDER_SOURCES)
 
 # Object files
-CORE_OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(CORE_SOURCES))
+FOUNDATION_OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(FOUNDATION_SOURCES))
+DAEMON_OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(DAEMON_SOURCES))
+WORKFLOW_OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(WORKFLOW_SOURCES))
 PROVIDER_OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(PROVIDER_SOURCES))
-OBJECTS = $(CORE_OBJECTS) $(PROVIDER_OBJECTS)
+OBJECTS = $(FOUNDATION_OBJECTS) $(DAEMON_OBJECTS) $(WORKFLOW_OBJECTS) $(PROVIDER_OBJECTS)
 
-# Core library
+# Libraries
 CORE_LIB = $(BUILD_DIR)/libargo_core.a
+DAEMON_LIB = $(BUILD_DIR)/libargo_daemon.a
+WORKFLOW_LIB = $(BUILD_DIR)/libargo_workflow.a
 
 # Script sources
 SCRIPT_SOURCES = $(SCRIPT_DIR)/argo_monitor.c \
@@ -144,8 +156,8 @@ JSON_TEST_TARGET = $(BUILD_DIR)/test_json
 API_COMMON_TEST_TARGET = $(BUILD_DIR)/test_api_common
 CLAUDE_PROVIDERS_TEST_TARGET = $(BUILD_DIR)/test_claude_providers
 
-# Default target
-all: directories $(CORE_LIB) $(EXECUTOR_BINARY) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(HTTP_TEST_TARGET) $(JSON_TEST_TARGET) $(CLAUDE_PROVIDERS_TEST_TARGET) $(SCRIPT_TARGETS)
+# Default target - build all three libraries
+all: directories $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) $(EXECUTOR_BINARY) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(HTTP_TEST_TARGET) $(JSON_TEST_TARGET) $(CLAUDE_PROVIDERS_TEST_TARGET) $(SCRIPT_TARGETS)
 
 # Create necessary directories
 directories:
@@ -236,14 +248,24 @@ $(BUILD_DIR)/%.o: $(TEST_DIR)/%.c
 $(BUILD_DIR)/stubs.o: $(BUILD_DIR)/stubs.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Build core library
-$(CORE_LIB): $(CORE_OBJECTS) $(STUB_OBJECTS)
+# Build core library (foundation + providers)
+$(CORE_LIB): $(FOUNDATION_OBJECTS) $(PROVIDER_OBJECTS) $(STUB_OBJECTS)
 	ar rcs $@ $^
 	@echo "Created core library: $@"
 
-# Build workflow executor binary
-$(EXECUTOR_BINARY): $(EXECUTOR_SOURCE) $(CORE_LIB)
-	$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
+# Build daemon library
+$(DAEMON_LIB): $(DAEMON_OBJECTS)
+	ar rcs $@ $^
+	@echo "Created daemon library: $@"
+
+# Build workflow library
+$(WORKFLOW_LIB): $(WORKFLOW_OBJECTS)
+	ar rcs $@ $^
+	@echo "Created workflow library: $@"
+
+# Build workflow executor binary (needs core + workflow)
+$(EXECUTOR_BINARY): $(EXECUTOR_SOURCE) $(CORE_LIB) $(WORKFLOW_LIB)
+	$(CC) $(CFLAGS) $< $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@echo "Built workflow executor: $@"
 
 # Build script executables
