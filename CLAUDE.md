@@ -89,6 +89,72 @@ argo-daemon (progress reporting)
 - Workflow depends on Core (but NOT Daemon)
 - Daemon ↔ Workflow communicate via HTTP only
 
+## Daemon Architecture
+
+### Communication Model
+
+**HTTP-Based Message Passing**:
+- `arc → daemon`: HTTP REST (POST, GET, DELETE)
+- `daemon → executor`: fork/exec + signals (SIGTERM, SIGINT)
+- `executor → daemon`: HTTP progress updates (best-effort)
+
+**Why HTTP?**
+- Location independence (localhost or remote)
+- Loose coupling (no shared memory)
+- Fault isolation (executor crash won't kill daemon)
+- Language agnostic (future executors in any language)
+- Testable (easy to mock endpoints)
+
+### REST API Endpoints
+
+**Workflow Operations** (`argo_daemon_api.c`):
+```c
+POST   /api/workflow/start         /* Start new workflow */
+GET    /api/workflow/list          /* List all workflows */
+GET    /api/workflow/status/{id}   /* Get workflow status */
+DELETE /api/workflow/abandon/{id}  /* Terminate workflow */
+POST   /api/workflow/progress/{id} /* Progress update (from executor) */
+POST   /api/workflow/pause/{id}    /* Pause workflow (stub) */
+POST   /api/workflow/resume/{id}   /* Resume workflow (stub) */
+```
+
+**Info Endpoints**:
+```c
+GET /api/health    /* Daemon health check */
+GET /api/version   /* Daemon version */
+```
+
+### HTTP Server Implementation
+
+**Custom HTTP Server** (`argo_http_server.c`):
+- ~350 lines, zero dependencies
+- Simple request/response handling
+- Route-based dispatch
+- JSON request/response format
+- Thread-per-connection model
+
+**Why custom?** No external dependencies (mongoose, libmicrohttpd), full control, minimal size.
+
+### Binaries
+
+**argo-daemon** (165 KB):
+- Persistent service (listens on port 9876 by default)
+- HTTP server + REST API handlers
+- Registry and lifecycle management
+- Forks workflow executors on demand
+
+**argo_workflow_executor** (179 KB):
+- Per-workflow process (one executor per workflow)
+- Loads JSON workflow templates
+- Executes steps sequentially
+- Reports progress to daemon via HTTP
+- Signal handling (SIGTERM/SIGINT)
+
+**arc** (~100 KB):
+- Thin HTTP client
+- Links only libargo_core.a
+- All operations via REST API to daemon
+
 ## Core Philosophy
 
 ### "What you don't build, you don't debug."
@@ -315,6 +381,138 @@ offset += snprintf(buffer + offset, sizeof(buffer) - offset, "Part 1: %s\n", par
 offset += snprintf(buffer + offset, sizeof(buffer) - offset, "Part 2: %s\n", part2);
 ```
 
+### Daemon API Handler Pattern
+```c
+/* REST API handler (in argo_daemon_api.c) */
+int api_workflow_operation(http_request_t* req, http_response_t* resp) {
+    if (!req || !resp) {
+        http_response_set_error(resp, 500, "Internal server error");
+        return E_SYSTEM_MEMORY;
+    }
+
+    /* Extract path parameters */
+    const char* workflow_id = extract_path_param(req->path, "/api/workflow/operation");
+    if (!workflow_id) {
+        http_response_set_error(resp, 400, "Missing workflow ID");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Parse JSON body if needed */
+    if (req->method == HTTP_METHOD_POST && !req->body) {
+        http_response_set_error(resp, 400, "Missing request body");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Perform operation */
+    int result = perform_operation(workflow_id, req->body);
+    if (result == E_WORKFLOW_NOT_FOUND) {
+        http_response_set_error(resp, 404, "Workflow not found");
+        return result;
+    } else if (result != ARGO_SUCCESS) {
+        http_response_set_error(resp, 500, "Operation failed");
+        return result;
+    }
+
+    /* Return success */
+    char response_json[256];
+    snprintf(response_json, sizeof(response_json),
+            "{\"status\":\"success\",\"workflow_id\":\"%s\"}",
+            workflow_id);
+
+    http_response_set_json(resp, 200, response_json);
+    return ARGO_SUCCESS;
+}
+```
+
+### Arc HTTP Client Pattern
+```c
+/* Arc command using HTTP (in arc/src/) */
+int arc_workflow_command(int argc, char** argv) {
+    const char* workflow_id = NULL;
+
+    /* Get workflow ID from args or context */
+    if (argc >= 1) {
+        workflow_id = argv[0];
+    } else {
+        LOG_USER_ERROR("No workflow specified\n");
+        LOG_USER_INFO("Usage: arc workflow command <workflow_id>\n");
+        return ARC_EXIT_ERROR;
+    }
+
+    /* Build request URL */
+    char endpoint[512];
+    snprintf(endpoint, sizeof(endpoint), "/api/workflow/command/%s", workflow_id);
+
+    /* Send HTTP request to daemon */
+    arc_http_response_t* response = NULL;
+    int result = arc_http_get(endpoint, &response);  /* or arc_http_post/delete */
+    if (result != ARGO_SUCCESS) {
+        LOG_USER_ERROR("Failed to connect to daemon: %s\n", arc_get_daemon_url());
+        LOG_USER_INFO("  Make sure daemon is running: argo-daemon\n");
+        return ARC_EXIT_ERROR;
+    }
+
+    /* Check HTTP status */
+    if (response->status_code == 404) {
+        LOG_USER_ERROR("Workflow not found: %s\n", workflow_id);
+        arc_http_response_free(response);
+        return ARC_EXIT_ERROR;
+    } else if (response->status_code != 200) {
+        LOG_USER_ERROR("Command failed (HTTP %d)\n", response->status_code);
+        arc_http_response_free(response);
+        return ARC_EXIT_ERROR;
+    }
+
+    /* Parse and display response */
+    if (response->body) {
+        /* Simple JSON field extraction using sscanf */
+        char field[256] = {0};
+        const char* field_str = strstr(response->body, "\"field\"");
+        if (field_str) {
+            sscanf(field_str, "\"field\":\"%255[^\"]\"", field);
+        }
+        LOG_USER_SUCCESS("Operation succeeded: %s\n", field);
+    }
+
+    /* Cleanup */
+    arc_http_response_free(response);
+    return ARC_EXIT_SUCCESS;
+}
+```
+
+### Executor Progress Reporting Pattern
+```c
+/* Executor reports progress to daemon (in workflow executor) */
+static void report_progress(const char* workflow_id, int current_step,
+                           int total_steps, const char* step_name) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return;
+
+    char url[512];
+    char json_body[512];
+    snprintf(url, sizeof(url),
+            "http://localhost:9876/api/workflow/progress/%s", workflow_id);
+    snprintf(json_body, sizeof(json_body),
+            "{\"current_step\":%d,\"total_steps\":%d,\"step_name\":\"%s\"}",
+            current_step, total_steps, step_name ? step_name : "");
+
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_body);
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);  /* Best-effort */
+    curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);   /* Don't need response */
+
+    curl_easy_perform(curl);  /* Ignore errors */
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+}
+```
+
 ## Where to Find Things
 
 ### Common Utilities
@@ -327,6 +525,18 @@ offset += snprintf(buffer + offset, sizeof(buffer) - offset, "Part 2: %s\n", par
 - `argo_error_messages.h` - Internationalization-ready error strings
 - `argo_limits.h` - **All numeric constants** (buffer sizes, timeouts, permissions)
 - `argo_file_utils.h` - File operations (file_read_all)
+
+### Daemon-Specific
+- `argo_http_server.h` - HTTP server implementation (route handling, request/response)
+- `argo_daemon_api.h` - REST API handlers for all endpoints
+- `argo_orchestrator.h` - Workflow orchestration (fork/exec executors)
+- `arc_http_client.h` - HTTP client for arc CLI (daemon communication)
+
+### Workflow-Specific
+- `argo_workflow.h` - Workflow controller, step execution
+- `argo_workflow_loader.h` - JSON workflow template loading
+- `argo_workflow_checkpoint.h` - Save/restore workflow state
+- `argo_workflow_steps.h` - Step type implementations
 
 ### Constants by Category
 **HTTP** (`argo_http.h`):
@@ -369,6 +579,10 @@ ERR_MSG_HTTP_BAD_REQUEST, ERR_MSG_API_KEY_MISSING
 - API provider? Read `src/argo_claude_api.c` or `src/argo_openai_api.c`
 - Local provider? Read `src/argo_ollama.c`
 - CLI provider? Read `src/argo_claude_code.c`
+- Daemon API handler? Read `src/argo_daemon_api.c` (see `api_workflow_status`, `api_workflow_progress`)
+- Arc HTTP command? Read `arc/src/workflow_status.c` or `arc/src/workflow_abandon.c`
+- Executor implementation? Read `bin/argo_workflow_executor_main.c`
+- HTTP server? Read `src/argo_http_server.c`
 - Error handling? Read any provider init/query function
 - Testing? Read `tests/test_providers.c`
 
@@ -552,6 +766,30 @@ static int newprovider_query(ci_provider_t* provider, const char* prompt, char**
 - [ ] Test file created (`tests/test_newprovider.c`)
 
 ## Incomplete Features & Future Work
+
+### Daemon Architecture (Production Ready ✅)
+
+**Fully Implemented**:
+- HTTP server (custom, 350 lines, zero dependencies)
+- REST API endpoints (start, list, status, abandon, progress)
+- Workflow executor (complete implementation, not stub)
+- Bi-directional messaging (executor → daemon via HTTP POST)
+- Arc CLI integration (workflow_start, workflow_status, workflow_abandon use HTTP)
+- Process management (fork/exec, signal handling)
+- Error handling (consistent HTTP status codes, JSON responses)
+
+**Partial/Stub Implementations**:
+- `api_workflow_pause()` - Returns success but doesn't actually pause execution
+- `api_workflow_resume()` - Returns success but doesn't actually resume execution
+- `arc workflow list` - Still uses direct registry access (not HTTP yet)
+
+**Future Enhancements** (design documented, not implemented):
+- Long-polling for real-time updates
+- WebSocket upgrade for streaming progress
+- Distributed daemon coordination (multi-host)
+- Enhanced progress tracking in registry
+
+### Legacy Code (Pre-Daemon)
 
 **No-op Implementations** (complete but minimal):
 - `argo_registry.c`:

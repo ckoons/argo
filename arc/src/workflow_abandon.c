@@ -8,6 +8,8 @@
 #include "arc_http_client.h"
 #include "argo_error.h"
 #include "argo_output.h"
+#include "argo_limits.h"
+#include "argo_http_server.h"
 
 /* Get confirmation from user */
 static int get_confirmation(const char* workflow_name) {
@@ -43,7 +45,7 @@ int arc_workflow_abandon(int argc, char** argv) {
     }
 
     /* Build request URL */
-    char endpoint[512];
+    char endpoint[ARGO_PATH_MAX];
     snprintf(endpoint, sizeof(endpoint), "/api/workflow/abandon/%s", workflow_name);
 
     /* Send DELETE request to daemon */
@@ -56,12 +58,12 @@ int arc_workflow_abandon(int argc, char** argv) {
     }
 
     /* Check HTTP status */
-    if (response->status_code == 404) {
+    if (response->status_code == HTTP_STATUS_NOT_FOUND) {
         LOG_USER_ERROR("Workflow not found: %s\n", workflow_name);
         LOG_USER_INFO("  Try: arc workflow list\n");
         arc_http_response_free(response);
         return ARC_EXIT_ERROR;
-    } else if (response->status_code != 200) {
+    } else if (response->status_code != HTTP_STATUS_OK) {
         LOG_USER_ERROR("Failed to abandon workflow (HTTP %d)\n", response->status_code);
         if (response->body) {
             LOG_USER_INFO("  %s\n", response->body);

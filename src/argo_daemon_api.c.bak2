@@ -16,6 +16,7 @@
 #include "argo_error.h"
 #include "argo_json.h"
 #include "argo_limits.h"
+#include "argo_http.h"
 
 /* Global daemon context for API handlers */
 argo_daemon_t* g_api_daemon = NULL;
@@ -129,7 +130,7 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
     }
 
     /* Create workflow ID */
-    char workflow_id[ARGO_BUFFER_MEDIUM];
+    char workflow_id[256];
     snprintf(workflow_id, sizeof(workflow_id), "%s_%s", template_name, instance_name);
 
     /* Start workflow execution */
@@ -143,7 +144,7 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
     }
 
     /* Build success response */
-    char response_json[ARGO_PATH_MAX];
+    char response_json[512];
     snprintf(response_json, sizeof(response_json),
         "{\"status\":\"success\",\"workflow_id\":\"%s\",\"environment\":\"%s\"}",
         workflow_id, environment);
@@ -265,7 +266,7 @@ int api_workflow_status(http_request_t* req, http_response_t* resp) {
     }
 
     /* Build response */
-    char response_json[ARGO_PATH_MAX];
+    char response_json[512];
     snprintf(response_json, sizeof(response_json),
         "{\"workflow_id\":\"%s\",\"status\":\"%s\",\"pid\":%d,\"template\":\"%s\"}",
         info->id,
@@ -293,7 +294,7 @@ int api_workflow_pause(http_request_t* req, http_response_t* resp) {
     }
 
     /* For now, just return success - actual pause logic will be added */
-    char response_json[ARGO_BUFFER_MEDIUM];
+    char response_json[256];
     snprintf(response_json, sizeof(response_json),
         "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"paused\"}",
         workflow_id);
@@ -316,7 +317,7 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
     }
 
     /* For now, just return success */
-    char response_json[ARGO_BUFFER_MEDIUM];
+    char response_json[256];
     snprintf(response_json, sizeof(response_json),
         "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"resumed\"}",
         workflow_id);
@@ -371,7 +372,7 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
     /* Remove from registry */
     workflow_registry_remove_workflow(registry, workflow_id);
 
-    char response_json[ARGO_BUFFER_MEDIUM];
+    char response_json[256];
     snprintf(response_json, sizeof(response_json),
         "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"abandoned\"}",
         workflow_id);
@@ -425,7 +426,7 @@ int api_workflow_progress(http_request_t* req, http_response_t* resp) {
             workflow_id, current_step, total_steps, step_name);
 
     /* Return success */
-    char response_json[ARGO_BUFFER_MEDIUM];
+    char response_json[256];
     snprintf(response_json, sizeof(response_json),
             "{\"status\":\"success\",\"workflow_id\":\"%s\"}",
             workflow_id);

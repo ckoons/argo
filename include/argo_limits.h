@@ -15,6 +15,7 @@
 /* Small buffers for names, identifiers, and short strings */
 #define ARGO_BUFFER_TINY 32
 #define ARGO_BUFFER_SMALL 64
+#define ARGO_BUFFER_NAME 128
 #define ARGO_BUFFER_MEDIUM 256
 
 /* Standard I/O and content buffers */

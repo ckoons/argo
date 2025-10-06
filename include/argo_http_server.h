@@ -6,6 +6,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* HTTP status codes */
+#define HTTP_STATUS_OK 200
+#define HTTP_STATUS_BAD_REQUEST 400
+#define HTTP_STATUS_UNAUTHORIZED 401
+#define HTTP_STATUS_FORBIDDEN 403
+#define HTTP_STATUS_NOT_FOUND 404
+#define HTTP_STATUS_CONFLICT 409
+#define HTTP_STATUS_RATE_LIMIT 429
+#define HTTP_STATUS_SERVER_ERROR 500
+
 /* HTTP methods */
 typedef enum {
     HTTP_METHOD_GET,

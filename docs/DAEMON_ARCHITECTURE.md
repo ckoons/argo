@@ -11,12 +11,17 @@ The Argo daemon (`argo-daemon`) is the central orchestration service that manage
 ## Architecture Pattern
 
 ```
-arc CLI  <--HTTP-->  argo-daemon  <--HTTP-->  workflow_executor
-   ↓                      ↓                           ↓
-Commands            Orchestration                Step Execution
-State Query         State Management             CI Interaction
-User I/O            Registry/Lifecycle           Output Generation
+arc CLI  <--HTTP-->  argo-daemon  <--fork/exec-->  workflow_executor
+   ↓                      ↓                               ↓
+Commands            Orchestration                   Step Execution
+State Query         State Management                CI Interaction
+User I/O            Registry/Lifecycle              Progress Reporting (HTTP)
 ```
+
+**Communication:**
+- `arc → daemon`: HTTP REST API (POST, GET, DELETE)
+- `daemon → executor`: fork/exec process creation + signals (SIGTERM, SIGINT)
+- `executor → daemon`: HTTP progress updates (best-effort)
 
 ### Why HTTP Message Passing?
 
@@ -219,11 +224,71 @@ All requests/responses use JSON with standard format:
 }
 ```
 
-## Async Messaging Design
+## Implemented REST API
 
-### Message Queue Structure
+### Core Workflow Operations
 
-Both daemon and executor maintain message queues:
+**POST /api/workflow/start**
+- Start new workflow from template
+- Body: `{"template":"name","instance":"id","branch":"main","environment":"dev"}`
+- Returns: `{"status":"success","workflow_id":"...","environment":"..."}`
+- Errors: 404 (template not found), 409 (duplicate), 500 (internal)
+
+**GET /api/workflow/list**
+- List all active workflows
+- Returns: `{"workflows":[{"workflow_id":"...","status":"...","pid":123}]}`
+
+**GET /api/workflow/status/{id}**
+- Get status of specific workflow
+- Returns: `{"workflow_id":"...","status":"...","pid":123,"template":"..."}`
+- Errors: 404 (not found)
+
+**DELETE /api/workflow/abandon/{id}**
+- Terminate workflow and remove from registry
+- Returns: `{"status":"success","workflow_id":"...","action":"abandoned"}`
+- Errors: 404 (not found), 500 (kill failed)
+
+**POST /api/workflow/progress/{id}**
+- Executor reports progress (called by executor, not arc)
+- Body: `{"current_step":2,"total_steps":4,"step_name":"..."}`
+- Returns: `{"status":"success","workflow_id":"..."}`
+- Logged to daemon stderr: `[PROGRESS] workflow_id: step X/Y (step_name)`
+
+### Future Endpoints (Stubs)
+
+**POST /api/workflow/pause/{id}** - Pause workflow (stub, returns success)
+**POST /api/workflow/resume/{id}** - Resume workflow (stub, returns success)
+
+### Health & Info
+
+**GET /api/health** - Daemon health check
+**GET /api/version** - Daemon version info
+
+## Current Implementation Status
+
+### ✅ Fully Implemented
+
+- **Daemon core**: HTTP server (350 lines, zero dependencies), registry, lifecycle
+- **REST API**: All workflow operations (start, list, status, abandon, progress)
+- **Executor**: Complete workflow execution with step-by-step progress reporting
+- **Arc integration**: workflow_start, workflow_status, workflow_abandon use HTTP
+- **Bi-directional messaging**: Executor→Daemon progress via HTTP POST
+- **Process management**: fork/exec workflow executors, signal handling
+- **Error handling**: Consistent HTTP status codes, JSON error responses
+
+### 🔄 Partial/Stub Implementation
+
+- **Pause/Resume**: API endpoints return success but don't actually pause workflows
+- **workflow_list**: Arc command still uses direct registry access (not yet HTTP)
+- **Message queues**: Conceptual design documented, not implemented (HTTP sufficient for MVP)
+
+### 📋 Design-Only (Future Work)
+
+- **Long-polling**: For real-time updates (documented, not implemented)
+- **WebSocket upgrade**: For streaming progress (design phase)
+- **Distributed daemon**: Multi-host coordination (architectural notes only)
+
+## Messaging Design (Reference)
 
 ```c
 typedef struct {
