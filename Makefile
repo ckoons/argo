@@ -268,9 +268,9 @@ $(WORKFLOW_LIB): $(WORKFLOW_OBJECTS)
 	ar rcs $@ $^
 	@echo "Created workflow library: $@"
 
-# Build workflow executor binary (needs core + workflow)
-$(EXECUTOR_BINARY): $(EXECUTOR_SOURCE) $(CORE_LIB) $(WORKFLOW_LIB)
-	$(CC) $(CFLAGS) $< $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+# Build workflow executor binary (needs core + daemon + workflow)
+$(EXECUTOR_BINARY): $(EXECUTOR_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@echo "Built workflow executor: $@"
 
 # Build daemon binary (needs core + daemon + workflow)
@@ -278,9 +278,9 @@ $(DAEMON_BINARY): $(DAEMON_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
 	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@echo "Built daemon: $@"
 
-# Build script executables
-$(BUILD_DIR)/%: $(SCRIPT_DIR)/%.c $(CORE_LIB)
-	$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
+# Build script executables (need core + daemon + workflow)
+$(BUILD_DIR)/%: $(SCRIPT_DIR)/%.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@ln -sf ../build/$(@F) $(SCRIPT_DIR)/$(@F)
 	@echo "Built script: $(@F) -> scripts/$(@F)"
 
