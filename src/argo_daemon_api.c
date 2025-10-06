@@ -182,9 +182,9 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
     }
 
     /* Get workflow list */
-    workflow_instance_t* workflows[64];
+    workflow_instance_t* workflows = NULL;
     int count = 0;
-    result = workflow_registry_list(registry, workflows, &count);
+    result = workflow_registry_list(registry, &workflows, &count);
     if (result != ARGO_SUCCESS) {
         workflow_registry_destroy(registry);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to list workflows");
@@ -214,9 +214,9 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
         }
         offset += snprintf(json_response + offset, 4096 - offset,
             "{\"workflow_id\":\"%s\",\"status\":\"%s\",\"pid\":%d}",
-            workflows[i]->id,
-            workflow_status_string(workflows[i]->status),
-            workflows[i]->pid);
+            workflows[i].id,
+            workflow_status_string(workflows[i].status),
+            workflows[i].pid);
     }
 
     offset += snprintf(json_response + offset, 4096 - offset, "]}");

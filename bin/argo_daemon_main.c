@@ -40,6 +40,24 @@ static void print_usage(const char* prog) {
 
 int main(int argc, char** argv) {
     uint16_t port = DEFAULT_DAEMON_PORT;
+    char cwd[512];
+
+    /* Log startup - do this FIRST before any crashes */
+    fprintf(stderr, "=== Argo Daemon Starting ===\n");
+
+    /* Get and log current directory */
+    if (getcwd(cwd, sizeof(cwd))) {
+        fprintf(stderr, "Current directory: %s\n", cwd);
+    } else {
+        fprintf(stderr, "WARNING: Could not get current directory\n");
+    }
+
+    /* Log all relevant environment variables */
+    fprintf(stderr, "Environment variables:\n");
+    fprintf(stderr, "  ARGO_DAEMON_PORT = %s\n", getenv("ARGO_DAEMON_PORT") ? getenv("ARGO_DAEMON_PORT") : "(not set)");
+    fprintf(stderr, "  ARC_ENV = %s\n", getenv("ARC_ENV") ? getenv("ARC_ENV") : "(not set)");
+    fprintf(stderr, "  HOME = %s\n", getenv("HOME") ? getenv("HOME") : "(not set)");
+    fprintf(stderr, "  PWD = %s\n", getenv("PWD") ? getenv("PWD") : "(not set)");
 
     /* Check environment variable */
     const char* env_port = getenv("ARGO_DAEMON_PORT");
@@ -47,6 +65,7 @@ int main(int argc, char** argv) {
         int p = atoi(env_port);
         if (p > 0 && p < 65536) {
             port = (uint16_t)p;
+            fprintf(stderr, "Using port from ARGO_DAEMON_PORT: %d\n", port);
         }
     }
 
@@ -57,6 +76,7 @@ int main(int argc, char** argv) {
                 int p = atoi(argv[++i]);
                 if (p > 0 && p < 65536) {
                     port = (uint16_t)p;
+                    fprintf(stderr, "Using port from --port argument: %d\n", port);
                 } else {
                     fprintf(stderr, "Error: Invalid port: %s\n", argv[i]);
                     return 1;
@@ -76,6 +96,10 @@ int main(int argc, char** argv) {
         }
     }
 
+    fprintf(stderr, "Final port: %d\n", port);
+    fprintf(stderr, "============================\n");
+    fflush(stderr);
+
     /* Create daemon */
     g_daemon = argo_daemon_create(port);
     if (!g_daemon) {
@@ -88,9 +112,12 @@ int main(int argc, char** argv) {
     signal(SIGTERM, signal_handler);
 
     /* Start daemon (blocks until stopped) */
+    fprintf(stderr, "Starting daemon on port %d...\n", port);
+    fflush(stderr);
     int result = argo_daemon_start(g_daemon);
 
     /* Cleanup */
+    fprintf(stderr, "Daemon stopping...\n");
     argo_daemon_destroy(g_daemon);
     g_daemon = NULL;
 

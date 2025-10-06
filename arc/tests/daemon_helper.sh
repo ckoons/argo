@@ -6,8 +6,12 @@
 
 # Daemon configuration
 DAEMON_PORT=${ARGO_DAEMON_PORT:-9876}
-# Use bin/argo-daemon (works from project root where tests run)
-DAEMON_BIN="bin/argo-daemon"
+# Daemon binary - use absolute path if PROJECT_ROOT is set
+if [[ -n "$PROJECT_ROOT" ]]; then
+    DAEMON_BIN="$PROJECT_ROOT/bin/argo-daemon"
+else
+    DAEMON_BIN="bin/argo-daemon"
+fi
 DAEMON_LOG="/tmp/argo_test_daemon.log"
 DAEMON_PID_FILE="/tmp/argo_test_daemon.pid"
 
@@ -37,9 +41,13 @@ start_test_daemon() {
         return 1
     fi
 
-    # Start daemon
+    # Start daemon (must run from project root to find workflows/templates)
     echo "Starting test daemon on port $DAEMON_PORT..."
-    $DAEMON_BIN --port $DAEMON_PORT > "$DAEMON_LOG" 2>&1 &
+    if [[ -n "$PROJECT_ROOT" ]]; then
+        (cd "$PROJECT_ROOT" && exec "$DAEMON_BIN" --port $DAEMON_PORT) > "$DAEMON_LOG" 2>&1 &
+    else
+        $DAEMON_BIN --port $DAEMON_PORT > "$DAEMON_LOG" 2>&1 &
+    fi
     local daemon_pid=$!
 
     # Save PID
