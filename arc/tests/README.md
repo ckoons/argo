@@ -2,6 +2,8 @@
 
 Complete testing infrastructure for the Arc CLI, organized from fast unit tests to comprehensive integration tests.
 
+**IMPORTANT**: All arc tests require the **argo-daemon** to be running. Tests automatically start/stop the daemon using `daemon_helper.sh`.
+
 ## Test Layers
 
 ### Layer 1: Unit Tests (Fast, Always Run)
@@ -93,6 +95,43 @@ make test-arc-workflow     # Just workflow tests
 make test-arc-background   # Just background tests
 ```
 
+## Daemon Requirement
+
+All arc tests now communicate with workflows through the **argo-daemon** HTTP API.
+
+### Daemon Helper (`daemon_helper.sh`)
+
+Test scripts use `daemon_helper.sh` to automatically manage the daemon:
+
+**Functions provided:**
+- `start_test_daemon()` - Start daemon on port 9876
+- `stop_test_daemon()` - Stop daemon gracefully
+- `is_daemon_running()` - Check daemon status
+- `wait_for_daemon()` - Wait for daemon to be ready
+- `daemon_status()` - Show daemon info
+
+**Automatic behavior:**
+- Tests start daemon before running
+- Tests stop daemon on exit (cleanup)
+- Daemon health checked before tests proceed
+- Logs written to `/tmp/argo_test_daemon.log`
+
+### Architecture Change
+
+**Before (Direct Access)**:
+```
+arc commands → registry/orchestrator (direct)
+```
+
+**Now (Daemon-Based)**:
+```
+arc commands → HTTP → argo-daemon → registry/orchestrator
+                           ↓
+                    workflow_executor
+```
+
+All workflow operations (`start`, `status`, `abandon`, etc.) now go through the daemon's REST API.
+
 ## Test Environment Isolation
 
 All tests use `ARC_ENV=test` to ensure:
@@ -100,6 +139,7 @@ All tests use `ARC_ENV=test` to ensure:
 - Clean separation of test data
 - Easy cleanup after tests
 - Repeatable test runs
+- Daemon runs in isolated test mode
 
 ## Test Results
 
