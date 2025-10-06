@@ -8,6 +8,7 @@
 
 /* Project includes */
 #include "argo_daemon.h"
+#include "argo_daemon_api.h"
 #include "argo_error.h"
 #include "argo_http_server.h"
 #include "argo_registry.h"
@@ -98,12 +99,15 @@ int daemon_handle_version(http_request_t* req, http_response_t* resp) {
 int argo_daemon_start(argo_daemon_t* daemon) {
     if (!daemon) return E_INVALID_PARAMS;
 
-    /* Register routes */
+    /* Register basic routes */
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
                          "/api/health", daemon_handle_health);
 
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
                          "/api/version", daemon_handle_version);
+
+    /* Register API routes */
+    argo_daemon_register_api_routes(daemon);
 
     printf("Argo Daemon starting on port %d\n", daemon->port);
 

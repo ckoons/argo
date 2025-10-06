@@ -57,7 +57,8 @@ DAEMON_SOURCES = $(SRC_DIR)/argo_registry.c \
                  $(SRC_DIR)/argo_workflow_templates.c \
                  $(SRC_DIR)/argo_merge.c \
                  $(SRC_DIR)/argo_http_server.c \
-                 $(SRC_DIR)/argo_daemon.c
+                 $(SRC_DIR)/argo_daemon.c \
+                 $(SRC_DIR)/argo_daemon_api.c
 
 # Workflow library sources (workflow execution)
 WORKFLOW_SOURCES = $(SRC_DIR)/argo_workflow.c \
