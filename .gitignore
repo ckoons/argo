@@ -4,11 +4,24 @@ argo_local.h
 argo_local_models.h
 include/argo_local_models.h
 .env.argo.local
-build/
 
-# Binaries (built artifacts, not source)
-bin/argo-daemon
-bin/argo_workflow_executor
+# Build artifacts (whitelist approach - ignore all, allow none)
+build/
+bin/*
+
+# Script binaries (built from scripts/utils/*.c)
+scripts/argo_monitor
+scripts/argo_ci_assign
+scripts/argo_update_models
+scripts/argo_memory_inspect
+scripts/argo_workflow_tracer
+
+# Component binaries
+arc/arc
+ui/argo-term/argo-term
+
+# Debug symbols everywhere
+**/*.dSYM/
 
 # CRITICAL: Never commit API keys
 src/x

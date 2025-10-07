@@ -112,20 +112,20 @@ DAEMON_LIB = $(BUILD_DIR)/libargo_daemon.a
 WORKFLOW_LIB = $(BUILD_DIR)/libargo_workflow.a
 
 # Script sources
-SCRIPT_SOURCES = $(SCRIPT_DIR)/argo_monitor.c \
-                 $(SCRIPT_DIR)/argo_memory_inspect.c \
-                 $(SCRIPT_DIR)/argo_update_models.c \
-                 $(SCRIPT_DIR)/argo_ci_assign.c \
-                 $(SCRIPT_DIR)/argo_workflow_tracer.c
+SCRIPT_SOURCES = $(SCRIPT_DIR)/utils/argo_monitor.c \
+                 $(SCRIPT_DIR)/utils/argo_memory_inspect.c \
+                 $(SCRIPT_DIR)/utils/argo_update_models.c \
+                 $(SCRIPT_DIR)/utils/argo_ci_assign.c \
+                 $(SCRIPT_DIR)/utils/argo_workflow_tracer.c
 
 # Script executables
-SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
+SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/utils/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
 
 # Binaries
 EXECUTOR_BINARY = bin/argo_workflow_executor
-EXECUTOR_SOURCE = bin/argo_workflow_executor_main.c
+EXECUTOR_SOURCE = $(SRC_DIR)/argo_workflow_executor_main.c
 DAEMON_BINARY = bin/argo-daemon
-DAEMON_SOURCE = bin/argo_daemon_main.c
+DAEMON_SOURCE = $(SRC_DIR)/argo_daemon_main.c
 
 # Test files
 TEST_SOURCES = $(TEST_DIR)/test_ci_providers.c
@@ -279,7 +279,7 @@ $(DAEMON_BINARY): $(DAEMON_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
 	@echo "Built daemon: $@"
 
 # Build script executables (need core + daemon + workflow)
-$(BUILD_DIR)/%: $(SCRIPT_DIR)/%.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+$(BUILD_DIR)/%: $(SCRIPT_DIR)/utils/%.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
 	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@ln -sf ../build/$(@F) $(SCRIPT_DIR)/$(@F)
 	@echo "Built script: $(@F) -> scripts/$(@F)"
