@@ -20,6 +20,7 @@
 #include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_json.h"
+#include "argo_claude.h"  /* For claude_code_create_provider */
 
 /* Helper: Generate unique task ID (thread-safe) */
 static void generate_task_id(char* id_out, size_t len) {
@@ -53,7 +54,15 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
     workflow->state = WORKFLOW_STATE_IDLE;
     workflow->registry = registry;
     workflow->lifecycle = lifecycle;
-    workflow->provider = NULL;          /* No provider by default */
+
+    /* Create default Claude Code provider */
+    workflow->provider = claude_code_create_provider(workflow_id);
+    if (!workflow->provider) {
+        LOG_WARN("Failed to create Claude Code provider, workflow will have no AI");
+    } else {
+        LOG_INFO("Workflow using Claude Code provider");
+    }
+
     workflow->tasks = NULL;
     workflow->total_tasks = 0;
     workflow->completed_tasks = 0;
