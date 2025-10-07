@@ -12,6 +12,7 @@
 #include "argo_daemon.h"
 #include "argo_error.h"
 #include "argo_env_utils.h"
+#include "argo_limits.h"
 
 /* Default port */
 #define DEFAULT_DAEMON_PORT 9876
@@ -40,7 +41,7 @@ static void print_usage(const char* prog) {
 
 int main(int argc, char** argv) {
     uint16_t port = DEFAULT_DAEMON_PORT;
-    char cwd[512];
+    char cwd[ARGO_PATH_MAX];
 
     /* Log startup - do this FIRST before any crashes */
     fprintf(stderr, "=== Argo Daemon Starting ===\n");

@@ -235,16 +235,16 @@ int workflow_exec_get_state(const char* workflow_id,
                 snprintf(state->last_checkpoint, sizeof(state->last_checkpoint),
                         "%s", checkpoint_path);
             } else {
-                strcpy(state->current_step, "Running");
+                snprintf(state->current_step, sizeof(state->current_step), "Running");
                 state->step_number = 0;
                 state->total_steps = 0;
-                strcpy(state->last_checkpoint, "No checkpoint available");
+                snprintf(state->last_checkpoint, sizeof(state->last_checkpoint), "No checkpoint available");
             }
         } else {
-            strcpy(state->current_step, "Running (no checkpoint)");
+            snprintf(state->current_step, sizeof(state->current_step), "Running (no checkpoint)");
             state->step_number = 0;
             state->total_steps = 0;
-            strcpy(state->last_checkpoint, "No checkpoint file");
+            snprintf(state->last_checkpoint, sizeof(state->last_checkpoint), "No checkpoint file");
         }
     }
 

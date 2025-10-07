@@ -217,3 +217,37 @@ int persona_registry_parse_json(persona_registry_t* registry,
     LOG_DEBUG("Parsed %d personas from workflow", registry->count);
     return ARGO_SUCCESS;
 }
+
+/* Build AI prompt with persona context */
+int workflow_persona_build_prompt(workflow_persona_t* persona,
+                                   const char* prompt,
+                                   char* output,
+                                   size_t output_size) {
+    if (!prompt || !output) {
+        argo_report_error(E_INPUT_NULL, "workflow_persona_build_prompt", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    if (!persona) {
+        /* No persona - use prompt directly */
+        if (strlen(prompt) >= output_size) {
+            argo_report_error(E_INPUT_TOO_LARGE, "workflow_persona_build_prompt", "prompt too large");
+            return E_INPUT_TOO_LARGE;
+        }
+        strncpy(output, prompt, output_size - 1);
+        output[output_size - 1] = '\0';
+        return ARGO_SUCCESS;
+    }
+
+    /* Build prompt with persona context */
+    int written = snprintf(output, output_size,
+                          "You are %s, a %s. Your communication style is: %s.\n\n%s",
+                          persona->name, persona->role, persona->style, prompt);
+
+    if (written < 0 || (size_t)written >= output_size) {
+        argo_report_error(E_INPUT_TOO_LARGE, "workflow_persona_build_prompt", "constructed prompt too large");
+        return E_INPUT_TOO_LARGE;
+    }
+
+    return ARGO_SUCCESS;
+}

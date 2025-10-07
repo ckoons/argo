@@ -63,16 +63,26 @@ static int ensure_capacity(workflow_context_t* ctx) {
 
     int new_capacity = ctx->capacity * 2;
 
+    /* Reallocate keys first */
     char** new_keys = realloc(ctx->keys, new_capacity * sizeof(char*));
-    char** new_values = realloc(ctx->values, new_capacity * sizeof(char*));
-
-    if (!new_keys || !new_values) {
-        free(new_keys);
-        free(new_values);
-        argo_report_error(E_SYSTEM_MEMORY, "ensure_capacity", "realloc failed");
+    if (!new_keys) {
+        argo_report_error(E_SYSTEM_MEMORY, "ensure_capacity", "keys realloc failed");
         return E_SYSTEM_MEMORY;
     }
 
+    /* Reallocate values second - keys succeeded so we can update ctx */
+    char** new_values = realloc(ctx->values, new_capacity * sizeof(char*));
+    if (!new_values) {
+        /* Keys realloc succeeded but values failed - restore keys and fail */
+        char** restored_keys = realloc(new_keys, ctx->capacity * sizeof(char*));
+        if (restored_keys) {
+            ctx->keys = restored_keys;
+        }
+        argo_report_error(E_SYSTEM_MEMORY, "ensure_capacity", "values realloc failed");
+        return E_SYSTEM_MEMORY;
+    }
+
+    /* Both succeeded - update context */
     ctx->keys = new_keys;
     ctx->values = new_values;
     ctx->capacity = new_capacity;

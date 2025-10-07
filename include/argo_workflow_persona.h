@@ -55,4 +55,10 @@ int persona_registry_parse_json(persona_registry_t* registry,
                                 void* tokens,
                                 int token_count);
 
+/* Build AI prompt with persona context */
+int workflow_persona_build_prompt(workflow_persona_t* persona,
+                                   const char* prompt,
+                                   char* output,
+                                   size_t output_size);
+
 #endif /* ARGO_WORKFLOW_PERSONA_H */

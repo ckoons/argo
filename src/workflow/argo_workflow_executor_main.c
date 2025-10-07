@@ -37,8 +37,8 @@ static void report_progress(const char* workflow_id, int current_step, int total
     CURL* curl = curl_easy_init();
     if (!curl) return;
 
-    char url[512];
-    char json_body[512];
+    char url[ARGO_PATH_MAX];
+    char json_body[ARGO_PATH_MAX];
     snprintf(url, sizeof(url), "http://localhost:9876/api/workflow/progress/%s", workflow_id);
     snprintf(json_body, sizeof(json_body),
             "{\"current_step\":%d,\"total_steps\":%d,\"step_name\":\"%s\"}",

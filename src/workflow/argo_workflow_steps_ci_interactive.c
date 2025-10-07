@@ -47,46 +47,11 @@ static void capture_response_callback(const ci_response_t* response, void* userd
 
     /* Log failed responses with their content */
     if (!response->success) {
-        LOG_ERROR("Provider returned error response: %s", capture->buffer);
-        /* Also print to stdout so it appears in workflow log */
-        fprintf(stderr, "\n[ERROR] Provider returned error response:\n%s\n", capture->buffer);
-        fflush(stderr);
+        argo_report_error(E_CI_TIMEOUT, "capture_response_callback",
+                         "Provider returned error response: %s", capture->buffer);
     }
 }
 
-/* Helper: Build AI prompt with persona context */
-static int build_ai_prompt_with_persona(workflow_persona_t* persona,
-                                         const char* prompt,
-                                         char* output,
-                                         size_t output_size) {
-    if (!prompt || !output) {
-        argo_report_error(E_INPUT_NULL, "build_ai_prompt_with_persona", "parameter is NULL");
-        return E_INPUT_NULL;
-    }
-
-    if (!persona) {
-        /* No persona - use prompt directly */
-        if (strlen(prompt) >= output_size) {
-            argo_report_error(E_INPUT_TOO_LARGE, "build_ai_prompt_with_persona", "prompt too large");
-            return E_INPUT_TOO_LARGE;
-        }
-        strncpy(output, prompt, output_size - 1);
-        output[output_size - 1] = '\0';
-        return ARGO_SUCCESS;
-    }
-
-    /* Build prompt with persona context */
-    int written = snprintf(output, output_size,
-                          "You are %s, a %s. Your communication style is: %s.\n\n%s",
-                          persona->name, persona->role, persona->style, prompt);
-
-    if (written < 0 || (size_t)written >= output_size) {
-        argo_report_error(E_INPUT_TOO_LARGE, "build_ai_prompt_with_persona", "constructed prompt too large");
-        return E_INPUT_TOO_LARGE;
-    }
-
-    return ARGO_SUCCESS;
-}
 
 /* Helper: Generate conversational question using AI */
 static int generate_conversational_question(ci_provider_t* provider,
@@ -124,11 +89,9 @@ static int generate_conversational_question(ci_provider_t* provider,
     }
 
     /* Fallback to original question */
-    LOG_ERROR("AI query failed (error %d), response: %s",
-             result, capture.bytes_written > 0 ? response : "(empty)");
-    fprintf(stderr, "\n[ERROR] AI query failed (error %d), response: %s\n",
-            result, capture.bytes_written > 0 ? response : "(empty)");
-    fflush(stderr);
+    argo_report_error(result, "generate_conversational_question",
+                     "AI query failed, response: %s",
+                     capture.bytes_written > 0 ? response : "(empty)");
     snprintf(output, output_size, "%s", question);
     return E_CI_TIMEOUT;  /* Query failed, use timeout as closest match */
 }
@@ -364,7 +327,7 @@ int step_ci_present(workflow_controller_t* workflow,
 
         /* Build AI prompt with persona */
         char ai_prompt[STEP_AI_PROMPT_BUFFER_SIZE];
-        result = build_ai_prompt_with_persona(persona, task, ai_prompt, sizeof(ai_prompt));
+        result = workflow_persona_build_prompt(persona, task, ai_prompt, sizeof(ai_prompt));
         if (result != ARGO_SUCCESS) {
             return result;
         }
@@ -384,11 +347,9 @@ int step_ci_present(workflow_controller_t* workflow,
             /* Display AI-formatted presentation */
             printf("\n%s\n", response);
         } else {
-            LOG_ERROR("AI query failed (error %d), response: %s",
-                     result, capture.bytes_written > 0 ? response : "(empty)");
-            fprintf(stderr, "\n[ERROR] AI query failed (error %d), response: %s\n",
-                    result, capture.bytes_written > 0 ? response : "(empty)");
-            fflush(stderr);
+            argo_report_error(result, "step_ci_present",
+                             "AI query failed, response: %s",
+                             capture.bytes_written > 0 ? response : "(empty)");
             printf("\nData source: %s\n", data_path);
             printf("(AI formatting unavailable)\n");
         }

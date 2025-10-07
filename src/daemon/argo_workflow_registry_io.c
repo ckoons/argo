@@ -11,6 +11,7 @@
 #include "argo_error.h"
 #include "argo_log.h"
 #include "argo_file_utils.h"
+#include "argo_limits.h"
 
 /* Forward declaration from jsmn.h */
 typedef struct jsmntok {
@@ -43,14 +44,14 @@ static int mkdir_recursive(const char* path) {
     for (p = tmp + 1; *p; p++) {
         if (*p == '/') {
             *p = '\0';
-            if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+            if (mkdir(tmp, ARGO_DIR_PERMISSIONS) != 0 && errno != EEXIST) {
                 return E_SYSTEM_FILE;
             }
             *p = '/';
         }
     }
 
-    if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(tmp, ARGO_DIR_PERMISSIONS) != 0 && errno != EEXIST) {
         return E_SYSTEM_FILE;
     }
 

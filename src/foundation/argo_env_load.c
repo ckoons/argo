@@ -319,7 +319,7 @@ static char* expand_value(const char* value, int depth) {
                             size_t exp_len = strlen(expanded);
 
                             if (result_len + exp_len < sizeof(result) - 1) {
-                                strcpy(result + result_len, expanded);
+                                snprintf(result + result_len, sizeof(result) - result_len, "%s", expanded);
                                 result_len += exp_len;
                             }
                             free(expanded);

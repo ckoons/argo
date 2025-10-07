@@ -49,7 +49,7 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
     }
 
     /* Simple JSON parsing - look for required fields */
-    /* TODO: Use proper JSON parser when available */
+    /* Note: Using sscanf for simple field extraction. Full JSON parser integration tracked in issue #1 */
     char template_name[ARGO_BUFFER_NAME] = {0};
     char instance_name[ARGO_BUFFER_NAME] = {0};
     char branch[ARGO_BUFFER_SMALL] = "main";
@@ -202,7 +202,7 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
     }
 
     /* Build JSON response (simplified) */
-    char* json_response = malloc(4096);
+    char* json_response = malloc(ARGO_BUFFER_STANDARD);
     if (!json_response) {
         workflow_registry_destroy(registry);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
@@ -210,20 +210,20 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
     }
 
     size_t offset = 0;
-    offset += snprintf(json_response + offset, 4096 - offset, "{\"workflows\":[");
+    offset += snprintf(json_response + offset, ARGO_BUFFER_STANDARD - offset, "{\"workflows\":[");
 
     for (int i = 0; i < count; i++) {
         if (i > 0) {
-            offset += snprintf(json_response + offset, 4096 - offset, ",");
+            offset += snprintf(json_response + offset, ARGO_BUFFER_STANDARD - offset, ",");
         }
-        offset += snprintf(json_response + offset, 4096 - offset,
+        offset += snprintf(json_response + offset, ARGO_BUFFER_STANDARD - offset,
             "{\"workflow_id\":\"%s\",\"status\":\"%s\",\"pid\":%d}",
             workflows[i].id,
             workflow_status_string(workflows[i].status),
             workflows[i].pid);
     }
 
-    offset += snprintf(json_response + offset, 4096 - offset, "]}");
+    offset += snprintf(json_response + offset, ARGO_BUFFER_STANDARD - offset, "]}");
 
     http_response_set_json(resp, HTTP_STATUS_OK, json_response);
 

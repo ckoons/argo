@@ -47,46 +47,11 @@ static void capture_response_callback(const ci_response_t* response, void* userd
 
     /* Log failed responses with their content */
     if (!response->success) {
-        LOG_ERROR("Provider returned error response: %s", capture->buffer);
-        /* Also print to stdout so it appears in workflow log */
-        fprintf(stderr, "\n[ERROR] Provider returned error response:\n%s\n", capture->buffer);
-        fflush(stderr);
+        argo_report_error(E_CI_TIMEOUT, "capture_response_callback",
+                         "Provider returned error response: %s", capture->buffer);
     }
 }
 
-/* Helper: Build AI prompt with persona context */
-static int build_ai_prompt_with_persona(workflow_persona_t* persona,
-                                         const char* prompt,
-                                         char* output,
-                                         size_t output_size) {
-    if (!prompt || !output) {
-        argo_report_error(E_INPUT_NULL, "build_ai_prompt_with_persona", "parameter is NULL");
-        return E_INPUT_NULL;
-    }
-
-    if (!persona) {
-        /* No persona - use prompt directly */
-        if (strlen(prompt) >= output_size) {
-            argo_report_error(E_INPUT_TOO_LARGE, "build_ai_prompt_with_persona", "prompt too large");
-            return E_INPUT_TOO_LARGE;
-        }
-        strncpy(output, prompt, output_size - 1);
-        output[output_size - 1] = '\0';
-        return ARGO_SUCCESS;
-    }
-
-    /* Build prompt with persona context */
-    int written = snprintf(output, output_size,
-                          "You are %s, a %s. Your communication style is: %s.\n\n%s",
-                          persona->name, persona->role, persona->style, prompt);
-
-    if (written < 0 || (size_t)written >= output_size) {
-        argo_report_error(E_INPUT_TOO_LARGE, "build_ai_prompt_with_persona", "constructed prompt too large");
-        return E_INPUT_TOO_LARGE;
-    }
-
-    return ARGO_SUCCESS;
-}
 
 /* Step: ci_ask */
 int step_ci_ask(workflow_controller_t* workflow,
@@ -179,11 +144,9 @@ int step_ci_ask(workflow_controller_t* workflow,
         } else {
             /* Fall back to template prompt */
             if (result != ARGO_SUCCESS) {
-                LOG_ERROR("AI query failed (error %d), response: %s",
-                         result, capture.bytes_written > 0 ? response : "(empty)");
-                fprintf(stderr, "\n[ERROR] AI query failed (error %d), response: %s\n",
-                        result, capture.bytes_written > 0 ? response : "(empty)");
-                fflush(stderr);
+                argo_report_error(result, "step_ci_ask",
+                                 "AI query failed, response: %s",
+                                 capture.bytes_written > 0 ? response : "(empty)");
             }
             if (persona->name[0] != '\0') {
                 snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, prompt);
@@ -288,7 +251,7 @@ int step_ci_analyze(workflow_controller_t* workflow,
     if (workflow->provider) {
         /* Build AI prompt with persona context and task */
         char ai_prompt[STEP_AI_PROMPT_BUFFER_SIZE];
-        result = build_ai_prompt_with_persona(persona, task, ai_prompt, sizeof(ai_prompt));
+        result = workflow_persona_build_prompt(persona, task, ai_prompt, sizeof(ai_prompt));
         if (result != ARGO_SUCCESS) {
             return result;
         }
@@ -305,11 +268,9 @@ int step_ci_analyze(workflow_controller_t* workflow,
                                           capture_response_callback, &capture);
 
         if (result != ARGO_SUCCESS) {
-            LOG_ERROR("AI query failed (error %d), response: %s",
-                     result, capture.bytes_written > 0 ? response : "(empty)");
-            fprintf(stderr, "\n[ERROR] AI query failed (error %d), response: %s\n",
-                    result, capture.bytes_written > 0 ? response : "(empty)");
-            fflush(stderr);
+            argo_report_error(result, "step_ci_analyze",
+                             "AI query failed, response: %s",
+                             capture.bytes_written > 0 ? response : "(empty)");
             /* Fall back to placeholder result */
             result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
         } else {

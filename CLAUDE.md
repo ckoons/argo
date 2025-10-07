@@ -209,9 +209,16 @@ Before writing code:
 ### Error Reporting
 - **ONLY use `argo_report_error()` for ALL errors** - single breakpoint location
 - Format: `argo_report_error(code, "function_name", "additional details")`
-- Never use `fprintf(stderr, ...)` or `LOG_ERROR()` directly for errors
+- Never use `fprintf(stderr, ...)` for error reporting
 - `LOG_ERROR()` is for informational logging only (non-error events)
 - All errors route through one function for consistent format and debugging
+
+**Acceptable stderr Usage**:
+- Daemon startup diagnostics (before logging system initialized)
+- Usage messages and help text
+- Progress reporting for long-running operations (non-error status)
+- Test output and debugging information
+- **Never for error reporting** - use `argo_report_error()` exclusively
 
 ### Code Organization
 - Max 600 lines per .c file (refactor if approaching, 3% tolerance acceptable)
@@ -937,7 +944,9 @@ Currently we use `snprintf()` for JSON which works fine for simple cases. Implem
 - Quality over quantity - do less perfectly rather than more poorly
 - Code you'd want to debug at 3am
 - Tests catch bugs, simplicity prevents them
-- Budget: 3,217 / 10,000 lines (32%) - plenty of room to grow
+- Budget: 15,953 lines actual (original target was 10,000 lines)
+- Scope expansion: 9 AI providers, daemon architecture, workflow engine, registry/lifecycle
+- Note: Original 10K budget was for MVP. Current codebase reflects production-ready multi-provider system
 - All 33 tests passing
 - 6 API providers (claude, openai, gemini, grok, deepseek, openrouter)
 

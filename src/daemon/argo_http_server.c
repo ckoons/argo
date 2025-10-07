@@ -165,7 +165,7 @@ static route_handler_fn find_route(http_server_t* server, http_request_t* req) {
 
 /* Send HTTP response */
 static void send_http_response(int client_fd, http_response_t* resp) {
-    char header[1024];
+    char header[ARGO_BUFFER_MEDIUM];
     int header_len = snprintf(header, sizeof(header),
         "HTTP/1.1 %d OK\r\n"
         "Content-Type: %s\r\n"
@@ -371,7 +371,7 @@ void http_response_set_json(http_response_t* resp, int status, const char* json_
 void http_response_set_error(http_response_t* resp, int status, const char* error_msg) {
     if (!resp) return;
 
-    char json[512];
+    char json[ARGO_PATH_MAX];
     snprintf(json, sizeof(json),
         "{\"status\":\"error\",\"message\":\"%s\"}",
         error_msg ? error_msg : "Unknown error");
