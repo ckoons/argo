@@ -79,12 +79,19 @@ $(BUILD_DIR)/stubs.c:
 	@echo "" >> $@
 	@echo "/* Error strings now in argo_error.c - no stub needed */" >> $@
 
-# Compile source files
+# Compile source files (handle subdirectories)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Compile test files
-$(BUILD_DIR)/%.o: $(TEST_DIR)/%.c
+# Compile test files from unit directory
+$(BUILD_DIR)/%.o: $(TEST_UNIT_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Compile test files from integration directory
+$(BUILD_DIR)/%.o: $(TEST_INTEGRATION_DIR)/%.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Compile stub file
@@ -129,13 +136,13 @@ bin/tests/%: $(OBJECTS) $(BUILD_DIR)/%.o $(STUB_OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Build harness executables into bin/tests/
-bin/tests/harness_%: tests/harness_%.c $(CORE_LIB)
+bin/tests/harness_%: $(TEST_INTEGRATION_DIR)/harness_%.c $(CORE_LIB)
 	@mkdir -p bin/tests
 	@echo "Building harness_$*..."
 	@$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
 
 # Component builds
-arc: $(CORE_LIB)
+arc: $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
 	@$(MAKE) -C arc
 
 ui: arc
