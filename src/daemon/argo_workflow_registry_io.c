@@ -119,7 +119,7 @@ static int parse_workflow_entry(const char* json, jsmntok_t* tokens,
     /* Extract status */
     field_idx = workflow_json_find_field(json, tokens, token_idx, "status");
     if (field_idx >= 0) {
-        char status_str[32];
+        char status_str[ARGO_BUFFER_TINY];
         workflow_json_extract_string(json, &tokens[field_idx],
                                     status_str, sizeof(status_str));
         wf->status = parse_workflow_status(status_str);

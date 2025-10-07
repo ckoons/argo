@@ -64,19 +64,19 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    /* Extract values (simplified) */
-    sscanf(template_str, "\"template\":\"%127[^\"]\"", template_name);
-    sscanf(instance_str, "\"instance\":\"%127[^\"]\"", instance_name);
+    /* Extract values (simplified) - using ARGO_BUFFER_NAME - 1 for scanf */
+    sscanf(template_str, "\"template\":\"%127[^\"]\"", template_name);  /* ARGO_BUFFER_NAME = 128 */
+    sscanf(instance_str, "\"instance\":\"%127[^\"]\"", instance_name);  /* ARGO_BUFFER_NAME = 128 */
 
     /* Optional branch and environment */
     const char* branch_str = strstr(req->body, "\"branch\"");
     if (branch_str) {
-        sscanf(branch_str, "\"branch\":\"%63[^\"]\"", branch);
+        sscanf(branch_str, "\"branch\":\"%63[^\"]\"", branch);  /* ARGO_BUFFER_SMALL = 64 */
     }
 
     const char* env_str = strstr(req->body, "\"environment\"");
     if (env_str) {
-        sscanf(env_str, "\"environment\":\"%31[^\"]\"", environment);
+        sscanf(env_str, "\"environment\":\"%31[^\"]\"", environment);  /* ARGO_BUFFER_TINY = 32 */
     }
 
     /* Validate template exists */
@@ -558,7 +558,7 @@ int api_workflow_progress(http_request_t* req, http_response_t* resp) {
         sscanf(total_str, "\"total_steps\":%d", &total_steps);
     }
     if (name_str) {
-        sscanf(name_str, "\"step_name\":\"%127[^\"]\"", step_name);
+        sscanf(name_str, "\"step_name\":\"%127[^\"]\"", step_name);  /* ARGO_BUFFER_NAME = 128 */
     }
 
     /* Log progress (in production, would update registry or database) */

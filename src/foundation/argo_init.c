@@ -14,6 +14,7 @@
 #include "argo_workflow_registry.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Registry path */
 #define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
@@ -84,8 +85,9 @@ int argo_init(void) {
     /* Register for cleanup on shutdown */
     argo_set_workflow_registry(registry);
 
-    /* Register periodic cleanup task (every 30 minutes = 1800 seconds) */
-    shared_services_register_task(services, periodic_workflow_cleanup, registry, 1800);
+    /* Register periodic cleanup task */
+    shared_services_register_task(services, periodic_workflow_cleanup, registry,
+                                  WORKFLOW_CLEANUP_INTERVAL_SECONDS);
 
     LOG_INFO("Argo initialization complete");
     return ARGO_SUCCESS;

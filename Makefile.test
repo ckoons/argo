@@ -3,7 +3,7 @@
 # Test target definitions, test harnesses, validation
 
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry test-http test-json test-api-common test-claude-providers test-arc
+test-quick: test-registry test-memory test-lifecycle test-providers test-messaging test-workflow test-integration test-persistence test-workflow-loader test-session test-env test-thread-safety test-shutdown-signals test-concurrent-workflows test-env-precedence test-shared-services test-workflow-registry test-http test-json test-api-common test-claude-providers test-memory-stress test-arc
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -171,6 +171,13 @@ test-claude-providers: $(CLAUDE_PROVIDERS_TEST_TARGET)
 	@echo "Claude Provider Tests"
 	@echo "=========================================="
 	@./$(CLAUDE_PROVIDERS_TEST_TARGET)
+
+test-memory-stress: $(MEMORY_STRESS_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Memory Stress Tests"
+	@echo "=========================================="
+	@./$(MEMORY_STRESS_TEST_TARGET)
 
 test-arc: arc
 	@$(MAKE) -C arc test-arc

@@ -14,9 +14,6 @@
 #include "argo_env_utils.h"
 #include "argo_limits.h"
 
-/* Default port */
-#define DEFAULT_DAEMON_PORT 9876
-
 /* Global daemon for signal handling */
 static argo_daemon_t* g_daemon = NULL;
 
@@ -64,7 +61,7 @@ int main(int argc, char** argv) {
     const char* env_port = getenv("ARGO_DAEMON_PORT");
     if (env_port) {
         int p = atoi(env_port);
-        if (p > 0 && p < 65536) {
+        if (p > 0 && p <= MAX_TCP_PORT) {
             port = (uint16_t)p;
             fprintf(stderr, "Using port from ARGO_DAEMON_PORT: %d\n", port);
         }
@@ -75,7 +72,7 @@ int main(int argc, char** argv) {
         if (strcmp(argv[i], "--port") == 0) {
             if (i + 1 < argc) {
                 int p = atoi(argv[++i]);
-                if (p > 0 && p < 65536) {
+                if (p > 0 && p <= MAX_TCP_PORT) {
                     port = (uint16_t)p;
                     fprintf(stderr, "Using port from --port argument: %d\n", port);
                 } else {

@@ -17,6 +17,7 @@
 #include "argo_socket.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Helper: Extract retry configuration from step JSON */
 int step_extract_retry_config(const char* json, jsmntok_t* tokens,
@@ -41,7 +42,7 @@ int step_extract_retry_config(const char* json, jsmntok_t* tokens,
     /* Extract max_retries if present */
     int max_retries_idx = workflow_json_find_field(json, tokens, retry_idx, STEP_FIELD_MAX_RETRIES);
     if (max_retries_idx >= 0) {
-        char max_retries_str[32];
+        char max_retries_str[ARGO_BUFFER_TINY];
         workflow_json_extract_string(json, &tokens[max_retries_idx], max_retries_str, sizeof(max_retries_str));
         config->max_retries = atoi(max_retries_str);
         if (config->max_retries < 0) {
@@ -52,7 +53,7 @@ int step_extract_retry_config(const char* json, jsmntok_t* tokens,
     /* Extract retry_delay if present */
     int delay_idx = workflow_json_find_field(json, tokens, retry_idx, STEP_FIELD_RETRY_DELAY);
     if (delay_idx >= 0) {
-        char delay_str[32];
+        char delay_str[ARGO_BUFFER_TINY];
         workflow_json_extract_string(json, &tokens[delay_idx], delay_str, sizeof(delay_str));
         config->retry_delay_ms = atoi(delay_str);
         if (config->retry_delay_ms < 0) {

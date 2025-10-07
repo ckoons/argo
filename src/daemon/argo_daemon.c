@@ -13,6 +13,7 @@
 #include "argo_http_server.h"
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
+#include "argo_limits.h"
 
 /* Create daemon */
 argo_daemon_t* argo_daemon_create(uint16_t port) {
@@ -80,7 +81,7 @@ int daemon_handle_health(http_request_t* req, http_response_t* resp) {
     const char* health_json =
         "{\"status\":\"ok\",\"service\":\"argo-daemon\",\"version\":\"0.1.0\"}";
 
-    http_response_set_json(resp, 200, health_json);
+    http_response_set_json(resp, HTTP_STATUS_OK, health_json);
     return ARGO_SUCCESS;
 }
 
@@ -91,7 +92,7 @@ int daemon_handle_version(http_request_t* req, http_response_t* resp) {
     const char* version_json =
         "{\"version\":\"0.1.0\",\"api_version\":\"1\"}";
 
-    http_response_set_json(resp, 200, version_json);
+    http_response_set_json(resp, HTTP_STATUS_OK, version_json);
     return ARGO_SUCCESS;
 }
 

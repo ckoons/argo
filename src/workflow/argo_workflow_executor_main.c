@@ -15,11 +15,12 @@
 #include "argo_lifecycle.h"
 #include "argo_error.h"
 #include "argo_init.h"
+#include "argo_limits.h"
 
 /* Global workflow for signal handling */
 static workflow_controller_t* g_workflow = NULL;
 static int g_should_stop = 0;
-static char g_workflow_id[256] = {0};
+static char g_workflow_id[ARGO_BUFFER_MEDIUM] = {0};
 
 /* Signal handler for graceful shutdown */
 static void signal_handler(int signum) {

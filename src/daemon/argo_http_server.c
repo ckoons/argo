@@ -17,10 +17,6 @@
 #include "argo_error.h"
 #include "argo_limits.h"
 
-#define HTTP_BUFFER_SIZE 16384
-#define HTTP_MAX_ROUTES 64
-#define HTTP_BACKLOG 10
-
 /* Thread argument for connection handling */
 typedef struct {
     http_server_t* server;
@@ -109,8 +105,8 @@ const char* http_method_string(http_method_t method) {
 /* Parse HTTP request */
 static int parse_http_request(const char* buffer, size_t len, http_request_t* req) {
     /* Parse request line: METHOD /path HTTP/1.1 */
-    char method[16] = {0};
-    char path[256] = {0};
+    char method[HTTP_METHOD_SIZE] = {0};
+    char path[HTTP_PATH_SIZE] = {0};
 
     if (sscanf(buffer, "%15s %255s", method, path) != 2) {
         return E_INVALID_PARAMS;

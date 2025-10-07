@@ -15,19 +15,15 @@
 #include "argo_workflow_registry.h"
 #include "argo_init.h"
 #include "argo_log.h"
-
-/* Maximum tracked objects */
-#define MAX_WORKFLOWS 32
-#define MAX_REGISTRIES 8
-#define MAX_LIFECYCLES 8
+#include "argo_limits.h"
 
 /* Shutdown tracking structures */
 static struct {
-    workflow_controller_t* workflows[MAX_WORKFLOWS];
+    workflow_controller_t* workflows[MAX_TRACKED_WORKFLOWS];
     int workflow_count;
-    ci_registry_t* registries[MAX_REGISTRIES];
+    ci_registry_t* registries[MAX_TRACKED_REGISTRIES];
     int registry_count;
-    lifecycle_manager_t* lifecycles[MAX_LIFECYCLES];
+    lifecycle_manager_t* lifecycles[MAX_TRACKED_LIFECYCLES];
     int lifecycle_count;
     shared_services_t* shared_services;
     workflow_registry_t* workflow_registry;
@@ -56,7 +52,7 @@ void argo_register_workflow(workflow_controller_t* workflow) {
     if (!workflow) return;
 
     pthread_mutex_lock(&shutdown_tracker.mutex);
-    if (shutdown_tracker.workflow_count < MAX_WORKFLOWS) {
+    if (shutdown_tracker.workflow_count < MAX_TRACKED_WORKFLOWS) {
         shutdown_tracker.workflows[shutdown_tracker.workflow_count++] = workflow;
         LOG_DEBUG("Registered workflow for cleanup tracking (%d active)",
                  shutdown_tracker.workflow_count);
@@ -90,7 +86,7 @@ void argo_register_registry(ci_registry_t* registry) {
     if (!registry) return;
 
     pthread_mutex_lock(&shutdown_tracker.mutex);
-    if (shutdown_tracker.registry_count < MAX_REGISTRIES) {
+    if (shutdown_tracker.registry_count < MAX_TRACKED_REGISTRIES) {
         shutdown_tracker.registries[shutdown_tracker.registry_count++] = registry;
         LOG_DEBUG("Registered registry for cleanup tracking (%d active)",
                  shutdown_tracker.registry_count);
@@ -124,7 +120,7 @@ void argo_register_lifecycle(lifecycle_manager_t* lifecycle) {
     if (!lifecycle) return;
 
     pthread_mutex_lock(&shutdown_tracker.mutex);
-    if (shutdown_tracker.lifecycle_count < MAX_LIFECYCLES) {
+    if (shutdown_tracker.lifecycle_count < MAX_TRACKED_LIFECYCLES) {
         shutdown_tracker.lifecycles[shutdown_tracker.lifecycle_count++] = lifecycle;
         LOG_DEBUG("Registered lifecycle for cleanup tracking (%d active)",
                  shutdown_tracker.lifecycle_count);
@@ -176,9 +172,9 @@ void argo_set_workflow_registry(workflow_registry_t* registry) {
 /* Cleanup all tracked objects (called by argo_exit()) */
 void argo_shutdown_cleanup(void) {
     /* Copy tracked objects and clear counts while holding mutex */
-    workflow_controller_t* workflows_to_cleanup[MAX_WORKFLOWS];
-    lifecycle_manager_t* lifecycles_to_cleanup[MAX_LIFECYCLES];
-    ci_registry_t* registries_to_cleanup[MAX_REGISTRIES];
+    workflow_controller_t* workflows_to_cleanup[MAX_TRACKED_WORKFLOWS];
+    lifecycle_manager_t* lifecycles_to_cleanup[MAX_TRACKED_LIFECYCLES];
+    ci_registry_t* registries_to_cleanup[MAX_TRACKED_REGISTRIES];
     shared_services_t* shared_services_to_cleanup = NULL;
     workflow_registry_t* workflow_registry_to_cleanup = NULL;
     int workflow_count, lifecycle_count, registry_count;

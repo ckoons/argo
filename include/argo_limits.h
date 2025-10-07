@@ -62,6 +62,9 @@
 /* Health check stale threshold in seconds */
 #define HEALTH_CHECK_STALE_SECONDS 60
 
+/* Periodic workflow cleanup interval in seconds (30 minutes) */
+#define WORKFLOW_CLEANUP_INTERVAL_SECONDS 1800
+
 /* ===== Merge Confidence ===== */
 
 /* Default merge confidence when not specified */
@@ -89,5 +92,31 @@
 
 /* File permissions for Argo-created files */
 #define ARGO_FILE_PERMISSIONS 0644
+
+/* ===== Shutdown and Tracking Limits ===== */
+
+/* Maximum number of workflows tracked for shutdown */
+#define MAX_TRACKED_WORKFLOWS 32
+
+/* Maximum number of registries tracked for shutdown */
+#define MAX_TRACKED_REGISTRIES 8
+
+/* Maximum number of lifecycles tracked for shutdown */
+#define MAX_TRACKED_LIFECYCLES 8
+
+/* ===== HTTP and Network ===== */
+
+/* Default daemon HTTP port */
+#define DEFAULT_DAEMON_PORT 9876
+
+/* Maximum valid TCP port number */
+#define MAX_TCP_PORT 65535
+
+/* HTTP server configuration */
+#define HTTP_BUFFER_SIZE 16384  /* Main HTTP buffer (same as ARGO_BUFFER_LARGE) */
+#define HTTP_MAX_ROUTES 64      /* Maximum number of routes */
+#define HTTP_BACKLOG 10         /* Listen backlog */
+#define HTTP_METHOD_SIZE 16     /* HTTP method string size (GET, POST, etc.) */
+#define HTTP_PATH_SIZE 256      /* HTTP path buffer size */
 
 #endif /* ARGO_LIMITS_H */
