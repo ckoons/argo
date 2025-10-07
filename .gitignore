@@ -86,3 +86,4 @@ dkms.conf
 
 # debug information files
 *.dwo
+arc/bin/arc

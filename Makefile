@@ -118,8 +118,8 @@ SCRIPT_SOURCES = $(SCRIPT_DIR)/utils/argo_monitor.c \
                  $(SCRIPT_DIR)/utils/argo_ci_assign.c \
                  $(SCRIPT_DIR)/utils/argo_workflow_tracer.c
 
-# Script executables
-SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/utils/%.c,$(BUILD_DIR)/%,$(SCRIPT_SOURCES))
+# Script executables (build into bin/utils/)
+SCRIPT_TARGETS = $(patsubst $(SCRIPT_DIR)/utils/%.c,bin/utils/%,$(SCRIPT_SOURCES))
 
 # Binaries
 EXECUTOR_BINARY = bin/argo_workflow_executor
@@ -135,31 +135,31 @@ TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/%.o,$(TEST_SOURCES))
 STUB_SOURCES = $(BUILD_DIR)/stubs.c
 STUB_OBJECTS = $(BUILD_DIR)/stubs.o
 
-# Targets
-TEST_TARGET = $(BUILD_DIR)/test_ci_providers
-API_TEST_TARGET = $(BUILD_DIR)/test_api_providers
-API_CALL_TARGET = $(BUILD_DIR)/test_api_calls
-REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_registry
-MEMORY_TEST_TARGET = $(BUILD_DIR)/test_memory
-LIFECYCLE_TEST_TARGET = $(BUILD_DIR)/test_lifecycle
-PROVIDER_TEST_TARGET = $(BUILD_DIR)/test_providers
-MESSAGING_TEST_TARGET = $(BUILD_DIR)/test_messaging
-WORKFLOW_TEST_TARGET = $(BUILD_DIR)/test_workflow
-INTEGRATION_TEST_TARGET = $(BUILD_DIR)/test_integration
-PERSISTENCE_TEST_TARGET = $(BUILD_DIR)/test_persistence
-WORKFLOW_LOADER_TEST_TARGET = $(BUILD_DIR)/test_workflow_loader
-SESSION_TEST_TARGET = $(BUILD_DIR)/test_session
-ENV_TEST_TARGET = $(BUILD_DIR)/test_env
-THREAD_SAFETY_TEST_TARGET = $(BUILD_DIR)/test_thread_safety
-SHUTDOWN_SIGNALS_TEST_TARGET = $(BUILD_DIR)/test_shutdown_signals
-CONCURRENT_WORKFLOWS_TEST_TARGET = $(BUILD_DIR)/test_concurrent_workflows
-ENV_PRECEDENCE_TEST_TARGET = $(BUILD_DIR)/test_env_precedence
-SHARED_SERVICES_TEST_TARGET = $(BUILD_DIR)/test_shared_services
-WORKFLOW_REGISTRY_TEST_TARGET = $(BUILD_DIR)/test_workflow_registry
-HTTP_TEST_TARGET = $(BUILD_DIR)/test_http
-JSON_TEST_TARGET = $(BUILD_DIR)/test_json
-API_COMMON_TEST_TARGET = $(BUILD_DIR)/test_api_common
-CLAUDE_PROVIDERS_TEST_TARGET = $(BUILD_DIR)/test_claude_providers
+# Test targets (build into bin/tests/)
+TEST_TARGET = bin/tests/test_ci_providers
+API_TEST_TARGET = bin/tests/test_api_providers
+API_CALL_TARGET = bin/tests/test_api_calls
+REGISTRY_TEST_TARGET = bin/tests/test_registry
+MEMORY_TEST_TARGET = bin/tests/test_memory
+LIFECYCLE_TEST_TARGET = bin/tests/test_lifecycle
+PROVIDER_TEST_TARGET = bin/tests/test_providers
+MESSAGING_TEST_TARGET = bin/tests/test_messaging
+WORKFLOW_TEST_TARGET = bin/tests/test_workflow
+INTEGRATION_TEST_TARGET = bin/tests/test_integration
+PERSISTENCE_TEST_TARGET = bin/tests/test_persistence
+WORKFLOW_LOADER_TEST_TARGET = bin/tests/test_workflow_loader
+SESSION_TEST_TARGET = bin/tests/test_session
+ENV_TEST_TARGET = bin/tests/test_env
+THREAD_SAFETY_TEST_TARGET = bin/tests/test_thread_safety
+SHUTDOWN_SIGNALS_TEST_TARGET = bin/tests/test_shutdown_signals
+CONCURRENT_WORKFLOWS_TEST_TARGET = bin/tests/test_concurrent_workflows
+ENV_PRECEDENCE_TEST_TARGET = bin/tests/test_env_precedence
+SHARED_SERVICES_TEST_TARGET = bin/tests/test_shared_services
+WORKFLOW_REGISTRY_TEST_TARGET = bin/tests/test_workflow_registry
+HTTP_TEST_TARGET = bin/tests/test_http
+JSON_TEST_TARGET = bin/tests/test_json
+API_COMMON_TEST_TARGET = bin/tests/test_api_common
+CLAUDE_PROVIDERS_TEST_TARGET = bin/tests/test_claude_providers
 
 # Default target - build libraries, binaries, and tests
 all: directories $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) $(EXECUTOR_BINARY) $(DAEMON_BINARY) $(TEST_TARGET) $(API_TEST_TARGET) $(API_CALL_TARGET) $(REGISTRY_TEST_TARGET) $(MEMORY_TEST_TARGET) $(LIFECYCLE_TEST_TARGET) $(PROVIDER_TEST_TARGET) $(MESSAGING_TEST_TARGET) $(WORKFLOW_TEST_TARGET) $(INTEGRATION_TEST_TARGET) $(PERSISTENCE_TEST_TARGET) $(WORKFLOW_LOADER_TEST_TARGET) $(SESSION_TEST_TARGET) $(ENV_TEST_TARGET) $(THREAD_SAFETY_TEST_TARGET) $(SHARED_SERVICES_TEST_TARGET) $(WORKFLOW_REGISTRY_TEST_TARGET) $(HTTP_TEST_TARGET) $(JSON_TEST_TARGET) $(CLAUDE_PROVIDERS_TEST_TARGET) $(SCRIPT_TARGETS)
@@ -278,106 +278,16 @@ $(DAEMON_BINARY): $(DAEMON_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
 	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@echo "Built daemon: $@"
 
-# Build script executables (need core + daemon + workflow)
-$(BUILD_DIR)/%: $(SCRIPT_DIR)/utils/%.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+# Build script executables into bin/utils/ (need core + daemon + workflow)
+bin/utils/%: $(SCRIPT_DIR)/utils/%.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+	@mkdir -p bin/utils
 	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
-	@ln -sf ../build/$(@F) $(SCRIPT_DIR)/$(@F)
-	@echo "Built script: $(@F) -> scripts/$(@F)"
+	@ln -sf ../$@ $(SCRIPT_DIR)/$(@F)
+	@echo "Built utility: $@"
 
-# Build test executable
-$(TEST_TARGET): $(OBJECTS) $(TEST_OBJECTS) $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build API test executable
-$(API_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_api_providers.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build API call test executable
-$(API_CALL_TARGET): $(OBJECTS) $(BUILD_DIR)/test_api_calls.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build registry test executable
-$(REGISTRY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_registry.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build memory test executable
-$(MEMORY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_memory.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build lifecycle test executable
-$(LIFECYCLE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_lifecycle.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build provider test executable
-$(PROVIDER_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_providers.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build messaging test executable
-$(MESSAGING_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_messaging.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build workflow test executable
-$(WORKFLOW_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build integration test executable
-$(INTEGRATION_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_integration.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build persistence test executable
-$(PERSISTENCE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_persistence.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build workflow loader test executable
-$(WORKFLOW_LOADER_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow_loader.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build session test executable
-$(SESSION_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_session.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build env test executable
-$(ENV_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_env.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build thread safety test executable
-$(THREAD_SAFETY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_thread_safety.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build shutdown signals test executable
-$(SHUTDOWN_SIGNALS_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_shutdown_signals.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build concurrent workflows test executable
-$(CONCURRENT_WORKFLOWS_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_concurrent_workflows.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build environment precedence test executable
-$(ENV_PRECEDENCE_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_env_precedence.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build shared services test executable
-$(SHARED_SERVICES_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_shared_services.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build workflow registry test executable
-$(WORKFLOW_REGISTRY_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_workflow_registry.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build HTTP test executable
-$(HTTP_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_http.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build JSON test executable
-$(JSON_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_json.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build API common test executable
-$(API_COMMON_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_api_common.o $(STUB_OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
-
-# Build Claude providers test executable
-$(CLAUDE_PROVIDERS_TEST_TARGET): $(OBJECTS) $(BUILD_DIR)/test_claude_providers.o $(STUB_OBJECTS)
+# Build test executables into bin/tests/
+bin/tests/%: $(OBJECTS) $(BUILD_DIR)/%.o $(STUB_OBJECTS)
+	@mkdir -p bin/tests
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # Quick tests - fast, no external dependencies
@@ -652,6 +562,7 @@ count-core:
 # Clean build artifacts
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -rf bin/tests bin/utils
 	rm -f $(EXECUTOR_BINARY)
 	rm -f $(DAEMON_BINARY)
 	@for script in $(SCRIPT_TARGETS); do \
@@ -685,19 +596,19 @@ update-models:
 	@echo "Updating model defaults from API providers..."
 	@./scripts/update_models.sh
 
-# Test Harnesses (not counted in diet)
-HARNESS_INIT_BASIC = $(BUILD_DIR)/harness_init_basic
-HARNESS_ENV_INSPECT = $(BUILD_DIR)/harness_env_inspect
-HARNESS_REINIT = $(BUILD_DIR)/harness_reinit
-HARNESS_INIT_ERROR = $(BUILD_DIR)/harness_init_error
-HARNESS_SOCKET = $(BUILD_DIR)/harness_socket
-HARNESS_TERMINAL = $(BUILD_DIR)/harness_terminal
-HARNESS_WORKFLOW_CONTEXT = $(BUILD_DIR)/harness_workflow_context
-HARNESS_CONTROL_FLOW = $(BUILD_DIR)/harness_control_flow
-HARNESS_CI_INTERACTIVE = $(BUILD_DIR)/harness_ci_interactive
-HARNESS_LOOP = $(BUILD_DIR)/harness_loop
-HARNESS_PERSONA = $(BUILD_DIR)/harness_persona
-HARNESS_WORKFLOW_CHAIN = $(BUILD_DIR)/harness_workflow_chain
+# Test Harnesses (not counted in diet - build into bin/tests/)
+HARNESS_INIT_BASIC = bin/tests/harness_init_basic
+HARNESS_ENV_INSPECT = bin/tests/harness_env_inspect
+HARNESS_REINIT = bin/tests/harness_reinit
+HARNESS_INIT_ERROR = bin/tests/harness_init_error
+HARNESS_SOCKET = bin/tests/harness_socket
+HARNESS_TERMINAL = bin/tests/harness_terminal
+HARNESS_WORKFLOW_CONTEXT = bin/tests/harness_workflow_context
+HARNESS_CONTROL_FLOW = bin/tests/harness_control_flow
+HARNESS_CI_INTERACTIVE = bin/tests/harness_ci_interactive
+HARNESS_LOOP = bin/tests/harness_loop
+HARNESS_PERSONA = bin/tests/harness_persona
+HARNESS_WORKFLOW_CHAIN = bin/tests/harness_workflow_chain
 
 harness-init-basic: $(HARNESS_INIT_BASIC)
 	@./$(HARNESS_INIT_BASIC)
@@ -766,54 +677,11 @@ test-all: test-quick test-harnesses
 	@echo "  make test-api-live"
 	@echo ""
 
-# Build harness executables
-$(HARNESS_INIT_BASIC): tests/harness_init_basic.c $(CORE_LIB)
-	@echo "Building harness_init_basic..."
-	@$(CC) $(CFLAGS) tests/harness_init_basic.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_ENV_INSPECT): tests/harness_env_inspect.c $(CORE_LIB)
-	@echo "Building harness_env_inspect..."
-	@$(CC) $(CFLAGS) tests/harness_env_inspect.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_REINIT): tests/harness_reinit.c $(CORE_LIB)
-	@echo "Building harness_reinit..."
-	@$(CC) $(CFLAGS) tests/harness_reinit.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_INIT_ERROR): tests/harness_init_error.c $(CORE_LIB)
-	@echo "Building harness_init_error..."
-	@$(CC) $(CFLAGS) tests/harness_init_error.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_SOCKET): tests/harness_socket.c $(CORE_LIB)
-	@echo "Building harness_socket..."
-	@$(CC) $(CFLAGS) tests/harness_socket.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_TERMINAL): tests/harness_terminal.c $(CORE_LIB)
-	@echo "Building harness_terminal..."
-	@$(CC) $(CFLAGS) tests/harness_terminal.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_WORKFLOW_CONTEXT): tests/harness_workflow_context.c $(CORE_LIB)
-	@echo "Building harness_workflow_context..."
-	@$(CC) $(CFLAGS) tests/harness_workflow_context.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_CONTROL_FLOW): tests/harness_control_flow.c $(CORE_LIB)
-	@echo "Building harness_control_flow..."
-	@$(CC) $(CFLAGS) tests/harness_control_flow.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_CI_INTERACTIVE): tests/harness_ci_interactive.c $(CORE_LIB)
-	@echo "Building harness_ci_interactive..."
-	@$(CC) $(CFLAGS) tests/harness_ci_interactive.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_LOOP): tests/harness_loop.c $(CORE_LIB)
-	@echo "Building harness_loop..."
-	@$(CC) $(CFLAGS) tests/harness_loop.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_PERSONA): tests/harness_persona.c $(CORE_LIB)
-	@echo "Building harness_persona..."
-	@$(CC) $(CFLAGS) tests/harness_persona.c $(CORE_LIB) -o $@ $(LDFLAGS)
-
-$(HARNESS_WORKFLOW_CHAIN): tests/harness_workflow_chain.c $(CORE_LIB)
-	@echo "Building harness_workflow_chain..."
-	@$(CC) $(CFLAGS) tests/harness_workflow_chain.c $(CORE_LIB) -o $@ $(LDFLAGS)
+# Build harness executables into bin/tests/
+bin/tests/harness_%: tests/harness_%.c $(CORE_LIB)
+	@mkdir -p bin/tests
+	@echo "Building harness_$*..."
+	@$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
 
 # Help system
 help:
@@ -838,9 +706,6 @@ ui-argo-term: arc
 all-components: $(CORE_LIB) arc ui
 
 # Component tests
-test-arc: arc
-	@$(MAKE) -C arc test
-
 test-ui: ui
 	@$(MAKE) -C ui/argo-term test
 

@@ -31,10 +31,10 @@ TEST_OBJECTS_LIB = $(filter-out $(BUILD_DIR)/main.o,$(OBJECTS))
 # Test files
 TEST_SOURCES = $(wildcard $(TEST_DIR)/*.c)
 TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%.o,$(TEST_SOURCES))
-TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%,$(TEST_SOURCES))
+TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,bin/tests/test_%,$(TEST_SOURCES))
 
-# Main target
-TARGET = arc
+# Main target (build into bin/)
+TARGET = bin/arc
 
 .PHONY: all clean test test-arc-unit test-arc-cli test-arc test-arc-workflow test-arc-background test-arc-full test-arc-all directories count install uninstall
 
@@ -45,11 +45,13 @@ all: directories $(TARGET)
 directories:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(PARENT_BUILD)
+	@mkdir -p bin/tests
 
-# Build arc executable (links daemon + workflow + core)
+# Build arc executable into bin/ (links daemon + workflow + core)
 $(TARGET): $(OBJECTS) $(ARGO_CORE) $(ARGO_DAEMON) $(ARGO_WORKFLOW)
+	@mkdir -p bin
 	$(CC) $(OBJECTS) $(ARGO_DAEMON) $(ARGO_WORKFLOW) $(ARGO_CORE) -o $@ $(LDFLAGS)
-	@echo "Built arc CLI -> ./arc"
+	@echo "Built arc CLI -> $@"
 
 # Compile source files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
@@ -59,8 +61,9 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 $(BUILD_DIR)/test_%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Build test executables (exclude main.o to avoid duplicate main)
-$(BUILD_DIR)/test_%: $(BUILD_DIR)/test_%.o $(TEST_OBJECTS_LIB) $(ARGO_CORE) $(ARGO_DAEMON) $(ARGO_WORKFLOW)
+# Build test executables into bin/tests/ (exclude main.o to avoid duplicate main)
+bin/tests/test_%: $(BUILD_DIR)/test_%.o $(TEST_OBJECTS_LIB) $(ARGO_CORE) $(ARGO_DAEMON) $(ARGO_WORKFLOW)
+	@mkdir -p bin/tests
 	$(CC) $< $(TEST_OBJECTS_LIB) $(ARGO_DAEMON) $(ARGO_WORKFLOW) $(ARGO_CORE) -o $@ $(LDFLAGS)
 
 # Unit tests (C tests)
@@ -131,7 +134,7 @@ count:
 
 # Clean build artifacts
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -rf $(BUILD_DIR) bin
 
 # Installation targets
 install:

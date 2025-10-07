@@ -611,6 +611,51 @@ typedef struct ArgoContext { ... }  // NO CamelCase
 void ArgoContextInit(...)           // NO CamelCase
 ```
 
+## Project Structure
+
+### Directory Organization
+
+```
+argo/
+├── src/              # Source code (.c files)
+├── include/          # Header files (.h files)
+├── build/            # Intermediate build artifacts (.o, .a)
+├── bin/              # Final executable deliverables
+│   ├── argo-daemon             # Core daemon (production)
+│   ├── argo_workflow_executor  # Workflow executor (production)
+│   ├── utils/                  # Developer/operator tools
+│   │   ├── argo_monitor
+│   │   ├── argo_ci_assign
+│   │   ├── argo_update_models
+│   │   ├── argo_memory_inspect
+│   │   └── argo_workflow_tracer
+│   └── tests/                  # Test executables
+│       ├── test_registry
+│       ├── test_workflow
+│       ├── test_integration
+│       └── ... (20+ test executables)
+├── scripts/          # Shell scripts + symlinks to bin/utils/
+│   ├── argo_monitor@ -> ../bin/utils/argo_monitor
+│   ├── *.sh                    # Shell utilities
+│   └── utils/                  # Source for utility executables
+│       └── *.c
+├── tests/            # Test source files
+├── arc/              # Arc CLI component
+│   ├── bin/                    # Arc executables
+│   │   ├── arc                 # Arc CLI
+│   │   └── tests/              # Arc test executables
+│   ├── src/
+│   └── build/
+└── workflows/        # Workflow templates (JSON)
+```
+
+**Key Principles**:
+- `src/` - Source code only (tracked in git)
+- `build/` - Intermediate artifacts only (.o, .a) - safe to delete
+- `bin/` - Final deliverables (executables) - ignored by git
+- `make clean` removes `build/` and `bin/` completely
+- Symlinks in `scripts/` provide convenience access to `bin/utils/`
+
 ## File Structure
 
 ```c
