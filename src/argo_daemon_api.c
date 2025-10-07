@@ -17,6 +17,7 @@
 #include "argo_error.h"
 #include "argo_json.h"
 #include "argo_limits.h"
+#include "argo_log.h"
 
 /* Global daemon context for API handlers */
 argo_daemon_t* g_api_daemon = NULL;
@@ -497,7 +498,19 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
     }
 
     /* Remove from registry */
-    workflow_registry_remove_workflow(registry, workflow_id);
+    result = workflow_registry_remove_workflow(registry, workflow_id);
+    if (result != ARGO_SUCCESS) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to remove workflow from registry");
+        return result;
+    }
+
+    /* Save registry after removal */
+    result = workflow_registry_save(registry);
+    if (result != ARGO_SUCCESS) {
+        LOG_ERROR("Failed to save registry after workflow abandon: %d", result);
+        /* Continue - registry will be saved eventually */
+    }
 
     char response_json[ARGO_BUFFER_MEDIUM];
     snprintf(response_json, sizeof(response_json),

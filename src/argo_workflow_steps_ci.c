@@ -28,7 +28,9 @@ typedef struct {
 static void capture_response_callback(const ci_response_t* response, void* userdata) {
     response_capture_t* capture = (response_capture_t*)userdata;
     if (!response || !capture || !capture->buffer) return;
-    if (!response->success || !response->content) return;
+
+    /* Capture both successful and failed responses for logging */
+    if (!response->content) return;
 
     size_t response_len = response->content_len;
     size_t available = capture->buffer_size - capture->bytes_written - 1;
@@ -41,6 +43,11 @@ static void capture_response_callback(const ci_response_t* response, void* userd
         memcpy(capture->buffer + capture->bytes_written, response->content, response_len);
         capture->bytes_written += response_len;
         capture->buffer[capture->bytes_written] = '\0';
+    }
+
+    /* Log failed responses with their content */
+    if (!response->success) {
+        LOG_ERROR("Provider returned error response: %s", capture->buffer);
     }
 }
 
@@ -284,8 +291,10 @@ int step_ci_ask(workflow_controller_t* workflow,
             snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, response);
         } else {
             /* Fall back to template prompt */
-            LOG_ERROR("AI query failed (error %d), response: %s",
-                     result, capture.bytes_written > 0 ? response : "(empty)");
+            if (result != ARGO_SUCCESS) {
+                LOG_ERROR("AI query failed (error %d), response: %s",
+                         result, capture.bytes_written > 0 ? response : "(empty)");
+            }
             if (persona->name[0] != '\0') {
                 snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, prompt);
             } else {
