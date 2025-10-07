@@ -227,11 +227,39 @@ int workflow_load_json(workflow_controller_t* workflow, const char* json_path) {
     workflow->token_count = token_count;
     workflow->context = context;
     workflow->personas = personas;
-    strncpy(workflow->current_step_id, "1", sizeof(workflow->current_step_id) - 1);
     workflow->step_count = 0;
 
-    LOG_INFO("Loaded workflow JSON: %s (%d tokens, %d personas)",
-             json_path, token_count, personas ? personas->count : 0);
+    /* Find first step - try "steps" array first (new format), then default to "1" */
+    int steps_idx = workflow_json_find_field(json, tokens, 0, WORKFLOW_JSON_FIELD_STEPS);
+    if (steps_idx >= 0 && tokens[steps_idx].type == JSMN_ARRAY && tokens[steps_idx].size > 0) {
+        /* Get first step object */
+        int first_step_idx = steps_idx + 1;
+        if (tokens[first_step_idx].type == JSMN_OBJECT) {
+            /* Find "step" field in first step */
+            int step_field_idx = workflow_json_find_field(json, tokens, first_step_idx, WORKFLOW_JSON_FIELD_STEP);
+            if (step_field_idx >= 0 && tokens[step_field_idx].type == JSMN_STRING) {
+                /* Extract step name */
+                int name_len = tokens[step_field_idx].end - tokens[step_field_idx].start;
+                if (name_len > 0 && name_len < (int)sizeof(workflow->current_step_id)) {
+                    strncpy(workflow->current_step_id, json + tokens[step_field_idx].start, name_len);
+                    workflow->current_step_id[name_len] = '\0';
+                    LOG_INFO("Starting at step: %s", workflow->current_step_id);
+                } else {
+                    strncpy(workflow->current_step_id, "1", sizeof(workflow->current_step_id) - 1);
+                }
+            } else {
+                strncpy(workflow->current_step_id, "1", sizeof(workflow->current_step_id) - 1);
+            }
+        } else {
+            strncpy(workflow->current_step_id, "1", sizeof(workflow->current_step_id) - 1);
+        }
+    } else {
+        /* Fall back to numeric "1" for old phase-based format */
+        strncpy(workflow->current_step_id, "1", sizeof(workflow->current_step_id) - 1);
+    }
+
+    LOG_INFO("Loaded workflow JSON: %s (%d tokens, %d personas, starting at: %s)",
+             json_path, token_count, personas ? personas->count : 0, workflow->current_step_id);
     return ARGO_SUCCESS;
 }
 
@@ -244,7 +272,34 @@ int workflow_find_step_token(workflow_controller_t* workflow, const char* step_i
     const char* json = workflow->json_workflow;
     jsmntok_t* tokens = workflow->tokens;
 
-    /* Find phases array */
+    /* Try new format first: top-level "steps" array */
+    int steps_idx = workflow_json_find_field(json, tokens, 0, WORKFLOW_JSON_FIELD_STEPS);
+    if (steps_idx >= 0 && tokens[steps_idx].type == JSMN_ARRAY) {
+        int step_count = tokens[steps_idx].size;
+        int step_token = steps_idx + 1;
+
+        for (int s = 0; s < step_count; s++) {
+            if (tokens[step_token].type != JSMN_OBJECT) {
+                continue;
+            }
+
+            /* Check step name (string field) */
+            int step_name_idx = workflow_json_find_field(json, tokens, step_token, WORKFLOW_JSON_FIELD_STEP);
+            if (step_name_idx >= 0 && tokens[step_name_idx].type == JSMN_STRING) {
+                int name_len = tokens[step_name_idx].end - tokens[step_name_idx].start;
+                if (strncmp(json + tokens[step_name_idx].start, step_id, name_len) == 0 &&
+                    step_id[name_len] == '\0') {
+                    return step_token;
+                }
+            }
+
+            /* Skip to next step */
+            int step_tokens = workflow_json_count_tokens(tokens, step_token);
+            step_token += step_tokens;
+        }
+    }
+
+    /* Fall back to old format: "phases" array with nested steps */
     int phases_idx = workflow_json_find_field(json, tokens, 0, WORKFLOW_JSON_FIELD_PHASES);
     if (phases_idx < 0 || tokens[phases_idx].type != JSMN_ARRAY) {
         return -1;
