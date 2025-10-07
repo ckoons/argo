@@ -1,0 +1,26 @@
+# © 2025 Casey Koons All rights reserved
+# Argo Clean Targets
+# Clean build artifacts, component cleaning, deep clean
+
+# Clean build artifacts
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -rf bin/tests bin/utils
+	rm -f $(EXECUTOR_BINARY)
+	rm -f $(DAEMON_BINARY)
+	@for script in $(SCRIPT_TARGETS); do \
+		rm -f $(SCRIPT_DIR)/$$(basename $$script); \
+	done
+
+# Deep clean (includes logs and sessions)
+distclean: clean
+	rm -rf .argo
+
+# Component cleaning
+clean-arc:
+	@$(MAKE) -C arc clean
+
+clean-ui:
+	@$(MAKE) -C ui/argo-term clean
+
+clean-all: clean clean-arc clean-ui

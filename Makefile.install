@@ -1,0 +1,48 @@
+# © 2025 Casey Koons All rights reserved
+# Argo Installation Targets
+# Installation, uninstallation, daemon management
+
+# Installation targets
+install:
+	install -d $(PREFIX)/bin
+	install -m 0755 bin/argo-daemon $(PREFIX)/bin/argo-daemon
+	install -m 0755 bin/argo_workflow_executor $(PREFIX)/bin/argo_workflow_executor
+
+install-arc:
+	$(MAKE) -C arc install PREFIX=$(PREFIX)
+
+install-term:
+	$(MAKE) -C ui/argo-term install PREFIX=$(PREFIX)
+
+restart-daemon:
+	@echo "Restarting argo-daemon..."
+	@pkill -TERM argo-daemon 2>/dev/null || true
+	@sleep 1
+	@$(PREFIX)/bin/argo-daemon --port 9876 >/dev/null 2>&1 &
+	@sleep 1
+	@echo "Daemon restarted"
+
+install-all: install install-arc install-term restart-daemon
+	@if ! echo $$PATH | grep -q "$(HOME)/.local/bin"; then \
+		echo ""; \
+		echo "⚠️  $(HOME)/.local/bin is not in your PATH"; \
+		echo "   Add this to your ~/.bashrc or ~/.zshrc:"; \
+		echo ""; \
+		echo "   export PATH=\"\$$HOME/.local/bin:\$$PATH\""; \
+		echo ""; \
+		echo "   Or run: ./scripts/setup_path.sh --auto"; \
+		echo ""; \
+	fi
+
+# Uninstallation targets
+uninstall:
+	rm -f $(PREFIX)/bin/argo-daemon
+	rm -f $(PREFIX)/bin/argo_workflow_executor
+
+uninstall-arc:
+	$(MAKE) -C arc uninstall PREFIX=$(PREFIX)
+
+uninstall-term:
+	$(MAKE) -C ui/argo-term uninstall PREFIX=$(PREFIX)
+
+uninstall-all: uninstall uninstall-arc uninstall-term

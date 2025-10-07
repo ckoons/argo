@@ -1,0 +1,154 @@
+# © 2025 Casey Koons All rights reserved
+# Argo Build Rules
+# Compilation patterns, libraries, binaries, components
+
+# Create necessary directories
+directories:
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(LOG_DIR)
+	@mkdir -p $(SESSION_DIR)
+
+# Generate stub implementations
+$(BUILD_DIR)/stubs.c:
+	@echo "/* © 2025 Casey Koons All rights reserved */" > $@
+	@echo "/* Temporary stub implementations */" >> $@
+	@echo "" >> $@
+	@echo "#include <stdio.h>" >> $@
+	@echo "#include <stdbool.h>" >> $@
+	@echo "#include <stddef.h>" >> $@
+	@echo "#include <stdint.h>" >> $@
+	@echo "#include \"argo_ci_defaults.h\"" >> $@
+	@echo "#include \"argo_log.h\"" >> $@
+	@echo "#include \"argo_ollama.h\"" >> $@
+	@echo "#include \"argo_claude.h\"" >> $@
+	@echo "" >> $@
+	@echo "/* CI defaults stubs */" >> $@
+	@echo "const ci_model_config_t* ci_get_model_defaults(const char* model) {" >> $@
+	@echo "    (void)model;" >> $@
+	@echo "    return NULL;" >> $@
+	@echo "}" >> $@
+	@echo "" >> $@
+	@echo "/* Logging stubs */" >> $@
+	@echo "log_config_t* g_log_config = NULL;" >> $@
+	@echo "int log_init(const char* dir) { (void)dir; return 0; }" >> $@
+	@echo "void log_cleanup(void) {}" >> $@
+	@echo "void log_set_level(log_level_t level) { (void)level; }" >> $@
+	@echo "void log_write(log_level_t level, const char* file, int line," >> $@
+	@echo "              const char* func, const char* fmt, ...) {" >> $@
+	@echo "    (void)level; (void)file; (void)line; (void)func; (void)fmt;" >> $@
+	@echo "}" >> $@
+	@echo "" >> $@
+	@echo "/* Ollama stubs */" >> $@
+	@echo "#include <sys/socket.h>" >> $@
+	@echo "#include <sys/time.h>" >> $@
+	@echo "#include <netinet/in.h>" >> $@
+	@echo "#include <arpa/inet.h>" >> $@
+	@echo "#include <unistd.h>" >> $@
+	@echo "#include <fcntl.h>" >> $@
+	@echo "" >> $@
+	@echo "bool ollama_is_running(void) {" >> $@
+	@echo "    /* Try to connect to Ollama */" >> $@
+	@echo "    int sock = socket(AF_INET, SOCK_STREAM, 0);" >> $@
+	@echo "    if (sock < 0) return false;" >> $@
+	@echo "" >> $@
+	@echo "    struct sockaddr_in addr;" >> $@
+	@echo "    addr.sin_family = AF_INET;" >> $@
+	@echo "    addr.sin_port = htons(11434);" >> $@
+	@echo "    addr.sin_addr.s_addr = inet_addr(\"127.0.0.1\");" >> $@
+	@echo "" >> $@
+	@echo "    /* Set timeout for connect */" >> $@
+	@echo "    struct timeval tv = {1, 0};" >> $@
+	@echo "    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));" >> $@
+	@echo "" >> $@
+	@echo "    int result = connect(sock, (struct sockaddr*)&addr, sizeof(addr));" >> $@
+	@echo "    close(sock);" >> $@
+	@echo "    return result == 0;" >> $@
+	@echo "}" >> $@
+	@echo "" >> $@
+	@echo "/* Claude stubs */" >> $@
+	@echo "bool claude_is_available(void) {" >> $@
+	@echo "    /* Check if claude CLI exists */" >> $@
+	@echo "    return false;  /* For now, assume not available */" >> $@
+	@echo "}" >> $@
+	@echo "/* claude_code functions are now in argo_claude_code.c */" >> $@
+	@echo "ci_provider_t* claude_code_create_provider(const char* ci_name);" >> $@
+	@echo "size_t claude_get_memory_usage(ci_provider_t* provider) {" >> $@
+	@echo "    (void)provider;" >> $@
+	@echo "    return 0;" >> $@
+	@echo "}" >> $@
+	@echo "" >> $@
+	@echo "/* Error strings now in argo_error.c - no stub needed */" >> $@
+
+# Compile source files
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Compile test files
+$(BUILD_DIR)/%.o: $(TEST_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Compile stub file
+$(BUILD_DIR)/stubs.o: $(BUILD_DIR)/stubs.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build core library (foundation + providers)
+$(CORE_LIB): $(FOUNDATION_OBJECTS) $(PROVIDER_OBJECTS) $(STUB_OBJECTS)
+	ar rcs $@ $^
+	@echo "Created core library: $@"
+
+# Build daemon library
+$(DAEMON_LIB): $(DAEMON_OBJECTS)
+	ar rcs $@ $^
+	@echo "Created daemon library: $@"
+
+# Build workflow library
+$(WORKFLOW_LIB): $(WORKFLOW_OBJECTS)
+	ar rcs $@ $^
+	@echo "Created workflow library: $@"
+
+# Build workflow executor binary (needs core + daemon + workflow)
+$(EXECUTOR_BINARY): $(EXECUTOR_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+	@echo "Built workflow executor: $@"
+
+# Build daemon binary (needs core + daemon + workflow)
+$(DAEMON_BINARY): $(DAEMON_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+	@echo "Built daemon: $@"
+
+# Build script executables into bin/utils/ (need core + daemon + workflow)
+bin/utils/%: $(SCRIPT_DIR)/utils/%.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+	@mkdir -p bin/utils
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+	@ln -sf ../$@ $(SCRIPT_DIR)/$(@F)
+	@echo "Built utility: $@"
+
+# Build test executables into bin/tests/
+bin/tests/%: $(OBJECTS) $(BUILD_DIR)/%.o $(STUB_OBJECTS)
+	@mkdir -p bin/tests
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# Build harness executables into bin/tests/
+bin/tests/harness_%: tests/harness_%.c $(CORE_LIB)
+	@mkdir -p bin/tests
+	@echo "Building harness_$*..."
+	@$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
+
+# Component builds
+arc: $(CORE_LIB)
+	@$(MAKE) -C arc
+
+ui: arc
+	@$(MAKE) -C ui/argo-term
+
+ui-argo-term: arc
+	@$(MAKE) -C ui/argo-term
+
+all-components: $(CORE_LIB) arc ui
+
+# Build just the scripts
+scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
+
+# Harness collection
+harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_CONTROL_FLOW) $(HARNESS_CI_INTERACTIVE) $(HARNESS_LOOP) $(HARNESS_PERSONA) $(HARNESS_WORKFLOW_CHAIN)
+	@echo "Built all test harnesses"
