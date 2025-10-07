@@ -20,7 +20,10 @@
 #include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_json.h"
-#include "argo_claude.h"  /* For claude_code_create_provider */
+#include "argo_env_utils.h"
+#include "argo_claude.h"
+#include "argo_api_providers.h"
+#include "argo_ollama.h"
 
 /* Helper: Generate unique task ID (thread-safe) */
 static void generate_task_id(char* id_out, size_t len) {
@@ -32,6 +35,90 @@ static void generate_task_id(char* id_out, size_t len) {
     pthread_mutex_unlock(&counter_mutex);
 
     snprintf(id_out, len, "task-%ld-%d", (long)time(NULL), counter);
+}
+
+/* Create provider by name and model */
+ci_provider_t* workflow_create_provider_by_name(const char* provider_name,
+                                                const char* model_name,
+                                                const char* workflow_id) {
+    if (!provider_name || !model_name || !workflow_id) {
+        LOG_WARN("Invalid provider configuration, using default");
+        return claude_code_create_provider(workflow_id);
+    }
+
+    LOG_INFO("Creating provider: %s (model: %s)", provider_name, model_name);
+
+    /* Claude Code provider (file-based, no API key) */
+    if (strcmp(provider_name, "claude_code") == 0) {
+        return claude_code_create_provider(workflow_id);
+    }
+
+    /* Claude API provider */
+    if (strcmp(provider_name, "claude_api") == 0) {
+        if (!claude_api_is_available()) {
+            LOG_WARN("Claude API not available (missing ANTHROPIC_API_KEY), using claude_code");
+            return claude_code_create_provider(workflow_id);
+        }
+        return claude_api_create_provider(model_name);
+    }
+
+    /* OpenAI API provider */
+    if (strcmp(provider_name, "openai_api") == 0) {
+        if (!openai_api_is_available()) {
+            LOG_WARN("OpenAI API not available (missing OPENAI_API_KEY), using claude_code");
+            return claude_code_create_provider(workflow_id);
+        }
+        return openai_api_create_provider(model_name);
+    }
+
+    /* Gemini API provider */
+    if (strcmp(provider_name, "gemini_api") == 0) {
+        if (!gemini_api_is_available()) {
+            LOG_WARN("Gemini API not available (missing GEMINI_API_KEY), using claude_code");
+            return claude_code_create_provider(workflow_id);
+        }
+        return gemini_api_create_provider(model_name);
+    }
+
+    /* Grok API provider */
+    if (strcmp(provider_name, "grok_api") == 0) {
+        if (!grok_api_is_available()) {
+            LOG_WARN("Grok API not available (missing GROK_API_KEY), using claude_code");
+            return claude_code_create_provider(workflow_id);
+        }
+        return grok_api_create_provider(model_name);
+    }
+
+    /* DeepSeek API provider */
+    if (strcmp(provider_name, "deepseek_api") == 0) {
+        if (!deepseek_api_is_available()) {
+            LOG_WARN("DeepSeek API not available (missing DEEPSEEK_API_KEY), using claude_code");
+            return claude_code_create_provider(workflow_id);
+        }
+        return deepseek_api_create_provider(model_name);
+    }
+
+    /* OpenRouter provider */
+    if (strcmp(provider_name, "openrouter") == 0) {
+        if (!openrouter_is_available()) {
+            LOG_WARN("OpenRouter not available (missing OPENROUTER_API_KEY), using claude_code");
+            return claude_code_create_provider(workflow_id);
+        }
+        return openrouter_create_provider(model_name);
+    }
+
+    /* Ollama local provider */
+    if (strcmp(provider_name, "ollama") == 0) {
+        if (!ollama_is_running()) {
+            LOG_WARN("Ollama not running (check port 11434), using claude_code");
+            return claude_code_create_provider(workflow_id);
+        }
+        return ollama_create_provider(model_name);
+    }
+
+    /* Unknown provider - fall back to claude_code */
+    LOG_WARN("Unknown provider '%s', using claude_code", provider_name);
+    return claude_code_create_provider(workflow_id);
 }
 
 /* Create workflow controller */
@@ -55,12 +142,25 @@ workflow_controller_t* workflow_create(ci_registry_t* registry,
     workflow->registry = registry;
     workflow->lifecycle = lifecycle;
 
-    /* Create default Claude Code provider */
-    workflow->provider = claude_code_create_provider(workflow_id);
+    /* Get provider configuration from environment */
+    const char* env_provider = argo_getenv("ARGO_DEFAULT_PROVIDER");
+    const char* env_model = argo_getenv("ARGO_DEFAULT_MODEL");
+
+    /* Store configuration in workflow (can be overridden by JSON later) */
+    strncpy(workflow->provider_name, env_provider ? env_provider : "claude_code",
+            sizeof(workflow->provider_name) - 1);
+    strncpy(workflow->model_name, env_model ? env_model : "claude-sonnet-4-5",
+            sizeof(workflow->model_name) - 1);
+
+    /* Create provider based on configuration */
+    workflow->provider = workflow_create_provider_by_name(workflow->provider_name,
+                                                          workflow->model_name,
+                                                          workflow_id);
     if (!workflow->provider) {
-        LOG_WARN("Failed to create Claude Code provider, workflow will have no AI");
+        LOG_WARN("Failed to create provider, workflow will have no AI");
     } else {
-        LOG_INFO("Workflow using Claude Code provider");
+        LOG_INFO("Workflow using provider: %s (model: %s)",
+                 workflow->provider_name, workflow->model_name);
     }
 
     workflow->tasks = NULL;

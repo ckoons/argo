@@ -19,6 +19,7 @@
 #include "argo_error.h"
 #include "argo_log.h"
 #include "argo_json.h"
+#include "argo_ci.h"
 
 /* Step handler function types */
 typedef int (*basic_step_fn)(const char* json, jsmntok_t* tokens, int step_idx, workflow_context_t* ctx);
@@ -229,6 +230,43 @@ int workflow_load_json(workflow_controller_t* workflow, const char* json_path) {
     workflow->context = context;
     workflow->personas = personas;
     workflow->step_count = 0;
+
+    /* Check for provider/model overrides in JSON */
+    int provider_idx = workflow_json_find_field(json, tokens, 0, "provider");
+    if (provider_idx >= 0 && tokens[provider_idx].type == JSMN_STRING) {
+        int len = tokens[provider_idx].end - tokens[provider_idx].start;
+        if (len > 0 && len < (int)sizeof(workflow->provider_name)) {
+            strncpy(workflow->provider_name, json + tokens[provider_idx].start, len);
+            workflow->provider_name[len] = '\0';
+            LOG_INFO("Workflow overrides provider: %s", workflow->provider_name);
+        }
+    }
+
+    int model_idx = workflow_json_find_field(json, tokens, 0, "model");
+    if (model_idx >= 0 && tokens[model_idx].type == JSMN_STRING) {
+        int len = tokens[model_idx].end - tokens[model_idx].start;
+        if (len > 0 && len < (int)sizeof(workflow->model_name)) {
+            strncpy(workflow->model_name, json + tokens[model_idx].start, len);
+            workflow->model_name[len] = '\0';
+            LOG_INFO("Workflow overrides model: %s", workflow->model_name);
+        }
+    }
+
+    /* Recreate provider if JSON specified different provider/model */
+    if (provider_idx >= 0 || model_idx >= 0) {
+        /* Cleanup old provider */
+        if (workflow->provider && workflow->provider->cleanup) {
+            workflow->provider->cleanup(workflow->provider);
+        }
+
+        /* Create new provider with overridden settings */
+        workflow->provider = workflow_create_provider_by_name(workflow->provider_name,
+                                                              workflow->model_name,
+                                                              workflow->workflow_id);
+        if (!workflow->provider) {
+            LOG_WARN("Failed to create overridden provider, workflow may fail");
+        }
+    }
 
     /* Find first step - try "steps" array first (new format), then default to "1" */
     int steps_idx = workflow_json_find_field(json, tokens, 0, WORKFLOW_JSON_FIELD_STEPS);

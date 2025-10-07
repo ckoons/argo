@@ -652,6 +652,62 @@ When uncertain:
 - Simple solution over clever solution
 - Working code over perfect code
 
+## Provider Configuration
+
+### Configuring AI Providers
+
+Argo supports multiple AI providers configured via environment variables and workflow JSON:
+
+**Environment Configuration** (`.env.argo`):
+```bash
+# Default provider for all workflows
+ARGO_DEFAULT_PROVIDER=claude_code
+ARGO_DEFAULT_MODEL=claude-sonnet-4-5
+```
+
+**Local Override** (`.env.argo.local` - not committed):
+```bash
+# Developer-specific provider/model
+ARGO_DEFAULT_PROVIDER=ollama
+ARGO_DEFAULT_MODEL=codellama
+
+# API keys (NEVER commit these to .env.argo)
+ANTHROPIC_API_KEY=sk-ant-api03-...
+OPENAI_API_KEY=sk-proj-...
+```
+
+**Workflow Override** (in workflow JSON):
+```json
+{
+  "workflow_name": "code_review",
+  "provider": "claude_api",
+  "model": "claude-opus-4",
+  "steps": [...]
+}
+```
+
+**Available Providers**:
+- `claude_code` - Claude Code CLI (no API key, uses Max account) [DEFAULT]
+- `claude_api` - Claude API (requires `ANTHROPIC_API_KEY`)
+- `openai_api` - OpenAI API (requires `OPENAI_API_KEY`)
+- `gemini_api` - Google Gemini API (requires `GEMINI_API_KEY`)
+- `grok_api` - xAI Grok API (requires `GROK_API_KEY`)
+- `deepseek_api` - DeepSeek API (requires `DEEPSEEK_API_KEY`)
+- `openrouter` - OpenRouter multi-model API (requires `OPENROUTER_API_KEY`)
+- `ollama` - Ollama local server (requires ollama on port 11434)
+
+**Configuration Precedence**:
+1. Workflow JSON `provider`/`model` fields (highest priority)
+2. `.env.argo.local` environment variables (developer overrides)
+3. `.env.argo` environment variables (project defaults)
+4. Built-in defaults: `claude_code` / `claude-sonnet-4-5` (lowest priority)
+
+**Best Practices**:
+- Use `claude_code` as default (no setup required, uses Max account)
+- Put API keys only in `.env.argo.local` (git-ignored)
+- Override provider per-workflow when specific model needed
+- Test with `ollama` locally before using API providers
+
 ## Provider Implementation Guide
 
 ### Provider Types

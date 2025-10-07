@@ -83,6 +83,8 @@ typedef struct workflow_controller {
     ci_registry_t* registry;
     lifecycle_manager_t* lifecycle;
     ci_provider_t* provider;       /* CI provider for AI-interactive steps */
+    char provider_name[64];        /* Provider name (claude_code, openai_api, etc) */
+    char model_name[128];          /* Model name (claude-sonnet-4-5, gpt-4, etc) */
 
     /* Task management */
     ci_task_t* tasks;
@@ -157,6 +159,11 @@ const char* workflow_phase_name(workflow_phase_t phase);
 
 /* Auto-assignment based on CI roles */
 int workflow_auto_assign_tasks(workflow_controller_t* workflow);
+
+/* Provider creation helper */
+ci_provider_t* workflow_create_provider_by_name(const char* provider_name,
+                                                const char* model_name,
+                                                const char* workflow_id);
 
 /* JSON workflow loading and execution */
 int workflow_load_json(workflow_controller_t* workflow, const char* json_path);
