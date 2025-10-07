@@ -882,7 +882,15 @@ install-arc:
 install-term:
 	$(MAKE) -C ui/argo-term install PREFIX=$(PREFIX)
 
-install-all: install install-arc install-term
+restart-daemon:
+	@echo "Restarting argo-daemon..."
+	@pkill -TERM argo-daemon 2>/dev/null || true
+	@sleep 1
+	@$(PREFIX)/bin/argo-daemon --port 9876 >/dev/null 2>&1 &
+	@sleep 1
+	@echo "Daemon restarted"
+
+install-all: install install-arc install-term restart-daemon
 	@if ! echo $$PATH | grep -q "$(HOME)/.local/bin"; then \
 		echo ""; \
 		echo "⚠️  $(HOME)/.local/bin is not in your PATH"; \

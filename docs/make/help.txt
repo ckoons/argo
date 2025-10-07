@@ -51,7 +51,8 @@ INSTALLATION
   install              Install argo core (daemon + executor)
   install-arc          Install arc CLI
   install-term         Install argo-term UI
-  install-all          Install everything (core + arc + ui)
+  install-all          Install everything (core + arc + ui) and restart daemon
+  restart-daemon       Restart the argo-daemon with new binaries
   uninstall            Uninstall argo core
   uninstall-arc        Uninstall arc CLI
   uninstall-term       Uninstall argo-term UI

@@ -48,6 +48,9 @@ static void capture_response_callback(const ci_response_t* response, void* userd
     /* Log failed responses with their content */
     if (!response->success) {
         LOG_ERROR("Provider returned error response: %s", capture->buffer);
+        /* Also print to stdout so it appears in workflow log */
+        fprintf(stderr, "\n[ERROR] Provider returned error response:\n%s\n", capture->buffer);
+        fflush(stderr);
     }
 }
 
@@ -123,6 +126,9 @@ static int generate_conversational_question(ci_provider_t* provider,
     /* Fallback to original question */
     LOG_ERROR("AI query failed (error %d), response: %s",
              result, capture.bytes_written > 0 ? response : "(empty)");
+    fprintf(stderr, "\n[ERROR] AI query failed (error %d), response: %s\n",
+            result, capture.bytes_written > 0 ? response : "(empty)");
+    fflush(stderr);
     snprintf(output, output_size, "%s", question);
     return E_CI_TIMEOUT;  /* Query failed, use timeout as closest match */
 }
@@ -294,6 +300,9 @@ int step_ci_ask(workflow_controller_t* workflow,
             if (result != ARGO_SUCCESS) {
                 LOG_ERROR("AI query failed (error %d), response: %s",
                          result, capture.bytes_written > 0 ? response : "(empty)");
+                fprintf(stderr, "\n[ERROR] AI query failed (error %d), response: %s\n",
+                        result, capture.bytes_written > 0 ? response : "(empty)");
+                fflush(stderr);
             }
             if (persona->name[0] != '\0') {
                 snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, prompt);
@@ -417,6 +426,9 @@ int step_ci_analyze(workflow_controller_t* workflow,
         if (result != ARGO_SUCCESS) {
             LOG_ERROR("AI query failed (error %d), response: %s",
                      result, capture.bytes_written > 0 ? response : "(empty)");
+            fprintf(stderr, "\n[ERROR] AI query failed (error %d), response: %s\n",
+                    result, capture.bytes_written > 0 ? response : "(empty)");
+            fflush(stderr);
             /* Fall back to placeholder result */
             result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
         } else {
@@ -615,6 +627,9 @@ int step_ci_present(workflow_controller_t* workflow,
         } else {
             LOG_ERROR("AI query failed (error %d), response: %s",
                      result, capture.bytes_written > 0 ? response : "(empty)");
+            fprintf(stderr, "\n[ERROR] AI query failed (error %d), response: %s\n",
+                    result, capture.bytes_written > 0 ? response : "(empty)");
+            fflush(stderr);
             printf("\nData source: %s\n", data_path);
             printf("(AI formatting unavailable)\n");
         }
