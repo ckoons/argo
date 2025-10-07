@@ -114,6 +114,8 @@ static int generate_conversational_question(ci_provider_t* provider,
     }
 
     /* Fallback to original question */
+    LOG_ERROR("AI query failed (error %d), response: %s",
+             result, capture.bytes_written > 0 ? response : "(empty)");
     snprintf(output, output_size, "%s", question);
     return E_CI_TIMEOUT;  /* Query failed, use timeout as closest match */
 }
@@ -282,6 +284,8 @@ int step_ci_ask(workflow_controller_t* workflow,
             snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, response);
         } else {
             /* Fall back to template prompt */
+            LOG_ERROR("AI query failed (error %d), response: %s",
+                     result, capture.bytes_written > 0 ? response : "(empty)");
             if (persona->name[0] != '\0') {
                 snprintf(final_prompt, sizeof(final_prompt), "[%s] %s ", persona->name, prompt);
             } else {
@@ -402,7 +406,8 @@ int step_ci_analyze(workflow_controller_t* workflow,
                                           capture_response_callback, &capture);
 
         if (result != ARGO_SUCCESS) {
-            LOG_ERROR("AI query failed with error %d", result);
+            LOG_ERROR("AI query failed (error %d), response: %s",
+                     result, capture.bytes_written > 0 ? response : "(empty)");
             /* Fall back to placeholder result */
             result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
         } else {
@@ -599,7 +604,8 @@ int step_ci_present(workflow_controller_t* workflow,
             /* Display AI-formatted presentation */
             printf("\n%s\n", response);
         } else {
-            LOG_ERROR("AI query failed with error %d", result);
+            LOG_ERROR("AI query failed (error %d), response: %s",
+                     result, capture.bytes_written > 0 ? response : "(empty)");
             printf("\nData source: %s\n", data_path);
             printf("(AI formatting unavailable)\n");
         }
