@@ -25,15 +25,15 @@ static int get_confirmation(const char* workflow_name) {
 int arc_workflow_abandon(int argc, char** argv) {
     const char* workflow_name = NULL;
 
-    /* Get workflow name from arg or context */
+    /* Get workflow ID from arg or context */
     if (argc >= 1) {
         workflow_name = argv[0];
     } else {
         workflow_name = arc_context_get();
         if (!workflow_name) {
             LOG_USER_ERROR("No active workflow context\n");
-            LOG_USER_INFO("Usage: arc workflow abandon [workflow_name]\n");
-            LOG_USER_INFO("   or: arc switch [workflow_name] && arc workflow abandon\n");
+            LOG_USER_INFO("Usage: arc workflow abandon <workflow_id>\n");
+            LOG_USER_INFO("   or: arc switch <workflow_id> && arc workflow abandon\n");
             return ARC_EXIT_ERROR;
         }
     }

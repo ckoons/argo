@@ -23,4 +23,7 @@ void arc_http_response_free(arc_http_response_t* response);
 /* Get daemon URL */
 const char* arc_get_daemon_url(void);
 
+/* Daemon management */
+int arc_ensure_daemon_running(void);
+
 #endif /* ARC_HTTP_CLIENT_H */

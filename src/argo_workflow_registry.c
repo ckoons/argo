@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
+#include <errno.h>
 #include "argo_workflow_registry.h"
 #include "argo_error.h"
 #include "argo_log.h"
@@ -260,4 +262,44 @@ const char* workflow_status_string(workflow_status_t status) {
         case WORKFLOW_STATUS_COMPLETED: return "completed";
         default:                        return "unknown";
     }
+}
+
+/* Cleanup dead workflows - remove workflows whose processes no longer exist */
+int workflow_registry_cleanup_dead_workflows(workflow_registry_t* registry) {
+    if (!registry) {
+        return E_INVALID_PARAMS;
+    }
+
+    int removed_count = 0;
+
+    /* Iterate backwards to safely remove entries */
+    for (int i = registry->workflow_count - 1; i >= 0; i--) {
+        workflow_instance_t* workflow = &registry->workflows[i];
+
+        /* Skip workflows without PIDs */
+        if (workflow->pid <= 0) {
+            continue;
+        }
+
+        /* Check if process exists using kill(pid, 0) */
+        if (kill(workflow->pid, 0) != 0) {
+            /* Process doesn't exist (errno == ESRCH) or permission denied */
+            if (errno == ESRCH) {
+                LOG_INFO("Removing dead workflow: %s (PID %d no longer exists)",
+                        workflow->id, workflow->pid);
+
+                /* Remove from registry */
+                workflow_registry_remove_workflow(registry, workflow->id);
+                removed_count++;
+            }
+        }
+    }
+
+    if (removed_count > 0) {
+        LOG_INFO("Cleaned up %d dead workflow(s)", removed_count);
+        /* Registry was modified, mark dirty for save */
+        registry->dirty = true;
+    }
+
+    return ARGO_SUCCESS;
 }

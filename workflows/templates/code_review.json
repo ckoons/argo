@@ -5,27 +5,32 @@
     {
       "step": "analyze_code_stats",
       "type": "prompt",
-      "prompt": "Run the arc component line counter to get current statistics:\ncd /Users/cskoons/projects/github/argo/arc && ../scripts/count_component.sh arc --budget 5000\n\nShow the output and confirm we're within budget."
+      "prompt": "Run the arc component line counter to get current statistics:\ncd /Users/cskoons/projects/github/argo/arc && ../scripts/count_component.sh arc --budget 5000\n\nShow the output and confirm we're within budget.",
+      "next_step": "review_recent_changes"
     },
     {
       "step": "review_recent_changes",
       "type": "prompt",
-      "prompt": "Review the arc CLI codebase focusing on recently modified files:\n- arc/src/workflow_list.c\n- arc/src/workflow_states.c\n- arc/src/workflow_attach.c\n- arc/src/workflow_start.c\n- arc/include/arc_constants.h\n\nCheck for:\n1. Any remaining magic numbers in .c files (should all be in headers)\n2. Potential buffer overflows (unsafe string operations)\n3. Memory leaks (malloc without free, missing goto cleanup patterns)\n4. Inconsistent error handling (should use arc_report_error)\n5. File length violations (max 600 lines per .c file, 3% tolerance)\n\nProvide specific file:line references for any issues found.\n\nContext:\n- We just created arc_constants.h with time and buffer size constants\n- All magic numbers should now use named constants from that header\n- Follow standards in arc/CLAUDE.md"
+      "prompt": "Review the arc CLI codebase focusing on recently modified files:\n- arc/src/workflow_list.c\n- arc/src/workflow_states.c\n- arc/src/workflow_attach.c\n- arc/src/workflow_start.c\n- arc/include/arc_constants.h\n\nCheck for:\n1. Any remaining magic numbers in .c files (should all be in headers)\n2. Potential buffer overflows (unsafe string operations)\n3. Memory leaks (malloc without free, missing goto cleanup patterns)\n4. Inconsistent error handling (should use arc_report_error)\n5. File length violations (max 600 lines per .c file, 3% tolerance)\n\nProvide specific file:line references for any issues found.\n\nContext:\n- We just created arc_constants.h with time and buffer size constants\n- All magic numbers should now use named constants from that header\n- Follow standards in arc/CLAUDE.md",
+      "next_step": "verify_compilation"
     },
     {
       "step": "verify_compilation",
       "type": "prompt",
-      "prompt": "Verify the code compiles cleanly:\ncd /Users/cskoons/projects/github/argo/arc && make clean && make arc 2>&1\n\nReport any warnings or errors. All code must compile with -Wall -Werror -Wextra -std=c11."
+      "prompt": "Verify the code compiles cleanly:\ncd /Users/cskoons/projects/github/argo/arc && make clean && make arc 2>&1\n\nReport any warnings or errors. All code must compile with -Wall -Werror -Wextra -std=c11.",
+      "next_step": "run_tests"
     },
     {
       "step": "run_tests",
       "type": "prompt",
-      "prompt": "Run the arc test suite:\ncd /Users/cskoons/projects/github/argo/arc && make test-arc\n\nConfirm all tests pass. Report:\n- Unit tests: should be 9/9 passing\n- CLI tests: should be 12/12 passing\n- Total: 21/21 tests passing"
+      "prompt": "Run the arc test suite:\ncd /Users/cskoons/projects/github/argo/arc && make test-arc\n\nConfirm all tests pass. Report:\n- Unit tests: should be 9/9 passing\n- CLI tests: should be 12/12 passing\n- Total: 21/21 tests passing",
+      "next_step": "summary_report"
     },
     {
       "step": "summary_report",
       "type": "prompt",
-      "prompt": "Provide a summary report:\n\n1. Code Statistics:\n   - Current line count vs budget\n   - Number of files\n   - Compliance status\n\n2. Issues Found:\n   - Critical issues (must fix)\n   - Warnings (should fix)\n   - Suggestions (nice to have)\n\n3. Test Results:\n   - All tests passing? (yes/no)\n   - Any failures to investigate?\n\n4. Recommendations:\n   - Priority fixes\n   - Optional improvements\n   - Areas for future enhancement\n\nKeep the report concise and actionable."
+      "prompt": "Provide a summary report:\n\n1. Code Statistics:\n   - Current line count vs budget\n   - Number of files\n   - Compliance status\n\n2. Issues Found:\n   - Critical issues (must fix)\n   - Warnings (should fix)\n   - Suggestions (nice to have)\n\n3. Test Results:\n   - All tests passing? (yes/no)\n   - Any failures to investigate?\n\n4. Recommendations:\n   - Priority fixes\n   - Optional improvements\n   - Areas for future enhancement\n\nKeep the report concise and actionable.",
+      "next_step": "EXIT"
     }
   ]
 }

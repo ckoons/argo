@@ -67,6 +67,9 @@ int workflow_registry_load(workflow_registry_t* registry);
 int workflow_registry_save(workflow_registry_t* registry);
 int workflow_registry_schedule_save(workflow_registry_t* registry);
 
+/* Maintenance */
+int workflow_registry_cleanup_dead_workflows(workflow_registry_t* registry);
+
 /* Workflow management */
 int workflow_registry_add_workflow(workflow_registry_t* registry,
                                    const char* template_name,

@@ -873,7 +873,8 @@ clean-all: clean clean-arc clean-ui
 # Installation targets
 install:
 	install -d $(PREFIX)/bin
-	install -m 0755 bin/argo_workflow_executor $(PREFIX)/bin/argo
+	install -m 0755 bin/argo-daemon $(PREFIX)/bin/argo-daemon
+	install -m 0755 bin/argo_workflow_executor $(PREFIX)/bin/argo_workflow_executor
 
 install-arc:
 	$(MAKE) -C arc install PREFIX=$(PREFIX)
@@ -895,7 +896,8 @@ install-all: install install-arc install-term
 
 # Uninstallation targets
 uninstall:
-	rm -f $(PREFIX)/bin/argo
+	rm -f $(PREFIX)/bin/argo-daemon
+	rm -f $(PREFIX)/bin/argo_workflow_executor
 
 uninstall-arc:
 	$(MAKE) -C arc uninstall PREFIX=$(PREFIX)

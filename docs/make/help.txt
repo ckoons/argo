@@ -46,6 +46,20 @@ SIZE TRACKING
   count-snapshot       Save historical snapshot
   count-json           JSON output for automation
 
+INSTALLATION
+------------
+  install              Install argo core (daemon + executor)
+  install-arc          Install arc CLI
+  install-term         Install argo-term UI
+  install-all          Install everything (core + arc + ui)
+  uninstall            Uninstall argo core
+  uninstall-arc        Uninstall arc CLI
+  uninstall-term       Uninstall argo-term UI
+  uninstall-all        Uninstall everything
+
+Default install location: ~/.local/bin
+Custom location: make install PREFIX=/usr/local
+
 OPTIONAL FEATURES
 -----------------
   make ENABLE_DRYRUN=1    # Build with dry-run mode

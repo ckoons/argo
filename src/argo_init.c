@@ -18,6 +18,15 @@
 /* Registry path */
 #define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
 
+/* Periodic cleanup task - runs every 30 minutes */
+static void periodic_workflow_cleanup(void* context) {
+    workflow_registry_t* registry = (workflow_registry_t*)context;
+    if (registry) {
+        LOG_DEBUG("Running periodic workflow cleanup");
+        workflow_registry_cleanup_dead_workflows(registry);
+    }
+}
+
 /* Initialize Argo library */
 int argo_init(void) {
     int result = ARGO_SUCCESS;
@@ -74,6 +83,9 @@ int argo_init(void) {
 
     /* Register for cleanup on shutdown */
     argo_set_workflow_registry(registry);
+
+    /* Register periodic cleanup task (every 30 minutes = 1800 seconds) */
+    shared_services_register_task(services, periodic_workflow_cleanup, registry, 1800);
 
     LOG_INFO("Argo initialization complete");
     return ARGO_SUCCESS;

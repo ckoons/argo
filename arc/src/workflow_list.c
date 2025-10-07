@@ -186,15 +186,14 @@ int arc_workflow_list(int argc, char** argv) {
     /* Get effective environment filter */
     const char* environment = arc_get_effective_environment(argc, argv);
 
-    /* Initialize argo for template discovery */
-    int result = argo_init();
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to initialize argo\n");
-        return ARC_EXIT_ERROR;
-    }
-
     /* Templates only */
     if (filter && strcmp(filter, "template") == 0) {
+        /* Initialize argo only for template discovery */
+        int result = argo_init();
+        if (result != ARGO_SUCCESS) {
+            LOG_USER_ERROR("Failed to initialize argo\n");
+            return ARC_EXIT_ERROR;
+        }
         result = list_templates();
         argo_exit();
         return result;
@@ -206,12 +205,16 @@ int arc_workflow_list(int argc, char** argv) {
     /* If no filter OR filter is not "active", also show templates */
     if (!filter || strcmp(filter, "active") != 0) {
         if (exit_code == ARC_EXIT_SUCCESS) {
+            /* Initialize argo only for template discovery */
+            int result = argo_init();
+            if (result != ARGO_SUCCESS) {
+                LOG_USER_WARN("Failed to load templates\n");
+                return exit_code;  /* Still return success for workflows */
+            }
             list_templates();
+            argo_exit();
         }
     }
-
-    /* Cleanup */
-    argo_exit();
 
     return exit_code;
 }

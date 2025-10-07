@@ -44,6 +44,7 @@ static const step_dispatch_entry_t step_dispatch_table[] = {
     { STEP_TYPE_DECIDE,        BRANCHING_STEP, { .branching = step_decide } },
     { STEP_TYPE_USER_CHOOSE,   BRANCHING_STEP, { .branching = step_user_choose } },
     { STEP_TYPE_CI_ASK,        CI_STEP,        { .ci = step_ci_ask } },
+    { STEP_TYPE_PROMPT,        CI_STEP,        { .ci = step_ci_ask } },  /* Alias for ci_ask */
     { STEP_TYPE_CI_ANALYZE,    CI_STEP,        { .ci = step_ci_analyze } },
     { STEP_TYPE_CI_ASK_SERIES, CI_STEP,        { .ci = step_ci_ask_series } },
     { STEP_TYPE_CI_PRESENT,    CI_STEP,        { .ci = step_ci_present } },

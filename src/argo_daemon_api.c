@@ -181,6 +181,9 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
         return result;
     }
 
+    /* Cleanup dead workflows after loading */
+    workflow_registry_cleanup_dead_workflows(registry);
+
     /* Get workflow list */
     workflow_instance_t* workflows = NULL;
     int count = 0;
@@ -257,6 +260,9 @@ int api_workflow_status(http_request_t* req, http_response_t* resp) {
         return result;
     }
 
+    /* Cleanup dead workflows after loading */
+    workflow_registry_cleanup_dead_workflows(registry);
+
     /* Get workflow info */
     workflow_instance_t* info = workflow_registry_get_workflow(registry, workflow_id);
     if (!info) {
@@ -306,6 +312,9 @@ int api_workflow_pause(http_request_t* req, http_response_t* resp) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
         return result;
     }
+
+    /* Cleanup dead workflows after loading */
+    workflow_registry_cleanup_dead_workflows(registry);
 
     /* Get workflow info */
     workflow_instance_t* info = workflow_registry_get_workflow(registry, workflow_id);
@@ -386,6 +395,9 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
         return result;
     }
 
+    /* Cleanup dead workflows after loading */
+    workflow_registry_cleanup_dead_workflows(registry);
+
     /* Get workflow info */
     workflow_instance_t* info = workflow_registry_get_workflow(registry, workflow_id);
     if (!info) {
@@ -464,6 +476,9 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
         return result;
     }
+
+    /* Cleanup dead workflows after loading */
+    workflow_registry_cleanup_dead_workflows(registry);
 
     /* Get workflow to get PID */
     workflow_instance_t* info = workflow_registry_get_workflow(registry, workflow_id);

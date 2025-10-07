@@ -16,6 +16,7 @@ typedef struct workflow_persona workflow_persona_t;
 #define STEP_TYPE_DECIDE "decide"
 #define STEP_TYPE_USER_CHOOSE "user_choose"
 #define STEP_TYPE_CI_ASK "ci_ask"
+#define STEP_TYPE_PROMPT "prompt"         /* Alias for ci_ask */
 #define STEP_TYPE_CI_ANALYZE "ci_analyze"
 #define STEP_TYPE_CI_ASK_SERIES "ci_ask_series"
 #define STEP_TYPE_CI_PRESENT "ci_present"
