@@ -152,7 +152,10 @@ int main(int argc, char** argv) {
         if (result == ARGO_SUCCESS) {
             printf("✓ Step %s completed\n\n", g_workflow->previous_step_id);
         } else {
-            fprintf(stderr, "✗ Step %s failed with error: %d\n\n", g_workflow->current_step_id, result);
+            fprintf(stderr, "✗ Step %s failed with error: [%s] %s\n\n",
+                    g_workflow->current_step_id,
+                    argo_error_string(result),
+                    argo_error_message(result));
             break;
         }
     }
