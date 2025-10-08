@@ -24,6 +24,7 @@
 #define GEMINI_MAX_CONTEXT 2097152
 
 /* Provider creation functions */
+ci_provider_t* claude_code_create_provider(const char* model);
 ci_provider_t* claude_api_create_provider(const char* model);
 ci_provider_t* openai_api_create_provider(const char* model);
 ci_provider_t* gemini_api_create_provider(const char* model);
@@ -72,5 +73,10 @@ typedef struct {
 
 /* Get model info */
 const api_model_info_t* get_api_model_info(const char* provider, const char* model);
+
+/* Claude Code memory management (sundown/sunrise) */
+int claude_code_set_sunrise(ci_provider_t* provider, const char* brief);
+int claude_code_set_sunset(ci_provider_t* provider, const char* notes);
+ci_memory_digest_t* claude_code_get_memory(ci_provider_t* provider);
 
 #endif /* ARGO_API_PROVIDERS_H */
