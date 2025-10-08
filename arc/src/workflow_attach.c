@@ -124,19 +124,24 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
     /* Seek to current position */
     lseek(fd, current_pos, SEEK_SET);
 
-    LOG_USER_INFO("\n[Streaming output - Press Enter to detach]\n");
+    LOG_USER_INFO("\n[Streaming output - Press Ctrl+D to detach]\n");
 
     char buffer[ARC_READ_CHUNK_SIZE];
     char input_char;
     bool should_exit = false;
 
     while (!should_exit) {
-        /* Check for Enter key press */
-        if (read(STDIN_FILENO, &input_char, 1) > 0) {
-            if (input_char == '\n') {
+        /* Check for Ctrl+D (EOF) */
+        ssize_t bytes = read(STDIN_FILENO, &input_char, 1);
+        if (bytes > 0) {
+            if (input_char == 4) {  /* Ctrl+D is ASCII 4 (EOT) */
                 should_exit = true;
                 break;
             }
+        } else if (bytes == 0) {
+            /* EOF from stdin (Ctrl+D) */
+            should_exit = true;
+            break;
         }
 
         /* Read new data from log */

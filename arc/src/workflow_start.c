@@ -70,8 +70,10 @@ int arc_workflow_start(int argc, char** argv) {
     LOG_USER_SUCCESS("Started workflow: %s (environment: %s)\n", workflow_id, environment);
     LOG_USER_INFO("Logs: ~/.argo/logs/%s.log\n", workflow_id);
 
-    /* Cleanup */
+    /* Cleanup HTTP response */
     arc_http_response_free(response);
 
-    return ARC_EXIT_SUCCESS;
+    /* Auto-attach to workflow */
+    char* attach_argv[] = {(char*)workflow_id};
+    return arc_workflow_attach(1, attach_argv);
 }
