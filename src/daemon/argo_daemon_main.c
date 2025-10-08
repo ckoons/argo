@@ -13,6 +13,7 @@
 #include "argo_error.h"
 #include "argo_env_utils.h"
 #include "argo_limits.h"
+#include "argo_urls.h"
 
 /* Global daemon for signal handling */
 static argo_daemon_t* g_daemon = NULL;

@@ -16,6 +16,7 @@
 #include "argo_error.h"
 #include "argo_init.h"
 #include "argo_limits.h"
+#include "argo_urls.h"
 
 /* Global workflow for signal handling */
 static workflow_controller_t* g_workflow = NULL;
@@ -33,14 +34,24 @@ static void signal_handler(int signum) {
     }
 }
 
+/* Get daemon base URL */
+static void get_daemon_base_url(char* buffer, size_t buffer_size) {
+    snprintf(buffer, buffer_size, "http://%s:%d",
+             DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT);
+}
+
 /* Report progress to daemon */
 static void report_progress(const char* workflow_id, int current_step, int total_steps, const char* step_name) {
     CURL* curl = curl_easy_init();
     if (!curl) return;
 
+    char base_url[ARGO_BUFFER_MEDIUM];
     char url[ARGO_PATH_MAX];
     char json_body[ARGO_PATH_MAX];
-    snprintf(url, sizeof(url), "http://localhost:9876/api/workflow/progress/%s", workflow_id);
+
+    get_daemon_base_url(base_url, sizeof(base_url));
+    snprintf(url, sizeof(url), "%s/api/workflow/progress/%s",
+             base_url, workflow_id);
     snprintf(json_body, sizeof(json_body),
             "{\"current_step\":%d,\"total_steps\":%d,\"step_name\":\"%s\"}",
             current_step, total_steps, step_name ? step_name : "");

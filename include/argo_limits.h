@@ -106,9 +106,6 @@
 
 /* ===== HTTP and Network ===== */
 
-/* Default daemon HTTP port */
-#define DEFAULT_DAEMON_PORT 9876
-
 /* Maximum valid TCP port number */
 #define MAX_TCP_PORT 65535
 
