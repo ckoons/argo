@@ -65,6 +65,14 @@
 /* Periodic workflow cleanup interval in seconds (30 minutes) */
 #define WORKFLOW_CLEANUP_INTERVAL_SECONDS 1800
 
+/* ===== Provider Defaults ===== */
+
+/* Ollama default port */
+#define OLLAMA_DEFAULT_PORT 11434
+
+/* Claude context window size */
+#define CLAUDE_CONTEXT_WINDOW 200000
+
 /* ===== Merge Confidence ===== */
 
 /* Default merge confidence when not specified */

@@ -41,7 +41,7 @@ workflow_input_socket_t* workflow_input_create(const char* workflow_id) {
             "%s/.argo/sockets/%s.sock", home, workflow_id);
 
     /* Create sockets directory if needed */
-    char sockets_dir[512];
+    char sockets_dir[ARGO_PATH_MAX];
     snprintf(sockets_dir, sizeof(sockets_dir), "%s/.argo/sockets", home);
     mkdir(sockets_dir, ARGO_DIR_PERMISSIONS);
 

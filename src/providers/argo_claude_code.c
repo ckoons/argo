@@ -86,7 +86,7 @@ ci_provider_t* claude_code_create_provider(const char* model) {
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = true;   /* Streaming visible to user */
     ctx->provider.supports_memory = true;      /* Memory digest integrated */
-    ctx->provider.max_context = 200000;        /* Claude's context window */
+    ctx->provider.max_context = CLAUDE_CONTEXT_WINDOW;
 
     /* Allocate response buffer */
     ctx->response_capacity = CLAUDE_CODE_RESPONSE_BUFFER_SIZE;
@@ -149,7 +149,7 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
     /* Add sunrise brief if available */
     if (ctx->memory_digest && ctx->memory_digest->sunrise_brief) {
         size_t sunrise_len = strlen(ctx->memory_digest->sunrise_brief);
-        augmented_size += sunrise_len + 100;  /* Extra space for markers */
+        augmented_size += sunrise_len + MEMORY_AUGMENT_MARKER_OVERHEAD;
     }
 
     /* Allocate augmented prompt buffer */

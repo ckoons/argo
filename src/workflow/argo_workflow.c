@@ -110,7 +110,7 @@ ci_provider_t* workflow_create_provider_by_name(const char* provider_name,
     /* Ollama local provider */
     if (strcmp(provider_name, "ollama") == 0) {
         if (!ollama_is_running()) {
-            LOG_WARN("Ollama not running (check port 11434), using claude_code");
+            LOG_WARN("Ollama not running (check port %d), using claude_code", OLLAMA_DEFAULT_PORT);
             return claude_code_create_provider(workflow_id);
         }
         return ollama_create_provider(model_name);

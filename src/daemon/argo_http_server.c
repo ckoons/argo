@@ -228,7 +228,7 @@ static void* handle_connection(void* arg) {
     route_handler_fn handler = find_route(server, &req);
 
     http_response_t resp = {0};
-    resp.status_code = 200;
+    resp.status_code = HTTP_STATUS_OK;
     strncpy(resp.content_type, "application/json", sizeof(resp.content_type) - 1);
 
     if (handler) {
@@ -236,7 +236,7 @@ static void* handle_connection(void* arg) {
         handler(&req, &resp);
     } else {
         /* 404 Not Found */
-        resp.status_code = 404;
+        resp.status_code = HTTP_STATUS_NOT_FOUND;
         const char* not_found = "{\"status\":\"error\",\"message\":\"Not found\"}";
         resp.body = (char*)not_found;
         resp.body_length = strlen(not_found);
@@ -246,7 +246,7 @@ static void* handle_connection(void* arg) {
     send_http_response(client_fd, &resp);
 
     /* Cleanup */
-    if (resp.body && resp.status_code != 404) {
+    if (resp.body && resp.status_code != HTTP_STATUS_NOT_FOUND) {
         free(resp.body);
     }
     free(req.body);

@@ -17,6 +17,9 @@
 /* Memory JSON buffer size */
 #define MEMORY_JSON_BUFFER_SIZE 8192
 
+/* Memory augmentation overhead for markers */
+#define MEMORY_AUGMENT_MARKER_OVERHEAD 100
+
 /* Memory JSON field names for parsing */
 #define MEMORY_JSON_SESSION_ID "\"session_id\":\""
 #define MEMORY_JSON_CI_NAME "\"ci_name\":\""
