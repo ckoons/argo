@@ -14,21 +14,21 @@ help-count:
 
 # Line counting
 count-core:
-	@./scripts/count_core.sh
+	@./scripts/dev/count_core.sh
 
 count: count-summary
 
 count-summary:
-	@./scripts/count_summary.sh
+	@./scripts/dev/count_summary.sh
 
 count-report:
-	@./scripts/count_report.sh
+	@./scripts/dev/count_report.sh
 
 count-snapshot:
-	@./scripts/count_snapshot.sh
+	@./scripts/dev/count_snapshot.sh
 
 count-json:
-	@./scripts/count_report.sh --json
+	@./scripts/dev/count_report.sh --json
 
 # Check code style
 check:
@@ -51,4 +51,4 @@ debug:
 # Update model defaults from API providers
 update-models:
 	@echo "Updating model defaults from API providers..."
-	@./scripts/update_models.sh
+	@./scripts/ops/update_models.sh
