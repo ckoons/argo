@@ -255,14 +255,19 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
 
     /* Write prompt to stdin */
     size_t prompt_len = strlen(augmented_prompt);
+    LOG_DEBUG("Writing %zu bytes to Claude stdin", prompt_len);
+
     ssize_t written = write(stdin_pipe[1], augmented_prompt, prompt_len);
     if (written < 0 || (size_t)written != prompt_len) {
-        argo_report_error(E_SYSTEM_PROCESS, "claude_code_execute", "failed to write prompt: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_PROCESS, "claude_code_execute", "failed to write prompt (wrote %zd of %zu): %s",
+                         written, prompt_len, strerror(errno));
         close(stdin_pipe[1]);
         close(stdout_pipe[0]);
         result = E_SYSTEM_PROCESS;
         goto cleanup_pipes;
     }
+
+    LOG_DEBUG("Successfully wrote prompt to stdin, closing pipe");
 
     /* Close stdin to signal EOF to Claude */
     close(stdin_pipe[1]);

@@ -7,6 +7,9 @@
 #include <signal.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 /* Project includes */
 #include "argo_daemon.h"
@@ -17,6 +20,15 @@
 
 /* Global daemon for signal handling */
 static argo_daemon_t* g_daemon = NULL;
+
+/* Kill any existing daemon - idempotent takeover */
+static void kill_existing_daemon(uint16_t port) {
+    (void)port;  /* Port displayed in main() output */
+
+    /* Blind kill - idempotent */
+    system("pkill -9 argo-daemon 2>/dev/null");
+    sleep(1);
+}
 
 /* Signal handler */
 static void signal_handler(int signum) {
@@ -98,6 +110,9 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Final port: %d\n", port);
     fprintf(stderr, "============================\n");
     fflush(stderr);
+
+    /* Kill any existing daemon on this port */
+    kill_existing_daemon(port);
 
     /* Create daemon */
     g_daemon = argo_daemon_create(port);
