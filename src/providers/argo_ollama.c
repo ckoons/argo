@@ -22,6 +22,7 @@
 #include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_ollama.h"
+#include "argo_urls.h"
 
 /* Ollama context structure */
 typedef struct ollama_context {
@@ -132,14 +133,14 @@ static int ollama_connect(ci_provider_t* provider) {
     }
 
     /* Connect to Ollama */
-    ctx->socket_fd = connect_to_ollama("localhost", ctx->port);
+    ctx->socket_fd = connect_to_ollama(DEFAULT_DAEMON_HOST, ctx->port);
     if (ctx->socket_fd < 0) {
         argo_report_error(E_CI_NO_PROVIDER, "ollama_connect", ERR_FMT_FAILED_AT_PORT, ctx->port);
         return E_CI_NO_PROVIDER;
     }
 
     ctx->connected = true;
-    LOG_INFO("Connected to Ollama at localhost:%d", ctx->port);
+    LOG_INFO("Connected to Ollama at %s:%d", DEFAULT_DAEMON_HOST, ctx->port);
     return ARGO_SUCCESS;
 }
 
@@ -460,12 +461,12 @@ static int build_http_request(char* buffer, size_t size,
     /* Build HTTP request */
     int req_len = snprintf(buffer, size,
                           "POST /api/generate HTTP/1.1\r\n"
-                          "Host: localhost\r\n"
+                          "Host: %s\r\n"
                           "Content-Type: application/json\r\n"
                           "Content-Length: %d\r\n"
                           "\r\n"
                           "%s",
-                          json_len, json_body);
+                          DEFAULT_DAEMON_HOST, json_len, json_body);
 
     if (req_len >= (int)size) {
         return -1;

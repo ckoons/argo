@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "argo_shared_services.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 
 /* Background thread main loop */
 static void* shared_services_thread_main(void* arg) {
@@ -42,7 +43,7 @@ static void* shared_services_thread_main(void* arg) {
         pthread_mutex_unlock(&svc->lock);
 
         /* Sleep briefly before next check */
-        usleep(SHARED_SERVICES_CHECK_INTERVAL_MS * 1000);
+        usleep(SHARED_SERVICES_CHECK_INTERVAL_MS * MICROSECONDS_PER_MILLISECOND);
     }
 
     return NULL;

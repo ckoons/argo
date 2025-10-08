@@ -29,11 +29,6 @@
 #include "argo_limits.h"
 #include "argo_memory.h"
 
-/* Buffer sizes */
-#define CLAUDE_CODE_RESPONSE_BUFFER_SIZE (1024 * 1024)  /* 1MB for response */
-#define CLAUDE_CODE_READ_CHUNK_SIZE 4096
-#define CLAUDE_CODE_MODEL_SIZE 128
-
 /* Claude Code context structure */
 typedef struct claude_code_context {
     /* Model configuration */

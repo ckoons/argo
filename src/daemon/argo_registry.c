@@ -15,6 +15,7 @@
 #include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_limits.h"
+#include "argo_urls.h"
 
 /* Create registry */
 ci_registry_t* registry_create(void) {
@@ -100,7 +101,7 @@ int registry_add_ci(ci_registry_t* registry,
     strncpy(entry->name, name, REGISTRY_NAME_MAX - 1);
     strncpy(entry->role, role, REGISTRY_ROLE_MAX - 1);
     strncpy(entry->model, model, REGISTRY_MODEL_MAX - 1);
-    strncpy(entry->host, "localhost", REGISTRY_HOST_MAX - 1);
+    strncpy(entry->host, DEFAULT_DAEMON_HOST, REGISTRY_HOST_MAX - 1);
     entry->port = port;
     entry->socket_fd = -1;
     entry->status = CI_STATUS_OFFLINE;

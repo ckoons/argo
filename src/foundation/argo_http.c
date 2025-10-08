@@ -286,11 +286,11 @@ int http_parse_url(const char* url, char** host, int* port, char** path) {
 
     const char* p = url;
 
-    if (strncmp(p, "https://", 8) == 0) {
-        p += 8;
+    if (strncmp(p, HTTPS_SCHEME_PREFIX, HTTPS_SCHEME_PREFIX_LEN) == 0) {
+        p += HTTPS_SCHEME_PREFIX_LEN;
         *port = HTTP_PORT_HTTPS;
-    } else if (strncmp(p, "http://", 7) == 0) {
-        p += 7;
+    } else if (strncmp(p, HTTP_SCHEME_PREFIX, HTTP_SCHEME_PREFIX_LEN) == 0) {
+        p += HTTP_SCHEME_PREFIX_LEN;
         *port = HTTP_PORT_HTTP;
     } else {
         result = E_INVALID_PARAMS;

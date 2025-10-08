@@ -73,6 +73,31 @@
 /* Claude context window size */
 #define CLAUDE_CONTEXT_WINDOW 200000
 
+/* Claude Code provider buffers */
+#define CLAUDE_CODE_RESPONSE_BUFFER_SIZE (1024 * 1024)  /* 1MB for response */
+#define CLAUDE_CODE_READ_CHUNK_SIZE 4096
+#define CLAUDE_CODE_MODEL_SIZE 128
+
+/* ===== Unit Conversions ===== */
+
+/* Percentage calculations */
+#define PERCENTAGE_DIVISOR 100
+
+/* Time conversions */
+#define MICROSECONDS_PER_MILLISECOND 1000
+
+/* ===== JSON Parsing ===== */
+
+/* sscanf buffer size limits (buffer_size - 1 for null terminator) */
+#define SSCANF_FMT_BUFFER_NAME_SIZE 127   /* ARGO_BUFFER_NAME - 1 */
+#define SSCANF_FMT_BUFFER_SMALL_SIZE 63   /* ARGO_BUFFER_SMALL - 1 */
+#define SSCANF_FMT_BUFFER_TINY_SIZE 31    /* ARGO_BUFFER_TINY - 1 */
+
+/* sscanf format string helpers */
+#define SSCANF_FMT_NAME "%127[^\"]"
+#define SSCANF_FMT_SMALL "%63[^\"]"
+#define SSCANF_FMT_TINY "%31[^\"]"
+
 /* ===== Merge Confidence ===== */
 
 /* Default merge confidence when not specified */

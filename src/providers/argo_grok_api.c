@@ -17,7 +17,6 @@
 #include "argo_api_provider_generator.h"
 
 /* Grok API Configuration */
-#define GROK_API_URL "https://api.x.ai/v1/chat/completions"
 #define GROK_API_KEY_ENV "XAI_API_KEY"
 
 /* Generate Grok provider using macro */

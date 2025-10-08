@@ -6,6 +6,12 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+/* HTTP URL scheme constants */
+#define HTTP_SCHEME_PREFIX "http://"
+#define HTTPS_SCHEME_PREFIX "https://"
+#define HTTP_SCHEME_PREFIX_LEN 7
+#define HTTPS_SCHEME_PREFIX_LEN 8
+
 /* HTTP constants */
 #define HTTP_DEFAULT_TIMEOUT_SECONDS 30
 #define HTTP_CMD_BUFFER_SIZE 8192

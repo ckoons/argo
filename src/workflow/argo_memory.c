@@ -12,6 +12,7 @@
 #include "argo_log.h"
 #include "argo_json.h"
 #include "argo_file_utils.h"
+#include "argo_limits.h"
 
 /* Static ID counter */
 static uint32_t g_next_memory_id = 1;
@@ -24,7 +25,7 @@ ci_memory_digest_t* memory_digest_create(size_t context_limit) {
         return NULL;
     }
 
-    digest->max_allowed_size = (context_limit * MEMORY_MAX_PERCENTAGE) / 100;
+    digest->max_allowed_size = (context_limit * MEMORY_MAX_PERCENTAGE) / PERCENTAGE_DIVISOR;
     digest->json_content = NULL;
     digest->json_size = 0;
     digest->suggestion_count = 0;
@@ -507,7 +508,7 @@ void memory_print_summary(ci_memory_digest_t* digest) {
     printf("  Size: %zu/%zu bytes (%.1f%%)\n",
            memory_calculate_size(digest),
            digest->max_allowed_size,
-           (memory_calculate_size(digest) * 100.0) / digest->max_allowed_size);
+           (memory_calculate_size(digest) * (double)PERCENTAGE_DIVISOR) / digest->max_allowed_size);
 }
 
 /* Print item */

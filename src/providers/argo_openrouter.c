@@ -16,7 +16,6 @@
 #include "argo_limits.h"
 
 /* OpenRouter Configuration */
-#define OPENROUTER_API_URL "https://openrouter.ai/api/v1/chat/completions"
 #define OPENROUTER_API_KEY_ENV "OPENROUTER_API_KEY"
 
 /* Get API key from environment */

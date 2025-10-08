@@ -64,19 +64,19 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    /* Extract values (simplified) - using ARGO_BUFFER_NAME - 1 for scanf */
-    sscanf(template_str, "\"template\":\"%127[^\"]\"", template_name);  /* ARGO_BUFFER_NAME = 128 */
-    sscanf(instance_str, "\"instance\":\"%127[^\"]\"", instance_name);  /* ARGO_BUFFER_NAME = 128 */
+    /* Extract values (simplified) - using buffer size - 1 for scanf */
+    sscanf(template_str, "\"template\":"SSCANF_FMT_NAME"\"", template_name);
+    sscanf(instance_str, "\"instance\":"SSCANF_FMT_NAME"\"", instance_name);
 
     /* Optional branch and environment */
     const char* branch_str = strstr(req->body, "\"branch\"");
     if (branch_str) {
-        sscanf(branch_str, "\"branch\":\"%63[^\"]\"", branch);  /* ARGO_BUFFER_SMALL = 64 */
+        sscanf(branch_str, "\"branch\":"SSCANF_FMT_SMALL"\"", branch);
     }
 
     const char* env_str = strstr(req->body, "\"environment\"");
     if (env_str) {
-        sscanf(env_str, "\"environment\":\"%31[^\"]\"", environment);  /* ARGO_BUFFER_TINY = 32 */
+        sscanf(env_str, "\"environment\":"SSCANF_FMT_TINY"\"", environment);
     }
 
     /* Validate template exists */

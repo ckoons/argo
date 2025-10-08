@@ -17,7 +17,6 @@
 #include "argo_api_provider_generator.h"
 
 /* DeepSeek API Configuration */
-#define DEEPSEEK_API_URL "https://api.deepseek.com/v1/chat/completions"
 #define DEEPSEEK_API_KEY_ENV "DEEPSEEK_API_KEY"
 
 /* Generate DeepSeek provider using macro */
