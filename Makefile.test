@@ -339,6 +339,42 @@ test-all: test-quick test-harnesses
 	@echo "  make test-api-live"
 	@echo ""
 
+# Stress tests (long-running, for overnight/CI)
+test-concurrency-stress: $(CONCURRENCY_STRESS_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Concurrency Stress Tests"
+	@echo "=========================================="
+	@./$(CONCURRENCY_STRESS_TEST_TARGET)
+
+test-soak: $(SOAK_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Soak Test (1 minute default)"
+	@echo "=========================================="
+	@./$(SOAK_TEST_TARGET)
+
+test-soak-1hr: $(SOAK_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Soak Test (1 hour)"
+	@echo "=========================================="
+	@./$(SOAK_TEST_TARGET) 3600
+
+test-soak-24hr: $(SOAK_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Soak Test (24 hours)"
+	@echo "WARNING: This will run for 24 hours!"
+	@echo "=========================================="
+	@./$(SOAK_TEST_TARGET) 86400
+
+test-stress-all: test-concurrency-stress test-soak
+	@echo ""
+	@echo "=========================================="
+	@echo "ALL STRESS TESTS COMPLETE"
+	@echo "=========================================="
+
 # Component tests
 test-ui: ui
 	@$(MAKE) -C ui/argo-term test

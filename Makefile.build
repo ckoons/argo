@@ -156,6 +156,21 @@ all-components: $(CORE_LIB) arc ui
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
 
+# Stress test builds (from tests/stress/)
+$(CONCURRENCY_STRESS_TEST_TARGET): tests/stress/test_concurrency_stress.c $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB)
+	@mkdir -p bin/tests
+	@echo "Building concurrency stress test..."
+	@$(CC) $(CFLAGS) -I./tests/stress $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+
+$(SOAK_TEST_TARGET): tests/stress/test_soak.c $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB)
+	@mkdir -p bin/tests
+	@echo "Building soak test..."
+	@$(CC) $(CFLAGS) -I./tests/stress $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+
+# Stress test collection
+stress-tests: $(CONCURRENCY_STRESS_TEST_TARGET) $(SOAK_TEST_TARGET)
+	@echo "Built all stress tests"
+
 # Harness collection
 harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_CONTROL_FLOW) $(HARNESS_CI_INTERACTIVE) $(HARNESS_LOOP) $(HARNESS_PERSONA) $(HARNESS_WORKFLOW_CHAIN)
 	@echo "Built all test harnesses"
