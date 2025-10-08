@@ -205,12 +205,20 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
                                                const char* augmented_prompt) {
     (void)prompt;  /* Unused - augmented_prompt contains prompt + context */
     int result = ARGO_SUCCESS;
+    int stdin_pipe[2] = {-1, -1};
     int stdout_pipe[2] = {-1, -1};
     pid_t pid = -1;
 
-    /* Create stdout pipe for reading response */
+    /* Create pipes for stdin and stdout */
+    if (pipe(stdin_pipe) < 0) {
+        argo_report_error(E_SYSTEM_PROCESS, "claude_code_execute", "stdin pipe creation failed: %s", strerror(errno));
+        return E_SYSTEM_PROCESS;
+    }
+
     if (pipe(stdout_pipe) < 0) {
-        argo_report_error(E_SYSTEM_PROCESS, "claude_code_execute", "pipe creation failed: %s", strerror(errno));
+        argo_report_error(E_SYSTEM_PROCESS, "claude_code_execute", "stdout pipe creation failed: %s", strerror(errno));
+        close(stdin_pipe[0]);
+        close(stdin_pipe[1]);
         return E_SYSTEM_PROCESS;
     }
 
@@ -223,23 +231,41 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
     }
 
     if (pid == 0) {
-        /* Child process: exec 'claude -p <prompt>' */
+        /* Child process: exec 'claude -p' (reads prompt from stdin) */
+        dup2(stdin_pipe[0], STDIN_FILENO);
         dup2(stdout_pipe[1], STDOUT_FILENO);
+        close(stdin_pipe[0]);
+        close(stdin_pipe[1]);
         close(stdout_pipe[0]);
         close(stdout_pipe[1]);
 
         /* Keep stderr visible for debugging */
 
-        /* Execute: claude -p with prompt as argument */
-        execlp("claude", "claude", "-p", augmented_prompt, NULL);
+        /* Execute: claude -p (prompt comes from stdin) */
+        execlp("claude", "claude", "-p", NULL);
 
         /* If exec fails */
         fprintf(stderr, "Failed to exec claude: %s\n", strerror(errno));
         exit(127);
     }
 
-    /* Parent process: stream I/O */
+    /* Parent process: write prompt to stdin, then read stdout */
+    close(stdin_pipe[0]);
     close(stdout_pipe[1]);
+
+    /* Write prompt to stdin */
+    size_t prompt_len = strlen(augmented_prompt);
+    ssize_t written = write(stdin_pipe[1], augmented_prompt, prompt_len);
+    if (written < 0 || (size_t)written != prompt_len) {
+        argo_report_error(E_SYSTEM_PROCESS, "claude_code_execute", "failed to write prompt: %s", strerror(errno));
+        close(stdin_pipe[1]);
+        close(stdout_pipe[0]);
+        result = E_SYSTEM_PROCESS;
+        goto cleanup_pipes;
+    }
+
+    /* Close stdin to signal EOF to Claude */
+    close(stdin_pipe[1]);
 
     /* Read response with streaming to stdout */
     size_t total_read = 0;
@@ -304,6 +330,8 @@ cleanup_pipes:
         kill(pid, SIGTERM);
         waitpid(pid, NULL, 0);
     }
+    if (stdin_pipe[0] >= 0) close(stdin_pipe[0]);
+    if (stdin_pipe[1] >= 0) close(stdin_pipe[1]);
     if (stdout_pipe[0] >= 0) close(stdout_pipe[0]);
     if (stdout_pipe[1] >= 0) close(stdout_pipe[1]);
 
