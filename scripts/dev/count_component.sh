@@ -68,10 +68,8 @@ count_directory() {
     local file_count=0
 
     if [ -d "$dir" ]; then
-        # Process .c files
-        for file in "$dir"/*.c; do
-            [ -f "$file" ] || continue
-
+        # Process .c files (recursively using find)
+        while IFS= read -r file; do
             # Skip third-party files
             basename=$(basename "$file")
             if echo "$basename" | grep -qE "(jsmn|cJSON)"; then
@@ -81,12 +79,10 @@ count_directory() {
             meaningful=$(count_meaningful_lines "$file")
             total=$((total + meaningful))
             file_count=$((file_count + 1))
-        done
+        done < <(find "$dir" -name "*.c" -type f 2>/dev/null)
 
-        # Process .h files
-        for file in "$dir"/*.h; do
-            [ -f "$file" ] || continue
-
+        # Process .h files (recursively using find)
+        while IFS= read -r file; do
             # Skip third-party files
             basename=$(basename "$file")
             if echo "$basename" | grep -qE "(jsmn|cJSON)"; then
@@ -96,7 +92,7 @@ count_directory() {
             meaningful=$(count_meaningful_lines "$file")
             total=$((total + meaningful))
             file_count=$((file_count + 1))
-        done
+        done < <(find "$dir" -name "*.h" -type f 2>/dev/null)
     fi
 
     echo "$total $file_count"
