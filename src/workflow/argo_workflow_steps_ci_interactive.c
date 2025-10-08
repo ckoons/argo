@@ -14,6 +14,7 @@
 #include "argo_workflow.h"
 #include "argo_workflow_persona.h"
 #include "argo_workflow_json.h"
+#include "argo_workflow_input.h"
 #include "argo_provider.h"
 #include "argo_error.h"
 #include "argo_log.h"
@@ -463,32 +464,35 @@ int step_user_ci_chat(workflow_controller_t* workflow,
         }
     }
 
+    /* Create input socket for interactive communication */
+    workflow_input_socket_t* input_socket = workflow_input_create(workflow->workflow_id);
+    if (!input_socket) {
+        argo_report_error(E_SYSTEM_SOCKET, "step_user_ci_chat", "failed to create input socket");
+        return E_SYSTEM_SOCKET;
+    }
+
     /* Interactive chat loop */
     int turn = 1;
     while (1) {
-        /* Show prompt */
+        /* Log that we're waiting for input (arc attach will detect this) */
         if (persona && persona->name[0] != '\0') {
-            printf("[You] ");
+            workflow_input_log_waiting(persona->name);
         } else {
-            printf("You: ");
+            workflow_input_log_waiting("You");
         }
-        fflush(stdout);
 
-        /* Read user input */
+        /* Read user input from socket */
         char input[STEP_INPUT_BUFFER_SIZE];
-        if (!fgets(input, sizeof(input), stdin)) {
-            break;  /* EOF */
+        int len = workflow_input_read_line(input_socket, input, sizeof(input));
+        if (len < 0) {
+            /* Error reading */
+            argo_report_error(E_SYSTEM_SOCKET, "step_user_ci_chat", "failed to read input");
+            workflow_input_destroy(input_socket);
+            return E_SYSTEM_SOCKET;
         }
 
-        /* Remove trailing newline */
-        size_t len = strlen(input);
-        if (len > 0 && input[len - 1] == '\n') {
-            input[len - 1] = '\0';
-            len--;
-        }
-
-        /* Empty input = exit chat */
         if (len == 0) {
+            /* Empty input = exit chat */
             printf("\n[Chat ended]\n");
             break;
         }
@@ -534,6 +538,9 @@ int step_user_ci_chat(workflow_controller_t* workflow,
 
         turn++;
     }
+
+    /* Cleanup socket */
+    workflow_input_destroy(input_socket);
 
     printf("========================================\n\n");
     LOG_DEBUG("CI chat: persona=%s, turns=%d, saved to '%s'",

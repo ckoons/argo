@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <errno.h>
 #include "arc_commands.h"
 #include "arc_context.h"
@@ -58,6 +60,50 @@ static int get_log_path(const char* workflow_id, char* path, size_t path_size) {
     return ARGO_SUCCESS;
 }
 
+/* Send user input to workflow via socket */
+static int send_input_to_workflow(const char* workflow_id, const char* input) {
+    const char* home = getenv("HOME");
+    if (!home) home = ".";
+
+    /* Build socket path */
+    char socket_path[512];
+    snprintf(socket_path, sizeof(socket_path),
+            "%s/.argo/sockets/%s.sock", home, workflow_id);
+
+    /* Connect to socket */
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock < 0) {
+        LOG_USER_ERROR("Failed to create socket: %s\n", strerror(errno));
+        return E_SYSTEM_SOCKET;
+    }
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        LOG_USER_ERROR("Failed to connect to workflow socket: %s\n", strerror(errno));
+        close(sock);
+        return E_SYSTEM_SOCKET;
+    }
+
+    /* Send input with newline */
+    size_t input_len = strlen(input);
+    ssize_t written = write(sock, input, input_len);
+    if (written < 0 || (size_t)written != input_len) {
+        LOG_USER_ERROR("Failed to send input: %s\n", strerror(errno));
+        close(sock);
+        return E_SYSTEM_SOCKET;
+    }
+
+    /* Send newline */
+    write(sock, "\n", 1);
+
+    close(sock);
+    return ARGO_SUCCESS;
+}
+
 /* Read and display log from cursor position, following until EOF */
 static int display_log_backlog(const char* log_path, off_t start_pos, off_t* end_pos) {
     int fd = open(log_path, O_RDONLY);
@@ -99,7 +145,7 @@ static int display_log_backlog(const char* log_path, off_t start_pos, off_t* end
 }
 
 /* Follow log file until user presses Enter (streaming mode) */
-static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final_pos) {
+static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final_pos, const char* workflow_id) {
     int result;
     off_t current_pos = start_pos;
 
@@ -129,6 +175,8 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
     char buffer[ARC_READ_CHUNK_SIZE];
     char input_char;
     bool should_exit = false;
+    char line_buffer[1024] = {0};
+    int line_pos = 0;
 
     while (!should_exit) {
         /* Check for Ctrl+D (EOF) */
@@ -147,8 +195,56 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
         /* Read new data from log */
         ssize_t bytes_read = read(fd, buffer, sizeof(buffer));
         if (bytes_read > 0) {
+            /* Write to stdout */
             write(STDOUT_FILENO, buffer, bytes_read);
             current_pos += bytes_read;
+
+            /* Check for [WAITING_FOR_INPUT] marker line-by-line */
+            for (ssize_t i = 0; i < bytes_read; i++) {
+                if (buffer[i] == '\n') {
+                    line_buffer[line_pos] = '\0';
+
+                    /* Check if this line contains waiting marker */
+                    if (strstr(line_buffer, "[WAITING_FOR_INPUT")) {
+                        /* Extract prompt if provided */
+                        char* prompt_start = strchr(line_buffer, ':');
+                        char* prompt_end = strchr(line_buffer, ']');
+
+                        /* Restore stdin to blocking mode temporarily */
+                        fcntl(STDIN_FILENO, F_SETFL, stdin_flags);
+
+                        /* Show prompt */
+                        if (prompt_start && prompt_end && prompt_start < prompt_end) {
+                            prompt_start++; /* Skip ':' */
+                            *prompt_end = '\0';
+                            printf("%s ", prompt_start);
+                        } else {
+                            printf("You: ");
+                        }
+                        fflush(stdout);
+
+                        /* Read user input */
+                        char user_input[4096];
+                        if (fgets(user_input, sizeof(user_input), stdin)) {
+                            /* Remove trailing newline */
+                            size_t len = strlen(user_input);
+                            if (len > 0 && user_input[len - 1] == '\n') {
+                                user_input[len - 1] = '\0';
+                            }
+
+                            /* Send to workflow via socket */
+                            send_input_to_workflow(workflow_id, user_input);
+                        }
+
+                        /* Restore non-blocking mode */
+                        fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
+                    }
+
+                    line_pos = 0;
+                } else if (line_pos < (int)sizeof(line_buffer) - 1) {
+                    line_buffer[line_pos++] = buffer[i];
+                }
+            }
         } else {
             /* No new data, sleep briefly */
             usleep(100000);  /* 100ms */
@@ -231,7 +327,7 @@ int arc_workflow_attach(int argc, char** argv) {
 
     /* Follow log stream until user presses Enter */
     off_t final_pos = cursor;
-    result = follow_log_stream(log_path, cursor, &final_pos);
+    result = follow_log_stream(log_path, cursor, &final_pos, workflow_id);
 
     /* Update cursor position ONLY on clean detach */
     if (result == ARGO_SUCCESS) {
