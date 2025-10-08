@@ -367,3 +367,177 @@ int step_ci_present(workflow_controller_t* workflow,
               persona ? persona->name : "none", format, data_path);
     return ARGO_SUCCESS;
 }
+
+/* Step: user_ci_chat */
+int step_user_ci_chat(workflow_controller_t* workflow,
+                      const char* json, jsmntok_t* tokens, int step_index) {
+    if (!workflow || !json || !tokens) {
+        argo_report_error(E_INPUT_NULL, "step_user_ci_chat", "parameter is NULL");
+        return E_INPUT_NULL;
+    }
+
+    if (!workflow->provider) {
+        argo_report_error(E_CI_NO_PROVIDER, "step_user_ci_chat", "no AI provider configured");
+        return E_CI_NO_PROVIDER;
+    }
+
+    /* Find persona field (optional) */
+    workflow_persona_t* persona = NULL;
+    int persona_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PERSONA);
+    if (persona_idx >= 0) {
+        char persona_name[STEP_PERSONA_BUFFER_SIZE];
+        workflow_json_extract_string(json, &tokens[persona_idx],
+                                     persona_name, sizeof(persona_name));
+        persona = persona_registry_find(workflow->personas, persona_name);
+        if (!persona) {
+            LOG_DEBUG("Persona '%s' not found, using default", persona_name);
+            persona = persona_registry_get_default(workflow->personas);
+        }
+    }
+
+    /* Find initial_prompt field (optional) */
+    char initial_prompt[STEP_PROMPT_BUFFER_SIZE] = {0};
+    int prompt_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_PROMPT_TEMPLATE);
+    if (prompt_idx >= 0) {
+        workflow_json_extract_string(json, &tokens[prompt_idx],
+                                     initial_prompt, sizeof(initial_prompt));
+
+        /* Substitute variables in prompt */
+        char substituted[STEP_OUTPUT_BUFFER_SIZE];
+        int result = workflow_context_substitute(workflow->context, initial_prompt,
+                                                 substituted, sizeof(substituted));
+        if (result == ARGO_SUCCESS) {
+            strncpy(initial_prompt, substituted, sizeof(initial_prompt) - 1);
+        }
+    }
+
+    /* Find save_to field (optional) */
+    char save_to[STEP_SAVE_TO_BUFFER_SIZE] = {0};
+    int save_to_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_SAVE_TO);
+    if (save_to_idx >= 0) {
+        workflow_json_extract_string(json, &tokens[save_to_idx], save_to, sizeof(save_to));
+    }
+
+    /* Show greeting */
+    if (persona && persona->greeting[0] != '\0') {
+        printf("\n%s\n", persona->greeting);
+    }
+
+    printf("\n========================================\n");
+    if (persona && persona->name[0] != '\0') {
+        printf("[%s] Interactive Chat Session\n", persona->name);
+    } else {
+        printf("Interactive Chat Session\n");
+    }
+    printf("========================================\n");
+    printf("(Press Enter with no input to end chat)\n\n");
+
+    /* Send initial prompt if provided */
+    if (initial_prompt[0] != '\0') {
+        printf("> %s\n\n", initial_prompt);
+
+        char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
+        response_capture_t capture = {
+            .buffer = response,
+            .buffer_size = sizeof(response),
+            .bytes_written = 0
+        };
+
+        int result = workflow->provider->query(workflow->provider, initial_prompt,
+                                              capture_response_callback, &capture);
+        if (result != ARGO_SUCCESS) {
+            argo_report_error(result, "step_user_ci_chat",
+                             "AI query failed, response: %s",
+                             capture.bytes_written > 0 ? response : "(empty)");
+            return result;
+        }
+
+        printf("[AI Response]\n%s\n\n", response);
+
+        /* Save initial exchange if save_to provided */
+        if (save_to[0] != '\0') {
+            char exchange[STEP_OUTPUT_BUFFER_SIZE];
+            snprintf(exchange, sizeof(exchange), "User: %s\nAI: %s\n",
+                    initial_prompt, response);
+            workflow_context_set(workflow->context, save_to, exchange);
+        }
+    }
+
+    /* Interactive chat loop */
+    int turn = 1;
+    while (1) {
+        /* Show prompt */
+        if (persona && persona->name[0] != '\0') {
+            printf("[You] ");
+        } else {
+            printf("You: ");
+        }
+        fflush(stdout);
+
+        /* Read user input */
+        char input[STEP_INPUT_BUFFER_SIZE];
+        if (!fgets(input, sizeof(input), stdin)) {
+            break;  /* EOF */
+        }
+
+        /* Remove trailing newline */
+        size_t len = strlen(input);
+        if (len > 0 && input[len - 1] == '\n') {
+            input[len - 1] = '\0';
+            len--;
+        }
+
+        /* Empty input = exit chat */
+        if (len == 0) {
+            printf("\n[Chat ended]\n");
+            break;
+        }
+
+        /* Send to AI */
+        char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
+        response_capture_t capture = {
+            .buffer = response,
+            .buffer_size = sizeof(response),
+            .bytes_written = 0
+        };
+
+        int result = workflow->provider->query(workflow->provider, input,
+                                              capture_response_callback, &capture);
+        if (result != ARGO_SUCCESS) {
+            printf("\n[AI Error: %s]\n", argo_error_message(result));
+            continue;  /* Allow retry */
+        }
+
+        /* Show AI response */
+        printf("\n");
+        if (persona && persona->name[0] != '\0') {
+            printf("[%s]\n", persona->name);
+        } else {
+            printf("[AI]\n");
+        }
+        printf("%s\n\n", response);
+
+        /* Append to conversation history if save_to provided */
+        if (save_to[0] != '\0') {
+            const char* existing = workflow_context_get(workflow->context, save_to);
+            char updated[STEP_OUTPUT_BUFFER_SIZE];
+
+            if (existing) {
+                snprintf(updated, sizeof(updated), "%sUser: %s\nAI: %s\n",
+                        existing, input, response);
+            } else {
+                snprintf(updated, sizeof(updated), "User: %s\nAI: %s\n",
+                        input, response);
+            }
+            workflow_context_set(workflow->context, save_to, updated);
+        }
+
+        turn++;
+    }
+
+    printf("========================================\n\n");
+    LOG_DEBUG("CI chat: persona=%s, turns=%d, saved to '%s'",
+              persona ? persona->name : "none", turn, save_to[0] ? save_to : "none");
+
+    return ARGO_SUCCESS;
+}

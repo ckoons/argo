@@ -49,6 +49,7 @@ static const step_dispatch_entry_t step_dispatch_table[] = {
     { STEP_TYPE_CI_ANALYZE,    CI_STEP,        { .ci = step_ci_analyze } },
     { STEP_TYPE_CI_ASK_SERIES, CI_STEP,        { .ci = step_ci_ask_series } },
     { STEP_TYPE_CI_PRESENT,    CI_STEP,        { .ci = step_ci_present } },
+    { STEP_TYPE_USER_CI_CHAT,  CI_STEP,        { .ci = step_user_ci_chat } },
     { STEP_TYPE_WORKFLOW_CALL, CI_STEP,        { .ci = step_workflow_call } },
     { STEP_TYPE_PARALLEL,      CI_STEP,        { .ci = step_parallel } },
     { NULL, BASIC_STEP, { .basic = NULL } }  /* Sentinel */

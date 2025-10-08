@@ -20,6 +20,7 @@ typedef struct workflow_persona workflow_persona_t;
 #define STEP_TYPE_CI_ANALYZE "ci_analyze"
 #define STEP_TYPE_CI_ASK_SERIES "ci_ask_series"
 #define STEP_TYPE_CI_PRESENT "ci_present"
+#define STEP_TYPE_USER_CI_CHAT "user_ci_chat"
 #define STEP_TYPE_WORKFLOW_CALL "workflow_call"
 #define STEP_TYPE_PARALLEL "parallel"
 
@@ -376,6 +377,33 @@ int step_ci_ask_series(workflow_controller_t* workflow,
  */
 int step_ci_present(workflow_controller_t* workflow,
                     const char* json, jsmntok_t* tokens, int step_index);
+
+/* Step: user_ci_chat
+ *
+ * Interactive chat session between user and AI with optional initial prompt.
+ *
+ * JSON Format:
+ *   {
+ *     "type": "user_ci_chat",
+ *     "persona": "maia",
+ *     "prompt_template": "Let's design a workflow together. What do you need?",
+ *     "save_to": "chat_history",
+ *     "next_step": 5
+ *   }
+ *
+ * Parameters:
+ *   workflow - Workflow controller (contains provider, personas, context)
+ *   json - Full JSON string
+ *   tokens - Parsed tokens
+ *   step_index - Token index of step object
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_INPUT_NULL if parameters NULL
+ *   E_CI_NO_PROVIDER if no provider configured
+ */
+int step_user_ci_chat(workflow_controller_t* workflow,
+                      const char* json, jsmntok_t* tokens, int step_index);
 
 /* Step: workflow_call
  *
