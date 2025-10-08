@@ -1,0 +1,26 @@
+{
+  "workflow_name": "query_response_test",
+  "description": "Simple test: get user input, send to Claude Code, capture and display full response",
+  "steps": [
+    {
+      "step": "get_user_query",
+      "type": "user_ask",
+      "prompt": "Enter your query for Claude Code:",
+      "save_to": "user_query",
+      "next_step": "send_to_claude"
+    },
+    {
+      "step": "send_to_claude",
+      "type": "ci_ask",
+      "prompt_template": "{{user_query}}",
+      "save_to": "claude_response",
+      "next_step": "show_response"
+    },
+    {
+      "step": "show_response",
+      "type": "display",
+      "message": "=== CLAUDE CODE RESPONSE ===\n\n{{claude_response}}\n\n=== END RESPONSE ===",
+      "next_step": "EXIT"
+    }
+  ]
+}

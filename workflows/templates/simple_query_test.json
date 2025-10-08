@@ -1,0 +1,19 @@
+{
+  "workflow_name": "simple_query_test",
+  "description": "Simplest test: hardcoded query to Claude Code, capture response",
+  "steps": [
+    {
+      "step": "query_claude",
+      "type": "ci_ask",
+      "prompt_template": "What is 2+2? Give a brief answer.",
+      "save_to": "response",
+      "next_step": "show_result"
+    },
+    {
+      "step": "show_result",
+      "type": "display",
+      "message": "=== RESPONSE ===\n{{response}}\n=== END ===",
+      "next_step": "EXIT"
+    }
+  ]
+}
