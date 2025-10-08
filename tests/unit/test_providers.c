@@ -187,8 +187,8 @@ static void test_ci_assignment(void) {
     /* Create CI */
     registry_add_ci(ci_reg, "test-ci", "builder", "default-model", 9000);
 
-    /* Create and register provider */
-    ci_provider_t* claude = claude_code_create_provider("test");
+    /* Create and register provider with NULL model (uses default) */
+    ci_provider_t* claude = claude_code_create_provider(NULL);
     provider_registry_add(provider_reg, claude, PROVIDER_TYPE_CLI, false);
     provider_registry_discover_all(provider_reg);
 
@@ -201,9 +201,9 @@ static void test_ci_assignment(void) {
         return;
     }
 
-    /* Verify assignment */
+    /* Verify assignment - should get default model "claude-sonnet-4" */
     ci_registry_entry_t* ci = registry_find_ci(ci_reg, "test-ci");
-    if (strcmp(ci->model, "claude-sonnet-4-5") != 0) {
+    if (strcmp(ci->model, "claude-sonnet-4") != 0) {
         FAIL("Model not updated");
         provider_registry_destroy(provider_reg);
         registry_destroy(ci_reg);
