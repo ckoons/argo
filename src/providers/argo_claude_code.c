@@ -205,12 +205,11 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
                                                const char* augmented_prompt) {
     (void)prompt;  /* Unused - augmented_prompt contains prompt + context */
     int result = ARGO_SUCCESS;
-    int stdin_pipe[2] = {-1, -1};
     int stdout_pipe[2] = {-1, -1};
     pid_t pid = -1;
 
-    /* Create pipes */
-    if (pipe(stdin_pipe) < 0 || pipe(stdout_pipe) < 0) {
+    /* Create stdout pipe for reading response */
+    if (pipe(stdout_pipe) < 0) {
         argo_report_error(E_SYSTEM_PROCESS, "claude_code_execute", "pipe creation failed: %s", strerror(errno));
         return E_SYSTEM_PROCESS;
     }
@@ -224,19 +223,15 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
     }
 
     if (pid == 0) {
-        /* Child process: exec 'claude -p' */
-        dup2(stdin_pipe[0], STDIN_FILENO);
-        close(stdin_pipe[0]);
-        close(stdin_pipe[1]);
-
+        /* Child process: exec 'claude -p <prompt>' */
         dup2(stdout_pipe[1], STDOUT_FILENO);
         close(stdout_pipe[0]);
         close(stdout_pipe[1]);
 
         /* Keep stderr visible for debugging */
 
-        /* Execute: claude -p (streaming prompt mode) */
-        execlp("claude", "claude", "-p", NULL);
+        /* Execute: claude -p with prompt as argument */
+        execlp("claude", "claude", "-p", augmented_prompt, NULL);
 
         /* If exec fails */
         fprintf(stderr, "Failed to exec claude: %s\n", strerror(errno));
@@ -244,21 +239,7 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
     }
 
     /* Parent process: stream I/O */
-    close(stdin_pipe[0]);
     close(stdout_pipe[1]);
-
-    /* Write augmented prompt to stdin */
-    size_t prompt_len = strlen(augmented_prompt);
-    ssize_t written = write(stdin_pipe[1], augmented_prompt, prompt_len);
-    if (written < 0 || (size_t)written != prompt_len) {
-        argo_report_error(E_SYSTEM_PROCESS, "claude_code_execute", "write failed: %s", strerror(errno));
-        result = E_SYSTEM_PROCESS;
-        goto cleanup_process;
-    }
-
-    /* Close stdin to signal EOF */
-    close(stdin_pipe[1]);
-    stdin_pipe[1] = -1;
 
     /* Read response with streaming to stdout */
     size_t total_read = 0;
@@ -318,15 +299,11 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
     LOG_DEBUG("Claude streaming complete (%zu bytes)", total_read);
     return ARGO_SUCCESS;
 
-cleanup_process:
+cleanup_pipes:
     if (pid > 0) {
         kill(pid, SIGTERM);
         waitpid(pid, NULL, 0);
     }
-
-cleanup_pipes:
-    if (stdin_pipe[0] >= 0) close(stdin_pipe[0]);
-    if (stdin_pipe[1] >= 0) close(stdin_pipe[1]);
     if (stdout_pipe[0] >= 0) close(stdout_pipe[0]);
     if (stdout_pipe[1] >= 0) close(stdout_pipe[1]);
 
