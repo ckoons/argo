@@ -11,17 +11,64 @@ The Argo daemon (`argo-daemon`) is the central orchestration service that manage
 ## Architecture Pattern
 
 ```
-arc CLI  <--HTTP-->  argo-daemon  <--fork/exec-->  workflow_executor
+arc CLI  <--HTTP-->  argo-daemon  <--fork/exec-->  workflow_executor (background)
    ↓                      ↓                               ↓
 Commands            Orchestration                   Step Execution
-State Query         State Management                CI Interaction
-User I/O            Registry/Lifecycle              Progress Reporting (HTTP)
+User I/O            State Management                CI Interaction
+                    I/O Queue (HTTP)                Progress Reporting (HTTP)
+                         ↑                               ↓
+                         └────────HTTP I/O Channel───────┘
 ```
 
 **Communication:**
 - `arc → daemon`: HTTP REST API (POST, GET, DELETE)
 - `daemon → executor`: fork/exec process creation + signals (SIGTERM, SIGINT)
-- `executor → daemon`: HTTP progress updates (best-effort)
+- `executor → daemon`: HTTP progress updates + I/O channel reads/writes
+- `arc ↔ daemon ↔ executor`: Interactive workflow I/O via HTTP message passing
+
+**Background Process Architecture:**
+- **Daemon**: Background service, NO stdin/stdout/stderr (logs only)
+- **Executor**: Background process, NO stdin/stdout/stderr (logs + HTTP I/O channel)
+- **Arc CLI**: Terminal-facing only, handles ALL user interaction
+
+### HTTP I/O Channel Architecture
+
+**Problem:** Interactive workflows need user input/output, but executor runs in background (no stdin/stdout).
+
+**Solution:** HTTP-based I/O channel that routes all user interaction through daemon:
+
+```
+User (terminal)
+    ↓ stdin
+arc CLI
+    ↓ HTTP POST /api/workflow/input/{id}
+argo-daemon (I/O queue)
+    ↓ HTTP GET /api/workflow/input/{id}
+workflow_executor (polls with HTTP)
+    ↓ io_channel_read_line()
+Workflow Step (user_ask, ci_ask, etc)
+    ↓ generates response
+    ↓ io_channel_write_str() → HTTP POST /api/workflow/output/{id}
+argo-daemon (I/O queue)
+    ↓ HTTP GET /api/workflow/output/{id}
+arc CLI
+    ↓ stdout
+User (terminal)
+```
+
+**Implementation:**
+- `io_channel_t` abstraction supports: sockets, socketpairs, null device, **HTTP**
+- Executor creates HTTP I/O channel on startup: `io_channel_create_http(daemon_url, workflow_id)`
+- All workflow steps use `io_channel_write_str()` / `io_channel_read_line()`
+- HTTP channel polls daemon with 100ms delays, 30-second timeout
+- Buffered writes reduce HTTP overhead
+- Non-blocking reads return `E_IO_WOULDBLOCK` when no data available
+
+**Files:**
+- `include/argo_io_channel.h` - Base I/O channel interface
+- `src/workflow/argo_io_channel.c` - Dispatch to type-specific implementations
+- `include/argo_io_channel_http.h` - HTTP-specific interface
+- `src/workflow/argo_io_channel_http.c` - CURL-based HTTP I/O (343 lines)
 
 ### Why HTTP Message Passing?
 
@@ -31,6 +78,7 @@ User I/O            Registry/Lifecycle              Progress Reporting (HTTP)
 4. **Observability:** Log all HTTP requests for debugging
 5. **Language Agnostic:** Future executors in Python/Go/Rust
 6. **Testability:** Easy to mock HTTP endpoints
+7. **Background Execution:** Executor can run detached with no terminal access
 
 ## Process Model
 
@@ -83,18 +131,29 @@ Executor exits, daemon updates workflow status
 - Call CI providers directly (executor does this)
 - Block waiting for workflows (async via messaging)
 
-### Executor (Per-Workflow Process)
+### Executor (Per-Workflow Background Process)
+
+**Background Service:** Executor runs completely detached from terminal with NO stdin/stdout/stderr access.
 
 **Manages:**
 - Workflow Controller (workflow-specific state)
 - Step Execution (call CI, capture output)
 - Progress Reporting (HTTP to daemon)
+- HTTP I/O Channel (for interactive workflows)
 - Cleanup on completion
 
 **Does NOT:**
+- Use stdin/stdout/stderr (all I/O via HTTP channel or logs)
 - Manage other workflows (isolated per-workflow)
 - Persist registry/lifecycle (daemon's job)
 - Handle pause/resume signals (daemon sends SIGSTOP/SIGCONT)
+- Output to terminal directly (only arc CLI does this)
+
+**I/O Patterns:**
+- **Startup**: Minimal diagnostics to stderr (before becoming background)
+- **Runtime**: All status via LOG_INFO/LOG_ERROR → log files
+- **Interactive Steps**: All user I/O via io_channel (HTTP) → daemon → arc CLI
+- **Errors**: argo_report_error() → log files only
 
 ## Library Structure
 
@@ -131,8 +190,11 @@ Executor exits, daemon updates workflow status
 - Step implementations (`argo_workflow_steps_*.c`)
 - Checkpoint/resume (`argo_workflow_checkpoint.c`)
 - Persona support (`argo_workflow_persona.c`)
+- **I/O Channel** (`argo_io_channel.c`, `argo_io_channel_http.c`)
 
 **Used by:** Executor only
+
+**Key Feature:** All workflow steps use `io_channel_t` abstraction for I/O, enabling background execution without terminal access.
 
 ### Arc CLI (Minimal)
 
@@ -170,12 +232,28 @@ DELETE /api/workflow/abandon/{id}  Abandon workflow (SIGTERM)
 #### Executor Communication API
 
 ```
+POST /api/workflow/progress/{id}       Executor reports progress
 POST /api/workflow/{id}/step/start     Executor reports step start
 POST /api/workflow/{id}/step/complete  Executor reports step completion
 POST /api/workflow/{id}/step/output    Executor sends step output
 GET  /api/workflow/{id}/messages       Executor polls for daemon messages (long-poll)
 POST /api/workflow/{id}/message        Executor sends message to daemon
 ```
+
+#### Interactive Workflow I/O API (HTTP I/O Channel)
+
+```
+POST /api/workflow/output/{id}         Executor writes output to daemon queue
+GET  /api/workflow/output/{id}         Arc reads output from daemon queue
+POST /api/workflow/input/{id}          Arc writes user input to daemon queue
+GET  /api/workflow/input/{id}          Executor polls for user input (non-blocking)
+```
+
+**Flow:**
+1. Workflow step calls `io_channel_write_str()` → HTTP POST to `/api/workflow/output/{id}`
+2. Arc CLI polls GET `/api/workflow/output/{id}` → displays to user
+3. User types input in arc → HTTP POST to `/api/workflow/input/{id}`
+4. Workflow step polls GET `/api/workflow/input/{id}` with retry logic → receives input
 
 #### Daemon Management
 
@@ -275,6 +353,11 @@ All requests/responses use JSON with standard format:
 - **Bi-directional messaging**: Executor→Daemon progress via HTTP POST
 - **Process management**: fork/exec workflow executors, signal handling
 - **Error handling**: Consistent HTTP status codes, JSON error responses
+- **HTTP I/O Channel**: Complete implementation for interactive workflows (543 lines)
+  - Base abstraction: `io_channel_t` supporting sockets, socketpairs, null, HTTP
+  - HTTP implementation: CURL-based with polling, buffering, timeout handling
+  - All workflow steps converted: user_ask, user_choose, display, ci_ask, ci_ask_series, ci_present, ci_chat
+  - Background-only execution: NO stdin/stdout/stderr in runtime loop
 
 ### 🔄 Partial/Stub Implementation
 

@@ -11,6 +11,9 @@ Current: 4,460 meaningful lines (44% of budget)
 
 ### What Works Now
 - ✅ **8 CI Providers**: Ollama, Claude (socket/code/API), OpenAI, Gemini, Grok, DeepSeek, OpenRouter
+- ✅ **Daemon Architecture**: Background HTTP service with REST API, fork/exec workflow executors
+- ✅ **HTTP I/O Channel**: Complete background execution - NO stdin/stdout/stderr in daemon/executor
+- ✅ **Interactive Workflows**: HTTP-based I/O routing (arc CLI ↔ daemon ↔ executor)
 - ✅ **Common Utilities**: JSON parsing, HTTP helpers, API abstractions
 - ✅ **Error System**: Human-readable messages with TYPE:NUMBER encoding
 - ✅ **Configuration**: Optional local model overrides

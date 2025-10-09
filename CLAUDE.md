@@ -57,30 +57,40 @@ Argo is a lean C library (<10,000 lines) for coordinating multiple AI coding ass
 
 **Data Flow (Daemon-Based Architecture)**:
 ```
-arc CLI
-    ↓ (HTTP)
-argo-daemon (persistent service)
+arc CLI (terminal-facing)
+    ↓ (HTTP REST API)
+argo-daemon (background service)
     ├─ Registry (service discovery)
     ├─ Lifecycle (resource management)
+    ├─ I/O Queue (HTTP)
     └─ Orchestrator (coordination)
     ↓ (fork+exec)
-workflow_executor (per-workflow process)
+workflow_executor (background process, NO stdin/stdout)
+    ├─ HTTP I/O Channel (io_channel_t)
     ↓
 Workflow Controller (step execution)
     ↓
 Provider Interface (ci_provider_t)
     ↓
 AI Backend (Claude/OpenAI/Gemini/etc)
-    ↓ (HTTP)
-argo-daemon (progress reporting)
+    ↓ (HTTP progress + I/O)
+argo-daemon
+    ↓ (HTTP output polling)
+arc CLI → User (terminal)
 ```
+
+**Background Process Model:**
+- **arc CLI**: ONLY terminal-facing component (handles ALL user I/O)
+- **argo-daemon**: Background service (NO stdin/stdout/stderr, logs only)
+- **workflow_executor**: Background process (NO stdin/stdout/stderr, HTTP I/O channel + logs)
+- **Interactive workflows**: User I/O routed through HTTP (arc ↔ daemon ↔ executor)
 
 **See:** [Daemon Architecture Documentation](docs/DAEMON_ARCHITECTURE.md) for detailed design.
 
 **Library Structure**:
 - **libargo_core.a** - Foundation (error, HTTP, JSON, providers)
 - **libargo_daemon.a** - Daemon services (registry, lifecycle, orchestrator, HTTP server)
-- **libargo_workflow.a** - Workflow execution (controller, steps, checkpoint)
+- **libargo_workflow.a** - Workflow execution (controller, steps, checkpoint, **HTTP I/O channel**)
 - **arc** - CLI (links core only, HTTP calls to daemon)
 
 **Module Dependencies**:
@@ -96,7 +106,8 @@ argo-daemon (progress reporting)
 **HTTP-Based Message Passing**:
 - `arc → daemon`: HTTP REST (POST, GET, DELETE)
 - `daemon → executor`: fork/exec + signals (SIGTERM, SIGINT)
-- `executor → daemon`: HTTP progress updates (best-effort)
+- `executor → daemon`: HTTP progress updates + I/O channel communication
+- `arc ↔ daemon ↔ executor`: Interactive workflow I/O via HTTP message passing
 
 **Why HTTP?**
 - Location independence (localhost or remote)
@@ -104,6 +115,7 @@ argo-daemon (progress reporting)
 - Fault isolation (executor crash won't kill daemon)
 - Language agnostic (future executors in any language)
 - Testable (easy to mock endpoints)
+- **Background execution**: Executor runs with NO terminal access (I/O via HTTP only)
 
 ### REST API Endpoints
 
@@ -116,6 +128,14 @@ DELETE /api/workflow/abandon/{id}  /* Terminate workflow */
 POST   /api/workflow/progress/{id} /* Progress update (from executor) */
 POST   /api/workflow/pause/{id}    /* Pause workflow (stub) */
 POST   /api/workflow/resume/{id}   /* Resume workflow (stub) */
+```
+
+**Interactive Workflow I/O** (HTTP I/O Channel):
+```c
+POST /api/workflow/output/{id}     /* Executor writes output */
+GET  /api/workflow/output/{id}     /* Arc reads output */
+POST /api/workflow/input/{id}      /* Arc writes user input */
+GET  /api/workflow/input/{id}      /* Executor polls for input */
 ```
 
 **Info Endpoints**:
@@ -144,11 +164,13 @@ GET /api/version   /* Daemon version */
 - Forks workflow executors on demand
 
 **argo_workflow_executor** (179 KB):
-- Per-workflow process (one executor per workflow)
+- Per-workflow **background process** (one executor per workflow)
+- **NO stdin/stdout/stderr** - uses HTTP I/O channel for all user interaction
 - Loads JSON workflow templates
 - Executes steps sequentially
 - Reports progress to daemon via HTTP
 - Signal handling (SIGTERM/SIGINT)
+- HTTP I/O channel for interactive workflows
 
 **arc** (~100 KB):
 - Thin HTTP client
