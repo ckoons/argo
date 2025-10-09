@@ -114,9 +114,11 @@ int step_ci_ask(workflow_controller_t* workflow,
         return result;
     }
 
-    /* Show persona greeting if available */
-    if (persona && persona->greeting[0] != '\0') {
-        printf("%s\n", persona->greeting);
+    /* Show persona greeting if available through I/O channel */
+    if (persona && persona->greeting[0] != '\0' && ctx->io_channel) {
+        io_channel_write_str(ctx->io_channel, persona->greeting);
+        io_channel_write_str(ctx->io_channel, "\n");
+        io_channel_flush(ctx->io_channel);
     }
 
     /* Optionally use AI to present a more conversational prompt */
@@ -281,11 +283,16 @@ int step_ci_analyze(workflow_controller_t* workflow,
         return result;
     }
 
-    /* Show analysis starting */
-    if (persona && persona->name[0] != '\0') {
-        printf("[%s - Analysis] %s\n", persona->name, task);
-    } else {
-        printf("[CI Analysis] %s\n", task);
+    /* Show analysis starting through I/O channel */
+    if (ctx->io_channel) {
+        char analysis_msg[STEP_OUTPUT_BUFFER_SIZE];
+        if (persona && persona->name[0] != '\0') {
+            snprintf(analysis_msg, sizeof(analysis_msg), "[%s - Analysis] %s\n", persona->name, task);
+        } else {
+            snprintf(analysis_msg, sizeof(analysis_msg), "[CI Analysis] %s\n", task);
+        }
+        io_channel_write_str(ctx->io_channel, analysis_msg);
+        io_channel_flush(ctx->io_channel);
     }
 
     /* If provider available, use AI to perform analysis */
@@ -315,8 +322,14 @@ int step_ci_analyze(workflow_controller_t* workflow,
             /* Fall back to placeholder result */
             result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
         } else {
+            /* Display AI response through I/O channel */
+            if (ctx->io_channel) {
+                io_channel_write_str(ctx->io_channel, "\n[AI Response]\n");
+                io_channel_write_str(ctx->io_channel, response);
+                io_channel_write_str(ctx->io_channel, "\n");
+                io_channel_flush(ctx->io_channel);
+            }
             /* Save AI response to context */
-            printf("\n[AI Response]\n%s\n", response);
             result = workflow_context_set(ctx, save_to, response);
         }
     } else {

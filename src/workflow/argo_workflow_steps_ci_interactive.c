@@ -22,6 +22,7 @@
 #include "argo_log.h"
 #include "argo_limits.h"
 #include "argo_urls.h"
+#include "argo_io_channel.h"
 
 /* Helper: Simple callback to capture AI response */
 typedef struct {
@@ -247,28 +248,67 @@ static int execute_series_iteration(workflow_controller_t* workflow,
                                     final_question, sizeof(final_question));
     }
 
-    printf("%s", final_question);
-    fflush(stdout);
+    /* Check for I/O channel */
+    if (!workflow->context->io_channel) {
+        argo_report_error(E_IO_INVALID, "execute_series_iteration",
+                         "no I/O channel available (executor running detached)");
+        return E_IO_INVALID;
+    }
 
-    /* Read answer */
+    /* Send question through I/O channel */
+    int result = io_channel_write_str(workflow->context->io_channel, final_question);
+    result = io_channel_flush(workflow->context->io_channel);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "execute_series_iteration", "failed to flush question");
+        return result;
+    }
+
+    /* Read answer with polling */
     char answer[STEP_INPUT_BUFFER_SIZE];
-    if (fgets(answer, sizeof(answer), stdin)) {
-        size_t len = strlen(answer);
-        if (len > 0 && answer[len - 1] == '\n') {
-            answer[len - 1] = '\0';
+    int attempts = 0;
+    while (attempts < IO_HTTP_POLL_MAX_ATTEMPTS) {
+        result = io_channel_read_line(workflow->context->io_channel, answer, sizeof(answer));
+
+        if (result == ARGO_SUCCESS) {
+            break;
         }
 
-        /* Get question ID and save answer */
-        int id_idx = workflow_json_find_field(json, tokens, question_token, "id");
-        if (id_idx >= 0) {
-            char id[STEP_SAVE_TO_BUFFER_SIZE];
-            workflow_json_extract_string(json, &tokens[id_idx], id, sizeof(id));
-
-            /* Build context path: save_to.id */
-            char full_path[STEP_SAVE_TO_BUFFER_SIZE * 2];
-            snprintf(full_path, sizeof(full_path), "%s.%s", save_to, id);
-            workflow_context_set(workflow->context, full_path, answer);
+        if (result == E_IO_EOF) {
+            argo_report_error(E_INPUT_INVALID, "execute_series_iteration", "EOF reading answer");
+            return E_INPUT_INVALID;
         }
+
+        if (result == E_IO_WOULDBLOCK) {
+            usleep(IO_HTTP_POLL_DELAY_USEC);
+            attempts++;
+            continue;
+        }
+
+        argo_report_error(result, "execute_series_iteration", "failed to read answer");
+        return result;
+    }
+
+    if (attempts >= IO_HTTP_POLL_MAX_ATTEMPTS) {
+        argo_report_error(E_SYSTEM_TIMEOUT, "execute_series_iteration", "timeout waiting for answer");
+        return E_SYSTEM_TIMEOUT;
+    }
+
+    /* Remove trailing newline */
+    size_t len = strlen(answer);
+    if (len > 0 && answer[len - 1] == '\n') {
+        answer[len - 1] = '\0';
+    }
+
+    /* Get question ID and save answer */
+    int id_idx = workflow_json_find_field(json, tokens, question_token, "id");
+    if (id_idx >= 0) {
+        char id[STEP_SAVE_TO_BUFFER_SIZE];
+        workflow_json_extract_string(json, &tokens[id_idx], id, sizeof(id));
+
+        /* Build context path: save_to.id */
+        char full_path[STEP_SAVE_TO_BUFFER_SIZE * 2];
+        snprintf(full_path, sizeof(full_path), "%s.%s", save_to, id);
+        workflow_context_set(workflow->context, full_path, answer);
     }
 
     return ARGO_SUCCESS;
@@ -296,20 +336,35 @@ int step_ci_ask_series(workflow_controller_t* workflow,
         }
     }
 
-    /* Show greeting and intro */
+    /* Check for I/O channel */
+    workflow_context_t* ctx = workflow->context;
+    if (!ctx->io_channel) {
+        argo_report_error(E_IO_INVALID, "step_ci_ask_series",
+                         "no I/O channel available (executor running detached)");
+        return E_IO_INVALID;
+    }
+
+    /* Show greeting and intro through I/O channel */
     if (persona && persona->greeting[0] != '\0') {
-        printf("\n%s\n", persona->greeting);
+        io_channel_write_str(ctx->io_channel, "\n");
+        io_channel_write_str(ctx->io_channel, persona->greeting);
+        io_channel_write_str(ctx->io_channel, "\n");
+        io_channel_flush(ctx->io_channel);
     }
 
     int intro_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_INTRO);
     if (intro_idx >= 0) {
         char intro[STEP_PROMPT_BUFFER_SIZE];
         workflow_json_extract_string(json, &tokens[intro_idx], intro, sizeof(intro));
+
+        char intro_msg[STEP_OUTPUT_BUFFER_SIZE];
         if (persona && persona->name[0] != '\0') {
-            printf("[%s] %s\n", persona->name, intro);
+            snprintf(intro_msg, sizeof(intro_msg), "[%s] %s\n", persona->name, intro);
         } else {
-            printf("\n%s\n", intro);
+            snprintf(intro_msg, sizeof(intro_msg), "\n%s\n", intro);
         }
+        io_channel_write_str(ctx->io_channel, intro_msg);
+        io_channel_flush(ctx->io_channel);
     }
 
     /* Find questions array */
@@ -354,7 +409,11 @@ int step_ci_ask_series(workflow_controller_t* workflow,
 
     LOG_DEBUG("CI ask_series: persona=%s, completed %d questions, saved to '%s'",
               persona ? persona->name : "none", question_count, save_to);
-    printf("\n");
+
+    /* Send final newline through I/O channel */
+    io_channel_write_str(ctx->io_channel, "\n");
+    io_channel_flush(ctx->io_channel);
+
     return ARGO_SUCCESS;
 }
 
@@ -400,15 +459,27 @@ int step_ci_present(workflow_controller_t* workflow,
         workflow_json_extract_string(json, &tokens[format_idx], format, sizeof(format));
     }
 
-    /* Show presentation header */
-    printf("\n");
-    printf("========================================\n");
-    if (persona && persona->name[0] != '\0') {
-        printf("[%s] PRESENTATION (%s format)\n", persona->name, format);
-    } else {
-        printf("PRESENTATION (%s format)\n", format);
+    /* Check for I/O channel */
+    workflow_context_t* ctx = workflow->context;
+    if (!ctx->io_channel) {
+        argo_report_error(E_IO_INVALID, "step_ci_present",
+                         "no I/O channel available (executor running detached)");
+        return E_IO_INVALID;
     }
-    printf("========================================\n");
+
+    /* Show presentation header through I/O channel */
+    io_channel_write_str(ctx->io_channel, "\n");
+    io_channel_write_str(ctx->io_channel, "========================================\n");
+
+    char header[ARGO_BUFFER_MEDIUM];
+    if (persona && persona->name[0] != '\0') {
+        snprintf(header, sizeof(header), "[%s] PRESENTATION (%s format)\n", persona->name, format);
+    } else {
+        snprintf(header, sizeof(header), "PRESENTATION (%s format)\n", format);
+    }
+    io_channel_write_str(ctx->io_channel, header);
+    io_channel_write_str(ctx->io_channel, "========================================\n");
+    io_channel_flush(ctx->io_channel);
 
     /* If provider available, use AI to format and present */
     if (workflow->provider) {
@@ -448,24 +519,31 @@ int step_ci_present(workflow_controller_t* workflow,
                                           capture_response_callback, &capture);
 
         if (result == ARGO_SUCCESS) {
-            /* Display AI-formatted presentation */
-            printf("\n%s\n", response);
+            /* Display AI-formatted presentation through I/O channel */
+            io_channel_write_str(ctx->io_channel, "\n");
+            io_channel_write_str(ctx->io_channel, response);
+            io_channel_write_str(ctx->io_channel, "\n");
         } else {
             argo_report_error(result, "step_ci_present",
                              "AI query failed, response: %s",
                              capture.bytes_written > 0 ? response : "(empty)");
-            printf("\nData source: %s\n", data_path);
-            printf("(AI formatting unavailable)\n");
+
+            char fallback[ARGO_BUFFER_MEDIUM];
+            snprintf(fallback, sizeof(fallback), "\nData source: %s\n(AI formatting unavailable)\n", data_path);
+            io_channel_write_str(ctx->io_channel, fallback);
         }
     } else {
         /* No provider - basic display */
         LOG_DEBUG("No AI provider available for presentation");
-        printf("\nData source: %s\n", data_path);
-        printf("(No AI provider configured for formatting)\n");
+
+        char fallback[ARGO_BUFFER_MEDIUM];
+        snprintf(fallback, sizeof(fallback), "\nData source: %s\n(No AI provider configured for formatting)\n", data_path);
+        io_channel_write_str(ctx->io_channel, fallback);
     }
 
-    printf("========================================\n");
-    printf("\n");
+    io_channel_write_str(ctx->io_channel, "========================================\n");
+    io_channel_write_str(ctx->io_channel, "\n");
+    io_channel_flush(ctx->io_channel);
 
     LOG_DEBUG("CI present: persona=%s, format='%s', data='%s'",
               persona ? persona->name : "none", format, data_path);
@@ -522,23 +600,40 @@ int step_user_ci_chat(workflow_controller_t* workflow,
         workflow_json_extract_string(json, &tokens[save_to_idx], save_to, sizeof(save_to));
     }
 
-    /* Show greeting */
-    if (persona && persona->greeting[0] != '\0') {
-        printf("\n%s\n", persona->greeting);
+    /* Check for I/O channel */
+    workflow_context_t* ctx = workflow->context;
+    if (!ctx->io_channel) {
+        argo_report_error(E_IO_INVALID, "step_user_ci_chat",
+                         "no I/O channel available (executor running detached)");
+        return E_IO_INVALID;
     }
 
-    printf("\n========================================\n");
-    if (persona && persona->name[0] != '\0') {
-        printf("[%s] Interactive Chat Session\n", persona->name);
-    } else {
-        printf("Interactive Chat Session\n");
+    /* Show greeting through I/O channel */
+    if (persona && persona->greeting[0] != '\0') {
+        io_channel_write_str(ctx->io_channel, "\n");
+        io_channel_write_str(ctx->io_channel, persona->greeting);
+        io_channel_write_str(ctx->io_channel, "\n");
     }
-    printf("========================================\n");
-    printf("(Press Enter with no input to end chat)\n\n");
+
+    io_channel_write_str(ctx->io_channel, "\n========================================\n");
+
+    char session_header[ARGO_BUFFER_MEDIUM];
+    if (persona && persona->name[0] != '\0') {
+        snprintf(session_header, sizeof(session_header), "[%s] Interactive Chat Session\n", persona->name);
+    } else {
+        snprintf(session_header, sizeof(session_header), "Interactive Chat Session\n");
+    }
+    io_channel_write_str(ctx->io_channel, session_header);
+    io_channel_write_str(ctx->io_channel, "========================================\n");
+    io_channel_write_str(ctx->io_channel, "(Press Enter with no input to end chat)\n\n");
+    io_channel_flush(ctx->io_channel);
 
     /* Send initial prompt if provided */
     if (initial_prompt[0] != '\0') {
-        printf("> %s\n\n", initial_prompt);
+        char prompt_msg[ARGO_BUFFER_MEDIUM];
+        snprintf(prompt_msg, sizeof(prompt_msg), "> %s\n\n", initial_prompt);
+        io_channel_write_str(ctx->io_channel, prompt_msg);
+        io_channel_flush(ctx->io_channel);
 
         char response[STEP_CI_RESPONSE_BUFFER_SIZE] = {0};
         response_capture_t capture = {
@@ -556,7 +651,10 @@ int step_user_ci_chat(workflow_controller_t* workflow,
             return result;
         }
 
-        printf("[AI Response]\n%s\n\n", response);
+        io_channel_write_str(ctx->io_channel, "[AI Response]\n");
+        io_channel_write_str(ctx->io_channel, response);
+        io_channel_write_str(ctx->io_channel, "\n\n");
+        io_channel_flush(ctx->io_channel);
 
         /* Save initial exchange if save_to provided */
         if (save_to[0] != '\0') {
@@ -597,7 +695,8 @@ int step_user_ci_chat(workflow_controller_t* workflow,
 
         /* Check for empty input (exit chat) */
         if (input[0] == '\0' || strcmp(input, "exit") == 0 || strcmp(input, "quit") == 0) {
-            printf("\n[Chat ended]\n");
+            io_channel_write_str(ctx->io_channel, "\n[Chat ended]\n");
+            io_channel_flush(ctx->io_channel);
             break;
         }
 
@@ -612,18 +711,26 @@ int step_user_ci_chat(workflow_controller_t* workflow,
         int query_result = workflow->provider->query(workflow->provider, input,
                                                      capture_response_callback, &capture);
         if (query_result != ARGO_SUCCESS) {
-            printf("\n[AI Error: %s]\n", argo_error_message(query_result));
+            char error_msg[ARGO_BUFFER_MEDIUM];
+            snprintf(error_msg, sizeof(error_msg), "\n[AI Error: %s]\n", argo_error_message(query_result));
+            io_channel_write_str(ctx->io_channel, error_msg);
+            io_channel_flush(ctx->io_channel);
             continue;  /* Allow retry */
         }
 
-        /* Show AI response */
-        printf("\n");
+        /* Show AI response through I/O channel */
+        io_channel_write_str(ctx->io_channel, "\n");
+
+        char ai_header[ARGO_BUFFER_SMALL];
         if (persona && persona->name[0] != '\0') {
-            printf("[%s]\n", persona->name);
+            snprintf(ai_header, sizeof(ai_header), "[%s]\n", persona->name);
         } else {
-            printf("[AI]\n");
+            snprintf(ai_header, sizeof(ai_header), "[AI]\n");
         }
-        printf("%s\n\n", response);
+        io_channel_write_str(ctx->io_channel, ai_header);
+        io_channel_write_str(ctx->io_channel, response);
+        io_channel_write_str(ctx->io_channel, "\n\n");
+        io_channel_flush(ctx->io_channel);
 
         /* Append to conversation history if save_to provided */
         if (save_to[0] != '\0') {
@@ -643,7 +750,9 @@ int step_user_ci_chat(workflow_controller_t* workflow,
         turn++;
     }
 
-    printf("========================================\n\n");
+    io_channel_write_str(ctx->io_channel, "========================================\n\n");
+    io_channel_flush(ctx->io_channel);
+
     LOG_DEBUG("CI chat: persona=%s, turns=%d, saved to '%s'",
               persona ? persona->name : "none", turn, save_to[0] ? save_to : "none");
 

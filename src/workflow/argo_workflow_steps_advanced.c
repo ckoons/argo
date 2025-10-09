@@ -328,7 +328,7 @@ int step_workflow_call(workflow_controller_t* workflow,
     }
 
     /* Execute child workflow */
-    printf("[Workflow Call] Executing: %s\n", workflow_path);
+    LOG_INFO("Executing child workflow: %s", workflow_path);
     result = workflow_execute_all_steps(child);
     if (result != ARGO_SUCCESS) {
         LOG_ERROR("Child workflow failed with error %d", result);

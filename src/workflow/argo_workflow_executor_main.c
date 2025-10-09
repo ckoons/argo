@@ -19,6 +19,7 @@
 #include "argo_limits.h"
 #include "argo_urls.h"
 #include "argo_io_channel_http.h"
+#include "argo_log.h"
 
 /* Global workflow for signal handling */
 static workflow_controller_t* g_workflow = NULL;
@@ -160,7 +161,7 @@ int main(int argc, char** argv) {
     while (!g_should_stop && strcmp(g_workflow->current_step_id, EXECUTOR_STEP_EXIT) != 0) {
         /* Safety: prevent infinite loops */
         if (g_workflow->step_count >= EXECUTOR_MAX_STEPS) {
-            fprintf(stderr, "Maximum step count exceeded (%d)\n", EXECUTOR_MAX_STEPS);
+            LOG_ERROR("Maximum step count exceeded (%d)", EXECUTOR_MAX_STEPS);
             result = E_INPUT_INVALID;
             break;
         }
@@ -171,9 +172,9 @@ int main(int argc, char** argv) {
         struct stat st;
         if (stat(log_path, &st) == 0) {
             if (st.st_size > MAX_WORKFLOW_LOG_SIZE) {
-                fprintf(stderr, "Log file exceeded maximum size (%lld > %d bytes)\n",
-                       (long long)st.st_size, MAX_WORKFLOW_LOG_SIZE);
-                fprintf(stderr, "Aborting to prevent runaway loop\n");
+                LOG_ERROR("Log file exceeded maximum size (%lld > %d bytes)",
+                         (long long)st.st_size, MAX_WORKFLOW_LOG_SIZE);
+                LOG_ERROR("Aborting to prevent runaway loop");
                 result = E_RESOURCE_LIMIT;
                 break;
             }
@@ -184,33 +185,33 @@ int main(int argc, char** argv) {
                        g_workflow->current_step_id);
 
         /* Execute current step */
-        printf("Executing step %d: %s\n", g_workflow->step_count + 1, g_workflow->current_step_id);
+        LOG_INFO("Executing step %d: %s", g_workflow->step_count + 1, g_workflow->current_step_id);
         result = workflow_execute_current_step(g_workflow);
 
         if (result == ARGO_SUCCESS) {
-            printf("✓ Step %s completed\n\n", g_workflow->previous_step_id);
+            LOG_INFO("Step %s completed", g_workflow->previous_step_id);
         } else {
-            fprintf(stderr, "✗ Step %s failed with error: [%s] %s\n\n",
-                    g_workflow->current_step_id,
-                    argo_error_string(result),
-                    argo_error_message(result));
+            LOG_ERROR("Step %s failed with error: [%s] %s",
+                     g_workflow->current_step_id,
+                     argo_error_string(result),
+                     argo_error_message(result));
             break;
         }
     }
 
     if (g_should_stop) {
-        printf("Workflow stopped by signal\n");
+        LOG_INFO("Workflow stopped by signal");
         exit_code = 2;
     } else if (strcmp(g_workflow->current_step_id, EXECUTOR_STEP_EXIT) == 0 && result == ARGO_SUCCESS) {
-        printf("=========================================\n");
-        printf("Workflow completed successfully\n");
-        printf("Total steps executed: %d\n", g_workflow->step_count);
-        printf("=========================================\n");
+        LOG_INFO("=========================================");
+        LOG_INFO("Workflow completed successfully");
+        LOG_INFO("Total steps executed: %d", g_workflow->step_count);
+        LOG_INFO("=========================================");
         exit_code = 0;
     } else {
-        printf("=========================================\n");
-        printf("Workflow failed\n");
-        printf("=========================================\n");
+        LOG_INFO("=========================================");
+        LOG_INFO("Workflow failed");
+        LOG_INFO("=========================================");
         exit_code = 1;
     }
 

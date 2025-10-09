@@ -150,11 +150,10 @@ void workflow_input_destroy(workflow_input_socket_t* socket) {
 
 /* Log that workflow is waiting for input */
 void workflow_input_log_waiting(const char* prompt) {
-    /* Special marker that arc attach can detect */
-    printf("\n[WAITING_FOR_INPUT");
+    /* Log to file instead of stdout (executor is background process) */
     if (prompt) {
-        printf(":%s", prompt);
+        LOG_DEBUG("Waiting for input: %s", prompt);
+    } else {
+        LOG_DEBUG("Waiting for input");
     }
-    printf("]\n");
-    fflush(stdout);
 }

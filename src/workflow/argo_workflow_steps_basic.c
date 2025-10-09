@@ -252,7 +252,6 @@ int step_save_file(const char* json, jsmntok_t* tokens, int step_index,
     fprintf(f, "{%s}\n", substituted);
     fclose(f);
 
-    printf("Saved workflow data to: %s\n", destination);
     LOG_DEBUG("Saved file: %s", destination);
     return ARGO_SUCCESS;
 }
