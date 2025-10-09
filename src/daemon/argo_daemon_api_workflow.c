@@ -66,9 +66,14 @@ static const char* extract_path_param(const char* path, const char* prefix) {
 
 /* POST /api/workflow/start - Start new workflow */
 int api_workflow_start(http_request_t* req, http_response_t* resp) {
+    int result = ARGO_SUCCESS;
+    workflow_registry_t* registry = NULL;
+    workflow_template_collection_t* templates = NULL;
+    char workflow_id[ARGO_BUFFER_MEDIUM] = {0};
+
     if (!req || !resp || !g_api_daemon) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
-        return E_SYSTEM_MEMORY;
+        return E_INVALID_PARAMS;
     }
 
     /* Parse JSON body */
@@ -109,68 +114,55 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
     }
 
     /* Validate template exists */
-    workflow_template_collection_t* templates = workflow_templates_create();
+    templates = workflow_templates_create();
     if (!templates) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load templates");
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto error;
     }
 
-    int result = workflow_templates_discover(templates);
+    result = workflow_templates_discover(templates);
     if (result != ARGO_SUCCESS) {
-        workflow_templates_destroy(templates);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to discover templates");
-        return result;
+        goto cleanup;
     }
 
     workflow_template_t* template = workflow_templates_find(templates, template_name);
     if (!template) {
-        workflow_templates_destroy(templates);
         http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Template not found");
-        return E_NOT_FOUND;
+        result = E_NOT_FOUND;
+        goto cleanup;
     }
 
-    /* Load workflow registry */
-    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    /* Get locked registry */
+    registry = get_locked_registry(resp);
     if (!registry) {
-        workflow_templates_destroy(templates);
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
-        return E_SYSTEM_MEMORY;
+        result = E_INVALID_STATE;
+        goto cleanup;
     }
 
-    result = workflow_registry_load(registry);
-    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
-        workflow_registry_destroy(registry);
-        workflow_templates_destroy(templates);
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
-        return result;
-    }
+    /* Create workflow ID */
+    snprintf(workflow_id, sizeof(workflow_id), "%s_%s", template_name, instance_name);
 
     /* Add workflow to registry */
     result = workflow_registry_add_workflow(registry, template_name, instance_name, branch, environment);
     if (result == E_DUPLICATE) {
-        workflow_registry_destroy(registry);
-        workflow_templates_destroy(templates);
         http_response_set_error(resp, HTTP_STATUS_CONFLICT, "Workflow already exists");
-        return E_DUPLICATE;
+        goto cleanup;
     } else if (result != ARGO_SUCCESS) {
-        workflow_registry_destroy(registry);
-        workflow_templates_destroy(templates);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to add workflow");
-        return result;
+        goto cleanup;
     }
 
-    /* Create workflow ID */
-    char workflow_id[ARGO_BUFFER_MEDIUM];
-    snprintf(workflow_id, sizeof(workflow_id), "%s_%s", template_name, instance_name);
+    /* Mark registry dirty for periodic save */
+    registry->dirty = true;
 
-    /* Start workflow execution */
+    /* Start workflow execution (NOTE: passes shared registry, not owned) */
     result = workflow_exec_start(workflow_id, template->path, branch, registry);
     if (result != ARGO_SUCCESS) {
         workflow_registry_remove_workflow(registry, workflow_id);
-        workflow_registry_destroy(registry);
-        workflow_templates_destroy(templates);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to start workflow");
-        return result;
+        goto cleanup;
     }
 
     /* Build success response */
@@ -181,11 +173,11 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
 
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
 
-    /* Cleanup */
-    workflow_registry_destroy(registry);
+cleanup:
+    if (registry) unlock_registry();
     workflow_templates_destroy(templates);
-
-    return ARGO_SUCCESS;
+error:
+    return result;
 }
 
 /* GET /api/workflow/list - List all workflows */
@@ -456,9 +448,12 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
 
 /* DELETE /api/workflow/abandon/{id} - Abandon workflow */
 int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
+    int result = ARGO_SUCCESS;
+    workflow_registry_t* registry = NULL;
+
     if (!req || !resp) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
-        return E_SYSTEM_MEMORY;
+        return E_INVALID_PARAMS;
     }
 
     const char* workflow_id = extract_path_param(req->path, "/api/workflow/abandon");
@@ -467,54 +462,39 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    /* Load registry */
-    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    /* Get locked registry */
+    registry = get_locked_registry(resp);
     if (!registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
-        return E_SYSTEM_MEMORY;
+        result = E_INVALID_STATE;
+        goto error;
     }
 
-    int result = workflow_registry_load(registry);
-    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
-        workflow_registry_destroy(registry);
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
-        return result;
-    }
-
-    /* Cleanup dead workflows after loading */
-    workflow_registry_cleanup_dead_workflows(registry);
-
-    /* Get workflow to get PID */
+    /* Get workflow to verify it exists */
     workflow_instance_t* info = workflow_registry_get_workflow(registry, workflow_id);
     if (!info) {
-        workflow_registry_destroy(registry);
         http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
-        return E_NOT_FOUND;
+        result = E_NOT_FOUND;
+        goto cleanup;
     }
 
-    /* Abandon workflow */
+    /* Abandon workflow (kills process) */
     result = workflow_exec_abandon(workflow_id, registry);
     if (result != ARGO_SUCCESS) {
-        workflow_registry_destroy(registry);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to abandon workflow");
-        return result;
+        goto cleanup;
     }
 
     /* Remove from registry */
     result = workflow_registry_remove_workflow(registry, workflow_id);
     if (result != ARGO_SUCCESS) {
-        workflow_registry_destroy(registry);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to remove workflow from registry");
-        return result;
+        goto cleanup;
     }
 
-    /* Save registry after removal */
-    result = workflow_registry_save(registry);
-    if (result != ARGO_SUCCESS) {
-        LOG_ERROR("Failed to save registry after workflow abandon: %d", result);
-        /* Continue - registry will be saved eventually */
-    }
+    /* Mark registry dirty for periodic save */
+    registry->dirty = true;
 
+    /* Build success response */
     char response_json[ARGO_BUFFER_MEDIUM];
     snprintf(response_json, sizeof(response_json),
         "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"abandoned\"}",
@@ -522,8 +502,10 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
 
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
 
-    workflow_registry_destroy(registry);
-    return ARGO_SUCCESS;
+cleanup:
+    if (registry) unlock_registry();
+error:
+    return result;
 }
 
 /* POST /api/workflow/progress/{id} - Report executor progress */
@@ -611,35 +593,29 @@ int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    /* Load registry */
-    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    /* Get locked registry */
+    workflow_registry_t* registry = get_locked_registry(resp);
     if (!registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
-        return E_SYSTEM_MEMORY;
-    }
-
-    int result = workflow_registry_load(registry);
-    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
-        workflow_registry_destroy(registry);
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
-        return result;
+        return E_INVALID_STATE;
     }
 
     /* Enqueue input */
-    result = workflow_registry_enqueue_input(registry, workflow_id, input_text);
+    int result = workflow_registry_enqueue_input(registry, workflow_id, input_text);
     if (result == E_NOT_FOUND) {
-        workflow_registry_destroy(registry);
+        unlock_registry();
         http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
         return result;
     } else if (result == E_RESOURCE_LIMIT) {
-        workflow_registry_destroy(registry);
+        unlock_registry();
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Input queue full");
         return result;
     } else if (result != ARGO_SUCCESS) {
-        workflow_registry_destroy(registry);
+        unlock_registry();
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to enqueue input");
         return result;
     }
+
+    unlock_registry();
 
     /* Return success */
     char response_json[ARGO_BUFFER_MEDIUM];
@@ -648,15 +624,18 @@ int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
             workflow_id);
 
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
-    workflow_registry_destroy(registry);
     return ARGO_SUCCESS;
 }
 
 /* GET /api/workflow/input/{id} - Dequeue input for executor (one item) */
 int api_workflow_input_get(http_request_t* req, http_response_t* resp) {
+    int result = ARGO_SUCCESS;
+    workflow_registry_t* registry = NULL;
+    char* input = NULL;
+
     if (!req || !resp) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
-        return E_SYSTEM_MEMORY;
+        return E_INVALID_PARAMS;
     }
 
     const char* workflow_id = extract_path_param(req->path, "/api/workflow/input");
@@ -665,34 +644,26 @@ int api_workflow_input_get(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    /* Load registry */
-    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    /* Get locked registry */
+    registry = get_locked_registry(resp);
     if (!registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
-        return E_SYSTEM_MEMORY;
-    }
-
-    int result = workflow_registry_load(registry);
-    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
-        workflow_registry_destroy(registry);
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
-        return result;
+        result = E_INVALID_STATE;
+        goto error;
     }
 
     /* Check if workflow exists */
     workflow_instance_t* workflow = workflow_registry_get_workflow(registry, workflow_id);
     if (!workflow) {
-        workflow_registry_destroy(registry);
         http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
-        return E_NOT_FOUND;
+        result = E_NOT_FOUND;
+        goto cleanup;
     }
 
     /* Dequeue input (may return NULL if queue empty) */
-    char* input = workflow_registry_dequeue_input(registry, workflow_id);
+    input = workflow_registry_dequeue_input(registry, workflow_id);
     if (!input) {
-        workflow_registry_destroy(registry);
         http_response_set_json(resp, HTTP_STATUS_NO_CONTENT, "");
-        return ARGO_SUCCESS;
+        goto cleanup;
     }
 
     /* Build response with input */
@@ -703,16 +674,24 @@ int api_workflow_input_get(http_request_t* req, http_response_t* resp) {
 
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
 
+cleanup:
+    if (registry) unlock_registry();
     free(input);
-    workflow_registry_destroy(registry);
-    return ARGO_SUCCESS;
+error:
+    return result;
 }
 
 /* GET /api/workflow/output/{id}?since={offset} - Stream workflow log output */
 int api_workflow_output_get(http_request_t* req, http_response_t* resp) {
+    int result = ARGO_SUCCESS;
+    workflow_registry_t* registry = NULL;
+    FILE* log_file = NULL;
+    char* content = NULL;
+    char* response_json = NULL;
+
     if (!req || !resp) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
-        return E_SYSTEM_MEMORY;
+        return E_INVALID_PARAMS;
     }
 
     const char* workflow_id = extract_path_param(req->path, "/api/workflow/output");
@@ -731,15 +710,33 @@ int api_workflow_output_get(http_request_t* req, http_response_t* resp) {
         }
     }
 
+    /* Get locked registry - verify workflow exists */
+    registry = get_locked_registry(resp);
+    if (!registry) {
+        result = E_INVALID_STATE;
+        goto error;
+    }
+
+    workflow_instance_t* workflow = workflow_registry_get_workflow(registry, workflow_id);
+    if (!workflow) {
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        result = E_NOT_FOUND;
+        goto cleanup;
+    }
+
+    /* Unlock registry before file I/O (don't hold lock during I/O) */
+    unlock_registry();
+    registry = NULL;
+
     /* Build log file path */
     char log_path[ARGO_PATH_MAX];
     snprintf(log_path, sizeof(log_path), ".argo/logs/%s.log", workflow_id);
 
     /* Check if log file exists and get size */
-    FILE* log_file = fopen(log_path, "r");
+    log_file = fopen(log_path, "r");
     if (!log_file) {
         http_response_set_json(resp, HTTP_STATUS_NO_CONTENT, "");
-        return ARGO_SUCCESS;
+        goto cleanup;
     }
 
     /* Get file size */
@@ -748,9 +745,8 @@ int api_workflow_output_get(http_request_t* req, http_response_t* resp) {
 
     /* Check if offset is beyond file size */
     if (offset >= file_size) {
-        fclose(log_file);
         http_response_set_json(resp, HTTP_STATUS_NO_CONTENT, "");
-        return ARGO_SUCCESS;
+        goto cleanup;
     }
 
     /* Seek to offset and read remaining content */
@@ -762,24 +758,23 @@ int api_workflow_output_get(http_request_t* req, http_response_t* resp) {
         bytes_to_read = ARGO_BUFFER_LARGE;
     }
 
-    char* content = malloc(bytes_to_read + 1);
+    content = malloc(bytes_to_read + 1);
     if (!content) {
-        fclose(log_file);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
     size_t bytes_read = fread(content, 1, bytes_to_read, log_file);
     content[bytes_read] = '\0';
-    fclose(log_file);
 
     /* Build JSON response with content and new offset */
     long new_offset = offset + bytes_read;
-    char* response_json = malloc(bytes_to_read + ARGO_BUFFER_MEDIUM);
+    response_json = malloc(bytes_to_read + ARGO_BUFFER_MEDIUM);
     if (!response_json) {
-        free(content);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
     snprintf(response_json, bytes_to_read + ARGO_BUFFER_MEDIUM,
@@ -788,8 +783,12 @@ int api_workflow_output_get(http_request_t* req, http_response_t* resp) {
 
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
 
+cleanup:
+    if (registry) unlock_registry();
+    if (log_file) fclose(log_file);
     free(content);
     free(response_json);
-    return ARGO_SUCCESS;
+error:
+    return result;
 }
 
