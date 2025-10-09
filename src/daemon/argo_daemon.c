@@ -14,6 +14,7 @@
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
 #include "argo_limits.h"
+#include "argo_log.h"
 
 /* Create daemon */
 argo_daemon_t* argo_daemon_create(uint16_t port) {
@@ -165,7 +166,7 @@ int argo_daemon_start(argo_daemon_t* daemon) {
     /* Register API routes */
     argo_daemon_register_api_routes(daemon);
 
-    printf("Argo Daemon starting on port %d\n", daemon->port);
+    LOG_INFO("Argo Daemon starting on port %d", daemon->port);
 
     /* Start HTTP server (blocking) */
     return http_server_start(daemon->http_server);
@@ -175,6 +176,6 @@ int argo_daemon_start(argo_daemon_t* daemon) {
 void argo_daemon_stop(argo_daemon_t* daemon) {
     if (!daemon) return;
 
-    printf("Stopping Argo Daemon\n");
+    LOG_INFO("Stopping Argo Daemon");
     http_server_stop(daemon->http_server);
 }

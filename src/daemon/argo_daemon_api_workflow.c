@@ -546,8 +546,8 @@ int api_workflow_progress(http_request_t* req, http_response_t* resp) {
         sscanf(name_str, "\"step_name\":\"%127[^\"]\"", step_name);  /* ARGO_BUFFER_NAME = 128 */
     }
 
-    /* Log progress (in production, would update registry or database) */
-    fprintf(stderr, "[PROGRESS] %s: step %d/%d (%s)\n",
+    /* Log progress */
+    LOG_INFO("[PROGRESS] %s: step %d/%d (%s)",
             workflow_id, current_step, total_steps, step_name);
 
     /* Return success */
