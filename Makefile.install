@@ -14,6 +14,27 @@ install-arc:
 install-term:
 	$(MAKE) -C ui/argo-term install PREFIX=$(PREFIX)
 
+install-completion:
+	@echo "Installing bash completion for arc..."
+	@if [ -d "$(HOME)/.bash_completion.d" ]; then \
+		install -m 0644 arc/completions/arc.bash $(HOME)/.bash_completion.d/arc; \
+		echo "✓ Installed to $(HOME)/.bash_completion.d/arc"; \
+		echo "  Add to ~/.bashrc: source $(HOME)/.bash_completion.d/arc"; \
+	elif [ -d /usr/local/etc/bash_completion.d ]; then \
+		sudo install -m 0644 arc/completions/arc.bash /usr/local/etc/bash_completion.d/arc; \
+		echo "✓ Installed to /usr/local/etc/bash_completion.d/arc"; \
+		echo "  Restart your shell or run: source /usr/local/etc/bash_completion.d/arc"; \
+	else \
+		mkdir -p $(HOME)/.bash_completion.d; \
+		install -m 0644 arc/completions/arc.bash $(HOME)/.bash_completion.d/arc; \
+		echo "✓ Created $(HOME)/.bash_completion.d/"; \
+		echo "✓ Installed to $(HOME)/.bash_completion.d/arc"; \
+		echo "  Add to ~/.bashrc: source $(HOME)/.bash_completion.d/arc"; \
+	fi
+	@echo ""
+	@echo "To test completion immediately (current session only):"
+	@echo "  source arc/completions/arc.bash"
+
 restart-daemon:
 	@echo "Restarting argo-daemon..."
 	@pkill -TERM argo-daemon 2>/dev/null || true

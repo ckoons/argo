@@ -18,16 +18,48 @@
 #include "argo_limits.h"
 #include "argo_urls.h"
 
+/* Localhost address */
+#define LOCALHOST_ADDR "127.0.0.1"
+
 /* Global daemon for signal handling */
 static argo_daemon_t* g_daemon = NULL;
 
-/* Kill any existing daemon - idempotent takeover */
+/* Kill any existing daemon on this port - NOT SELF */
 static void kill_existing_daemon(uint16_t port) {
-    (void)port;  /* Port displayed in main() output */
+    /* Try to connect to the port */
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        return;  /* Can't check, assume port is free */
+    }
 
-    /* Blind kill - idempotent */
-    system("pkill -9 argo-daemon 2>/dev/null");
-    sleep(1);
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr(LOCALHOST_ADDR);
+
+    /* Try to connect */
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+        /* Port is in use - send shutdown request to existing daemon */
+        close(sock);
+
+        fprintf(stderr, "Port %d is in use, requesting existing daemon to shutdown...\n", port);
+
+        /* Send HTTP GET to /api/shutdown */
+        char shutdown_url[ARGO_BUFFER_MEDIUM];
+        snprintf(shutdown_url, sizeof(shutdown_url),
+                "curl -s -X POST http://%s:%d/api/shutdown >/dev/null 2>&1",
+                LOCALHOST_ADDR, port);
+        system(shutdown_url);
+
+        /* Wait for port to become free */
+        sleep(2);
+
+        fprintf(stderr, "Previous daemon should be stopped.\n");
+    } else {
+        /* Port is free */
+        close(sock);
+    }
 }
 
 /* Signal handler */

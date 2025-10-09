@@ -27,8 +27,8 @@ all: directories $(BUILD_DIR)/stubs.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) 
         harness-control-flow harness-ci-interactive harness-loop harness-persona \
         harness-workflow-chain arc ui ui-argo-term all-components test-arc test-ui \
         test-all-components count count-summary count-report count-snapshot count-json \
-        clean-arc clean-ui clean-all install install-arc install-term install-all \
-        uninstall uninstall-arc uninstall-term uninstall-all test-thread-safety \
+        clean-arc clean-ui clean-all install install-arc install-term install-completion \
+        install-all uninstall uninstall-arc uninstall-term uninstall-all test-thread-safety \
         test-shutdown-signals test-concurrent-workflows test-env-precedence \
         test-shared-services test-workflow-registry test-valgrind build-asan \
         test-asan test-asan-full help help-test help-count restart-daemon

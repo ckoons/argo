@@ -168,35 +168,28 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
         return E_SYSTEM_MEMORY;
     }
 
-    /* Load registry */
-    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    /* Use shared registry with mutex protection */
+    pthread_mutex_lock(&g_api_daemon->workflow_registry_lock);
+
+    workflow_registry_t* registry = g_api_daemon->workflow_registry;
     if (!registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
-        return E_SYSTEM_MEMORY;
+        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Registry not initialized");
+        return E_INVALID_STATE;
     }
-
-    int result = workflow_registry_load(registry);
-    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
-        workflow_registry_destroy(registry);
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
-        return result;
-    }
-
-    /* Cleanup dead workflows after loading */
-    workflow_registry_cleanup_dead_workflows(registry);
 
     /* Get workflow list */
     workflow_instance_t* workflows = NULL;
     int count = 0;
-    result = workflow_registry_list(registry, &workflows, &count);
+    int result = workflow_registry_list(registry, &workflows, &count);
     if (result != ARGO_SUCCESS) {
-        workflow_registry_destroy(registry);
+        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to list workflows");
         return result;
     }
 
     if (count == 0) {
-        workflow_registry_destroy(registry);
+        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
         http_response_set_json(resp, HTTP_STATUS_OK, "{\"workflows\":[]}");
         return ARGO_SUCCESS;
     }
@@ -204,7 +197,7 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
     /* Build JSON response (simplified) */
     char* json_response = malloc(ARGO_BUFFER_STANDARD);
     if (!json_response) {
-        workflow_registry_destroy(registry);
+        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
         return E_SYSTEM_MEMORY;
     }
@@ -225,10 +218,11 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
 
     offset += snprintf(json_response + offset, ARGO_BUFFER_STANDARD - offset, "]}");
 
-    http_response_set_json(resp, HTTP_STATUS_OK, json_response);
+    /* Unlock before setting response (no more registry access needed) */
+    pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
 
+    http_response_set_json(resp, HTTP_STATUS_OK, json_response);
     free(json_response);
-    workflow_registry_destroy(registry);
 
     return ARGO_SUCCESS;
 }
