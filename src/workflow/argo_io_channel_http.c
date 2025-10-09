@@ -10,6 +10,7 @@
 #include "argo_limits.h"
 #include "argo_log.h"
 #include "argo_json.h"
+#include "argo_http.h"
 
 /* HTTP I/O channel context */
 typedef struct {
@@ -59,8 +60,7 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
              ctx->daemon_url, ctx->workflow_id);
 
     /* Build JSON body - escape the output text */
-    /* Worst case: every char becomes \uXXXX (6 bytes) + JSON overhead (100 bytes) */
-    size_t max_escaped = ctx->write_buffer_used * 6 + 100;
+    size_t max_escaped = ctx->write_buffer_used * JSON_ESCAPE_MAX_MULTIPLIER + JSON_OVERHEAD_BYTES;
     char* json_body = malloc(max_escaped);
     if (!json_body) {
         return E_SYSTEM_MEMORY;
@@ -68,26 +68,40 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
 
     /* Simple JSON encoding - just escape quotes and backslashes */
     char* dst = json_body;
-    dst += sprintf(dst, "{\"output\":\"");
-    for (size_t i = 0; i < ctx->write_buffer_used; i++) {
+    size_t remaining = max_escaped;
+
+    /* Add opening */
+    int written = snprintf(dst, remaining, "{\"output\":\"");
+    dst += written;
+    remaining -= written;
+
+    /* Escape content */
+    for (size_t i = 0; i < ctx->write_buffer_used && remaining > JSON_ENCODING_SAFETY_MARGIN; i++) {
         char c = ctx->write_buffer[i];
         if (c == '"' || c == '\\') {
             *dst++ = '\\';
+            remaining--;
         }
         if (c == '\n') {
             *dst++ = '\\';
             *dst++ = 'n';
+            remaining -= 2;
         } else if (c == '\r') {
             *dst++ = '\\';
             *dst++ = 'r';
+            remaining -= 2;
         } else if (c == '\t') {
             *dst++ = '\\';
             *dst++ = 't';
+            remaining -= 2;
         } else {
             *dst++ = c;
+            remaining--;
         }
     }
-    dst += sprintf(dst, "\"}");
+
+    /* Add closing */
+    snprintf(dst, remaining, "\"}");
 
     /* Setup CURL request */
     curl_easy_setopt(ctx->curl, CURLOPT_URL, url);
@@ -145,12 +159,12 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     long http_code = 0;
     curl_easy_getinfo(ctx->curl, CURLINFO_RESPONSE_CODE, &http_code);
 
-    if (http_code == 404) {
+    if (http_code == HTTP_STATUS_NOT_FOUND) {
         free(response);
         return E_IO_WOULDBLOCK;  /* No input available */
     }
 
-    if (http_code != 200) {
+    if (http_code != HTTP_STATUS_OK) {
         free(response);
         LOG_ERROR("HTTP error polling input: %ld", http_code);
         return E_SYSTEM_NETWORK;

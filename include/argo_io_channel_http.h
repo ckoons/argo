@@ -19,6 +19,11 @@
  * This keeps the executor as a pure background service with no stdin/stdout.
  */
 
+/* JSON encoding constants */
+#define JSON_ESCAPE_MAX_MULTIPLIER 6    /* Worst case: char -> \uXXXX */
+#define JSON_OVERHEAD_BYTES 100         /* Space for {"output":"..."} */
+#define JSON_ENCODING_SAFETY_MARGIN 10  /* Extra bytes for loop termination */
+
 /**
  * Create an HTTP-based I/O channel
  *
