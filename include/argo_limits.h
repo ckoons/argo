@@ -65,6 +65,14 @@
 /* Periodic workflow cleanup interval in seconds (30 minutes) */
 #define WORKFLOW_CLEANUP_INTERVAL_SECONDS 1800
 
+/* ===== Workflow Limits ===== */
+
+/* Maximum workflow log file size (poor man's loop catcher) */
+#define MAX_WORKFLOW_LOG_SIZE (100 * 1024 * 1024)  /* 100MB */
+
+/* Maximum queued input lines per workflow */
+#define MAX_WORKFLOW_INPUT_QUEUE 10
+
 /* ===== Provider Defaults ===== */
 
 /* Ollama default port */

@@ -8,6 +8,7 @@
 #include "argo_workflow_registry.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Create workflow registry */
 workflow_registry_t* workflow_registry_create(const char* registry_path) {
@@ -302,4 +303,86 @@ int workflow_registry_cleanup_dead_workflows(workflow_registry_t* registry) {
     }
 
     return ARGO_SUCCESS;
+}
+
+/* Enqueue input for workflow */
+int workflow_registry_enqueue_input(workflow_registry_t* registry,
+                                    const char* workflow_id,
+                                    const char* input) {
+    if (!registry || !workflow_id || !input) {
+        return E_INPUT_NULL;
+    }
+
+    workflow_instance_t* workflow = workflow_registry_get_workflow(registry, workflow_id);
+    if (!workflow) {
+        return E_NOT_FOUND;
+    }
+
+    workflow_input_queue_t* queue = &workflow->input_queue;
+
+    /* Check if queue is full */
+    if (queue->count >= MAX_WORKFLOW_INPUT_QUEUE) {
+        argo_report_error(E_RESOURCE_LIMIT, "workflow_registry_enqueue_input",
+                         "Input queue full for workflow %s", workflow_id);
+        return E_RESOURCE_LIMIT;
+    }
+
+    /* Duplicate input string */
+    queue->inputs[queue->tail] = strdup(input);
+    if (!queue->inputs[queue->tail]) {
+        return E_SYSTEM_MEMORY;
+    }
+
+    /* Advance tail (circular queue) */
+    queue->tail = (queue->tail + 1) % MAX_WORKFLOW_INPUT_QUEUE;
+    queue->count++;
+
+    LOG_DEBUG("Enqueued input for workflow %s (queue size: %d)", workflow_id, queue->count);
+    return ARGO_SUCCESS;
+}
+
+/* Dequeue input from workflow */
+char* workflow_registry_dequeue_input(workflow_registry_t* registry,
+                                      const char* workflow_id) {
+    if (!registry || !workflow_id) {
+        return NULL;
+    }
+
+    workflow_instance_t* workflow = workflow_registry_get_workflow(registry, workflow_id);
+    if (!workflow) {
+        return NULL;
+    }
+
+    workflow_input_queue_t* queue = &workflow->input_queue;
+
+    /* Check if queue is empty */
+    if (queue->count == 0) {
+        return NULL;
+    }
+
+    /* Get input from head */
+    char* input = queue->inputs[queue->head];
+    queue->inputs[queue->head] = NULL;
+
+    /* Advance head (circular queue) */
+    queue->head = (queue->head + 1) % MAX_WORKFLOW_INPUT_QUEUE;
+    queue->count--;
+
+    LOG_DEBUG("Dequeued input for workflow %s (queue size: %d)", workflow_id, queue->count);
+    return input;  /* Caller must free */
+}
+
+/* Get input queue count */
+int workflow_registry_get_input_count(workflow_registry_t* registry,
+                                      const char* workflow_id) {
+    if (!registry || !workflow_id) {
+        return 0;
+    }
+
+    workflow_instance_t* workflow = workflow_registry_get_workflow(registry, workflow_id);
+    if (!workflow) {
+        return 0;
+    }
+
+    return workflow->input_queue.count;
 }

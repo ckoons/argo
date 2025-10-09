@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <curl/curl.h>
+#include <sys/stat.h>
 
 /* Project includes */
 #include "argo_workflow.h"
@@ -151,6 +152,20 @@ int main(int argc, char** argv) {
             fprintf(stderr, "Maximum step count exceeded (%d)\n", EXECUTOR_MAX_STEPS);
             result = E_INPUT_INVALID;
             break;
+        }
+
+        /* Safety: check log file size to prevent runaway loops */
+        char log_path[ARGO_PATH_MAX];
+        snprintf(log_path, sizeof(log_path), ".argo/logs/%s.log", g_workflow_id);
+        struct stat st;
+        if (stat(log_path, &st) == 0) {
+            if (st.st_size > MAX_WORKFLOW_LOG_SIZE) {
+                fprintf(stderr, "Log file exceeded maximum size (%lld > %d bytes)\n",
+                       (long long)st.st_size, MAX_WORKFLOW_LOG_SIZE);
+                fprintf(stderr, "Aborting to prevent runaway loop\n");
+                result = E_RESOURCE_LIMIT;
+                break;
+            }
         }
 
         /* Report progress to daemon */

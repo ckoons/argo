@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <curl/curl.h>
 
 /* External library - header only for struct definitions */
 #define JSMN_HEADER
@@ -18,6 +20,8 @@
 #include "argo_provider.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
+#include "argo_urls.h"
 
 /* Helper: Simple callback to capture AI response */
 typedef struct {
@@ -53,6 +57,105 @@ static void capture_response_callback(const ci_response_t* response, void* userd
     }
 }
 
+/* Helper: CURL write callback for HTTP response */
+static size_t http_response_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t realsize = size * nmemb;
+    response_capture_t* capture = (response_capture_t*)userp;
+
+    size_t available = capture->buffer_size - capture->bytes_written - 1;
+    if (realsize > available) {
+        realsize = available;
+    }
+
+    if (realsize > 0) {
+        memcpy(capture->buffer + capture->bytes_written, contents, realsize);
+        capture->bytes_written += realsize;
+        capture->buffer[capture->bytes_written] = '\0';
+    }
+
+    return size * nmemb;  /* Return original size to avoid curl error */
+}
+
+/* Helper: Poll daemon for workflow input via HTTP */
+static int poll_daemon_for_input(const char* workflow_id, char* input_buffer, size_t buffer_size) {
+    if (!workflow_id || !input_buffer || buffer_size == 0) {
+        return E_INVALID_PARAMS;
+    }
+
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        return E_SYSTEM_MEMORY;
+    }
+
+    /* Build URL: GET /api/workflow/input/{workflow_id} */
+    char url[ARGO_PATH_MAX];
+    snprintf(url, sizeof(url), "http://%s:%d/api/workflow/input/%s",
+            DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT, workflow_id);
+
+    /* Setup response capture */
+    char response_buffer[ARGO_BUFFER_STANDARD] = {0};
+    response_capture_t capture = {
+        .buffer = response_buffer,
+        .buffer_size = sizeof(response_buffer),
+        .bytes_written = 0
+    };
+
+    /* Configure CURL */
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, http_response_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &capture);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
+
+    /* Perform request */
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        return E_SYSTEM_NETWORK;
+    }
+
+    /* Check HTTP status */
+    if (http_code == 204) {
+        /* No content - queue is empty */
+        return E_NOT_FOUND;
+    } else if (http_code != 200) {
+        return E_SYSTEM_NETWORK;
+    }
+
+    /* Extract input field from JSON response: {"workflow_id":"...", "input":"..."} */
+    const char* input_field = strstr(response_buffer, "\"input\"");
+    if (!input_field) {
+        return E_INVALID_PARAMS;
+    }
+
+    /* Extract input value (simple JSON parsing) */
+    const char* value_start = strchr(input_field, ':');
+    if (!value_start) {
+        return E_INVALID_PARAMS;
+    }
+    value_start = strchr(value_start, '"');
+    if (!value_start) {
+        return E_INVALID_PARAMS;
+    }
+    value_start++;  /* Skip opening quote */
+
+    const char* value_end = strchr(value_start, '"');
+    if (!value_end) {
+        return E_INVALID_PARAMS;
+    }
+
+    size_t value_len = value_end - value_start;
+    if (value_len >= buffer_size) {
+        value_len = buffer_size - 1;
+    }
+
+    memcpy(input_buffer, value_start, value_len);
+    input_buffer[value_len] = '\0';
+
+    return ARGO_SUCCESS;
+}
 
 /* Helper: Generate conversational question using AI */
 static int generate_conversational_question(ci_provider_t* provider,
@@ -464,14 +567,7 @@ int step_user_ci_chat(workflow_controller_t* workflow,
         }
     }
 
-    /* Create input socket for interactive communication */
-    workflow_input_socket_t* input_socket = workflow_input_create(workflow->workflow_id);
-    if (!input_socket) {
-        argo_report_error(E_SYSTEM_SOCKET, "step_user_ci_chat", "failed to create input socket");
-        return E_SYSTEM_SOCKET;
-    }
-
-    /* Interactive chat loop */
+    /* Interactive chat loop - poll daemon for user input */
     int turn = 1;
     while (1) {
         /* Log that we're waiting for input (arc attach will detect this) */
@@ -481,18 +577,26 @@ int step_user_ci_chat(workflow_controller_t* workflow,
             workflow_input_log_waiting("You");
         }
 
-        /* Read user input from socket */
+        /* Poll daemon for user input via HTTP */
         char input[STEP_INPUT_BUFFER_SIZE];
-        int len = workflow_input_read_line(input_socket, input, sizeof(input));
-        if (len < 0) {
-            /* Error reading */
-            argo_report_error(E_SYSTEM_SOCKET, "step_user_ci_chat", "failed to read input");
-            workflow_input_destroy(input_socket);
-            return E_SYSTEM_SOCKET;
+        int result;
+        while (1) {
+            result = poll_daemon_for_input(workflow->workflow_id, input, sizeof(input));
+            if (result == ARGO_SUCCESS) {
+                break;  /* Got input */
+            } else if (result == E_NOT_FOUND) {
+                /* Queue empty, poll again after short delay */
+                usleep(500 * MICROSECONDS_PER_MILLISECOND);  /* 500ms */
+                continue;
+            } else {
+                /* Error polling */
+                argo_report_error(result, "step_user_ci_chat", "failed to poll for input");
+                return result;
+            }
         }
 
-        if (len == 0) {
-            /* Empty input = exit chat */
+        /* Check for empty input (exit chat) */
+        if (input[0] == '\0' || strcmp(input, "exit") == 0 || strcmp(input, "quit") == 0) {
             printf("\n[Chat ended]\n");
             break;
         }
@@ -505,10 +609,10 @@ int step_user_ci_chat(workflow_controller_t* workflow,
             .bytes_written = 0
         };
 
-        int result = workflow->provider->query(workflow->provider, input,
-                                              capture_response_callback, &capture);
-        if (result != ARGO_SUCCESS) {
-            printf("\n[AI Error: %s]\n", argo_error_message(result));
+        int query_result = workflow->provider->query(workflow->provider, input,
+                                                     capture_response_callback, &capture);
+        if (query_result != ARGO_SUCCESS) {
+            printf("\n[AI Error: %s]\n", argo_error_message(query_result));
             continue;  /* Allow retry */
         }
 
@@ -538,9 +642,6 @@ int step_user_ci_chat(workflow_controller_t* workflow,
 
         turn++;
     }
-
-    /* Cleanup socket */
-    workflow_input_destroy(input_socket);
 
     printf("========================================\n\n");
     LOG_DEBUG("CI chat: persona=%s, turns=%d, saved to '%s'",

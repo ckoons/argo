@@ -51,6 +51,14 @@ int argo_daemon_register_api_routes(argo_daemon_t* daemon) {
     http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
                          "/api/workflow/progress", api_workflow_progress);
 
+    /* Interactive workflow I/O routes */
+    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
+                         "/api/workflow/input", api_workflow_input_post);
+    http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
+                         "/api/workflow/input", api_workflow_input_get);
+    http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
+                         "/api/workflow/output", api_workflow_output_get);
+
     /* Registry routes */
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
                          "/api/registry/ci", api_registry_list_ci);

@@ -16,6 +16,11 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp);
 /* Executor progress reporting */
 int api_workflow_progress(http_request_t* req, http_response_t* resp);
 
+/* Interactive workflow I/O */
+int api_workflow_input_post(http_request_t* req, http_response_t* resp);
+int api_workflow_input_get(http_request_t* req, http_response_t* resp);
+int api_workflow_output_get(http_request_t* req, http_response_t* resp);
+
 /* Registry API handlers */
 int api_registry_list_ci(http_request_t* req, http_response_t* resp);
 

@@ -6,6 +6,7 @@
 #include <time.h>
 #include <stdbool.h>
 #include <sys/types.h>
+#include "argo_limits.h"
 
 /* Maximum sizes */
 #define WORKFLOW_REGISTRY_MAX_WORKFLOWS 64
@@ -27,6 +28,14 @@ typedef enum {
     WORKFLOW_STATUS_COMPLETED
 } workflow_status_t;
 
+/* Workflow input queue */
+typedef struct workflow_input_queue {
+    char* inputs[MAX_WORKFLOW_INPUT_QUEUE];  /* Queue of input strings */
+    int head;                                  /* Read position */
+    int tail;                                  /* Write position */
+    int count;                                 /* Number of queued inputs */
+} workflow_input_queue_t;
+
 /* Workflow instance */
 typedef struct workflow_instance {
     char id[WORKFLOW_REGISTRY_ID_MAX];                  /* template_instance */
@@ -38,6 +47,9 @@ typedef struct workflow_instance {
     time_t created_at;
     time_t last_active;
     pid_t pid;                                          /* Process ID (0 if not running) */
+
+    /* Interactive input/output */
+    workflow_input_queue_t input_queue;                 /* User input queue */
 } workflow_instance_t;
 
 /* Forward declaration */
@@ -90,6 +102,17 @@ int workflow_registry_update_branch(workflow_registry_t* registry,
 int workflow_registry_set_status(workflow_registry_t* registry,
                                  const char* workflow_id,
                                  workflow_status_t status);
+
+/* Input queue management */
+int workflow_registry_enqueue_input(workflow_registry_t* registry,
+                                    const char* workflow_id,
+                                    const char* input);
+
+char* workflow_registry_dequeue_input(workflow_registry_t* registry,
+                                      const char* workflow_id);
+
+int workflow_registry_get_input_count(workflow_registry_t* registry,
+                                      const char* workflow_id);
 
 /* Query */
 int workflow_registry_list(workflow_registry_t* registry,

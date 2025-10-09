@@ -575,3 +575,218 @@ int api_workflow_progress(http_request_t* req, http_response_t* resp) {
     return ARGO_SUCCESS;
 }
 
+/* POST /api/workflow/input/{id} - Enqueue user input for workflow */
+int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
+    if (!req || !resp) {
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        return E_SYSTEM_MEMORY;
+    }
+
+    const char* workflow_id = extract_path_param(req->path, "/api/workflow/input");
+    if (!workflow_id) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Parse JSON body for input text */
+    if (!req->body) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing request body");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Extract input field */
+    char input_text[ARGO_BUFFER_STANDARD] = {0};
+    const char* input_str = strstr(req->body, "\"input\"");
+    if (!input_str) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing input field");
+        return E_INVALID_PARAMS;
+    }
+
+    sscanf(input_str, "\"input\":\"%4095[^\"]\"", input_text);
+    if (input_text[0] == '\0') {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Empty input");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Load registry */
+    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    if (!registry) {
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
+        return E_SYSTEM_MEMORY;
+    }
+
+    int result = workflow_registry_load(registry);
+    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
+        return result;
+    }
+
+    /* Enqueue input */
+    result = workflow_registry_enqueue_input(registry, workflow_id, input_text);
+    if (result == E_NOT_FOUND) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        return result;
+    } else if (result == E_RESOURCE_LIMIT) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Input queue full");
+        return result;
+    } else if (result != ARGO_SUCCESS) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to enqueue input");
+        return result;
+    }
+
+    /* Return success */
+    char response_json[ARGO_BUFFER_MEDIUM];
+    snprintf(response_json, sizeof(response_json),
+            "{\"status\":\"success\",\"workflow_id\":\"%s\",\"queued\":true}",
+            workflow_id);
+
+    http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+    workflow_registry_destroy(registry);
+    return ARGO_SUCCESS;
+}
+
+/* GET /api/workflow/input/{id} - Dequeue input for executor (one item) */
+int api_workflow_input_get(http_request_t* req, http_response_t* resp) {
+    if (!req || !resp) {
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        return E_SYSTEM_MEMORY;
+    }
+
+    const char* workflow_id = extract_path_param(req->path, "/api/workflow/input");
+    if (!workflow_id) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Load registry */
+    workflow_registry_t* registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
+    if (!registry) {
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to create registry");
+        return E_SYSTEM_MEMORY;
+    }
+
+    int result = workflow_registry_load(registry);
+    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to load registry");
+        return result;
+    }
+
+    /* Check if workflow exists */
+    workflow_instance_t* workflow = workflow_registry_get_workflow(registry, workflow_id);
+    if (!workflow) {
+        workflow_registry_destroy(registry);
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        return E_NOT_FOUND;
+    }
+
+    /* Dequeue input (may return NULL if queue empty) */
+    char* input = workflow_registry_dequeue_input(registry, workflow_id);
+    if (!input) {
+        workflow_registry_destroy(registry);
+        http_response_set_json(resp, HTTP_STATUS_NO_CONTENT, "");
+        return ARGO_SUCCESS;
+    }
+
+    /* Build response with input */
+    char response_json[ARGO_BUFFER_STANDARD];
+    snprintf(response_json, sizeof(response_json),
+            "{\"workflow_id\":\"%s\",\"input\":\"%s\"}",
+            workflow_id, input);
+
+    http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+
+    free(input);
+    workflow_registry_destroy(registry);
+    return ARGO_SUCCESS;
+}
+
+/* GET /api/workflow/output/{id}?since={offset} - Stream workflow log output */
+int api_workflow_output_get(http_request_t* req, http_response_t* resp) {
+    if (!req || !resp) {
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        return E_SYSTEM_MEMORY;
+    }
+
+    const char* workflow_id = extract_path_param(req->path, "/api/workflow/output");
+    if (!workflow_id) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        return E_INVALID_PARAMS;
+    }
+
+    /* Extract offset from query string (format: ?since=12345) */
+    long offset = 0;
+    const char* query = strchr(req->path, '?');
+    if (query) {
+        const char* since_param = strstr(query, "since=");
+        if (since_param) {
+            sscanf(since_param, "since=%ld", &offset);
+        }
+    }
+
+    /* Build log file path */
+    char log_path[ARGO_PATH_MAX];
+    snprintf(log_path, sizeof(log_path), ".argo/logs/%s.log", workflow_id);
+
+    /* Check if log file exists and get size */
+    FILE* log_file = fopen(log_path, "r");
+    if (!log_file) {
+        http_response_set_json(resp, HTTP_STATUS_NO_CONTENT, "");
+        return ARGO_SUCCESS;
+    }
+
+    /* Get file size */
+    fseek(log_file, 0, SEEK_END);
+    long file_size = ftell(log_file);
+
+    /* Check if offset is beyond file size */
+    if (offset >= file_size) {
+        fclose(log_file);
+        http_response_set_json(resp, HTTP_STATUS_NO_CONTENT, "");
+        return ARGO_SUCCESS;
+    }
+
+    /* Seek to offset and read remaining content */
+    fseek(log_file, offset, SEEK_SET);
+    long bytes_to_read = file_size - offset;
+
+    /* Limit response size to prevent memory issues */
+    if (bytes_to_read > ARGO_BUFFER_LARGE) {
+        bytes_to_read = ARGO_BUFFER_LARGE;
+    }
+
+    char* content = malloc(bytes_to_read + 1);
+    if (!content) {
+        fclose(log_file);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
+        return E_SYSTEM_MEMORY;
+    }
+
+    size_t bytes_read = fread(content, 1, bytes_to_read, log_file);
+    content[bytes_read] = '\0';
+    fclose(log_file);
+
+    /* Build JSON response with content and new offset */
+    long new_offset = offset + bytes_read;
+    char* response_json = malloc(bytes_to_read + ARGO_BUFFER_MEDIUM);
+    if (!response_json) {
+        free(content);
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
+        return E_SYSTEM_MEMORY;
+    }
+
+    snprintf(response_json, bytes_to_read + ARGO_BUFFER_MEDIUM,
+            "{\"workflow_id\":\"%s\",\"offset\":%ld,\"content\":\"%s\"}",
+            workflow_id, new_offset, content);
+
+    http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+
+    free(content);
+    free(response_json);
+    return ARGO_SUCCESS;
+}
+
