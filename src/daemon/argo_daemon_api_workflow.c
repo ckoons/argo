@@ -22,6 +22,35 @@
 /* Global daemon context for API handlers */
 argo_daemon_t* g_api_daemon = NULL;
 
+/* Helper: Get locked registry with validation */
+static workflow_registry_t* get_locked_registry(http_response_t* resp) {
+    if (!g_api_daemon) {
+        if (resp) {
+            http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Daemon not initialized");
+        }
+        return NULL;
+    }
+
+    pthread_mutex_lock(&g_api_daemon->workflow_registry_lock);
+
+    if (!g_api_daemon->workflow_registry) {
+        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
+        if (resp) {
+            http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Registry not initialized");
+        }
+        return NULL;
+    }
+
+    return g_api_daemon->workflow_registry;
+}
+
+/* Helper: Unlock registry */
+static void unlock_registry(void) {
+    if (g_api_daemon) {
+        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
+    }
+}
+
 /* Helper: Extract path parameter (e.g., /api/workflow/status/{id} -> id) */
 static const char* extract_path_param(const char* path, const char* prefix) {
     if (!path || !prefix) return NULL;
@@ -162,44 +191,41 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
 /* GET /api/workflow/list - List all workflows */
 int api_workflow_list(http_request_t* req, http_response_t* resp) {
     (void)req;  /* Unused */
+    int result = ARGO_SUCCESS;
+    workflow_registry_t* registry = NULL;
+    char* json_response = NULL;
 
-    if (!resp || !g_api_daemon) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
-        return E_SYSTEM_MEMORY;
+    if (!resp) {
+        return E_INVALID_PARAMS;
     }
 
-    /* Use shared registry with mutex protection */
-    pthread_mutex_lock(&g_api_daemon->workflow_registry_lock);
-
-    workflow_registry_t* registry = g_api_daemon->workflow_registry;
+    /* Get locked registry */
+    registry = get_locked_registry(resp);
     if (!registry) {
-        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Registry not initialized");
-        return E_INVALID_STATE;
+        result = E_INVALID_STATE;
+        goto error;
     }
 
     /* Get workflow list */
     workflow_instance_t* workflows = NULL;
     int count = 0;
-    int result = workflow_registry_list(registry, &workflows, &count);
+    result = workflow_registry_list(registry, &workflows, &count);
     if (result != ARGO_SUCCESS) {
-        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to list workflows");
-        return result;
+        goto cleanup;
     }
 
     if (count == 0) {
-        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
         http_response_set_json(resp, HTTP_STATUS_OK, "{\"workflows\":[]}");
-        return ARGO_SUCCESS;
+        goto cleanup;
     }
 
-    /* Build JSON response (simplified) */
-    char* json_response = malloc(ARGO_BUFFER_STANDARD);
+    /* Build JSON response */
+    json_response = malloc(ARGO_BUFFER_STANDARD);
     if (!json_response) {
-        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
-        return E_SYSTEM_MEMORY;
+        result = E_SYSTEM_MEMORY;
+        goto cleanup;
     }
 
     size_t offset = 0;
@@ -218,20 +244,23 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
 
     offset += snprintf(json_response + offset, ARGO_BUFFER_STANDARD - offset, "]}");
 
-    /* Unlock before setting response (no more registry access needed) */
-    pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
-
     http_response_set_json(resp, HTTP_STATUS_OK, json_response);
-    free(json_response);
 
-    return ARGO_SUCCESS;
+cleanup:
+    if (registry) unlock_registry();
+    free(json_response);
+error:
+    return result;
 }
 
 /* GET /api/workflow/status/{id} - Get workflow status */
 int api_workflow_status(http_request_t* req, http_response_t* resp) {
-    if (!req || !resp || !g_api_daemon) {
+    int result = ARGO_SUCCESS;
+    workflow_registry_t* registry = NULL;
+
+    if (!req || !resp) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
-        return E_SYSTEM_MEMORY;
+        return E_INVALID_PARAMS;
     }
 
     /* Extract workflow ID from path */
@@ -241,22 +270,19 @@ int api_workflow_status(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    /* Use shared registry with mutex protection */
-    pthread_mutex_lock(&g_api_daemon->workflow_registry_lock);
-
-    workflow_registry_t* registry = g_api_daemon->workflow_registry;
+    /* Get locked registry */
+    registry = get_locked_registry(resp);
     if (!registry) {
-        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Registry not initialized");
-        return E_INVALID_STATE;
+        result = E_INVALID_STATE;
+        goto error;
     }
 
     /* Get workflow info */
     workflow_instance_t* info = workflow_registry_get_workflow(registry, workflow_id);
     if (!info) {
-        pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
         http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
-        return E_NOT_FOUND;
+        result = E_NOT_FOUND;
+        goto cleanup;
     }
 
     /* Build response */
@@ -268,10 +294,12 @@ int api_workflow_status(http_request_t* req, http_response_t* resp) {
         info->pid,
         info->template_name);
 
-    pthread_mutex_unlock(&g_api_daemon->workflow_registry_lock);
-
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
-    return ARGO_SUCCESS;
+
+cleanup:
+    if (registry) unlock_registry();
+error:
+    return result;
 }
 
 /* POST /api/workflow/pause/{id} - Pause workflow */
