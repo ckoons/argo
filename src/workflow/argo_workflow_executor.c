@@ -199,6 +199,12 @@ int workflow_load_json(workflow_controller_t* workflow, const char* json_path) {
         return E_SYSTEM_MEMORY;
     }
 
+    /* Create HTTP I/O channel for interactive workflows
+     * For now, we'll leave io_channel as NULL - it will be set by the executor main
+     * after we have the workflow_id
+     */
+    context->io_channel = NULL;
+
     /* Create and parse persona registry */
     persona_registry_t* personas = persona_registry_create();
     if (!personas) {

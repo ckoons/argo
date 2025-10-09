@@ -18,6 +18,7 @@
 #include "argo_init.h"
 #include "argo_limits.h"
 #include "argo_urls.h"
+#include "argo_io_channel_http.h"
 
 /* Global workflow for signal handling */
 static workflow_controller_t* g_workflow = NULL;
@@ -142,6 +143,16 @@ int main(int argc, char** argv) {
     printf("Loaded workflow from: %s\n", template_path);
     printf("Branch: %s\n\n", branch);
 
+    /* Create HTTP I/O channel for interactive workflows */
+    char daemon_url[ARGO_BUFFER_MEDIUM];
+    get_daemon_base_url(daemon_url, sizeof(daemon_url));
+    g_workflow->context->io_channel = io_channel_create_http(daemon_url, g_workflow_id);
+    if (!g_workflow->context->io_channel) {
+        fprintf(stderr, "Warning: Failed to create HTTP I/O channel - interactive workflows may not work\n");
+    } else {
+        printf("Created HTTP I/O channel: %s (workflow: %s)\n\n", daemon_url, g_workflow_id);
+    }
+
     /* Execute workflow steps */
     printf("Starting workflow execution...\n\n");
 
@@ -205,6 +216,10 @@ int main(int argc, char** argv) {
 
 cleanup:
     if (g_workflow) {
+        if (g_workflow->context && g_workflow->context->io_channel) {
+            io_channel_free(g_workflow->context->io_channel);
+            g_workflow->context->io_channel = NULL;
+        }
         workflow_destroy(g_workflow);
     }
     if (lifecycle) {

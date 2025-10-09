@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include "argo_io_channel.h"
+#include "argo_io_channel_http.h"
 #include "argo_error.h"
 #include "argo_limits.h"
 
@@ -159,6 +160,11 @@ int io_channel_write(io_channel_t* channel, const void* data, size_t len) {
         return E_IO_INVALID;
     }
 
+    /* Dispatch to HTTP implementation */
+    if (channel->type == IO_CHANNEL_HTTP) {
+        return io_channel_http_write(channel, data, len);
+    }
+
     /* Null channel discards all output */
     if (channel->type == IO_CHANNEL_NULL) {
         return ARGO_SUCCESS;
@@ -213,6 +219,11 @@ int io_channel_flush(io_channel_t* channel) {
         return ARGO_SUCCESS;  /* Already closed */
     }
 
+    /* Dispatch to HTTP implementation */
+    if (channel->type == IO_CHANNEL_HTTP) {
+        return io_channel_http_flush(channel);
+    }
+
     if (channel->type == IO_CHANNEL_NULL) {
         return ARGO_SUCCESS;  /* Nothing to flush */
     }
@@ -253,6 +264,11 @@ int io_channel_read_line(io_channel_t* channel, char* buffer, size_t max_len) {
     if (!channel->is_open) {
         argo_report_error(E_IO_INVALID, "io_channel_read_line", "channel closed");
         return E_IO_INVALID;
+    }
+
+    /* Dispatch to HTTP implementation */
+    if (channel->type == IO_CHANNEL_HTTP) {
+        return io_channel_http_read_line(channel, buffer, max_len);
     }
 
     /* Null channel always returns EOF */
@@ -417,6 +433,12 @@ void io_channel_close(io_channel_t* channel) {
         return;
     }
 
+    /* Dispatch to HTTP implementation */
+    if (channel->type == IO_CHANNEL_HTTP) {
+        io_channel_http_close(channel);
+        return;
+    }
+
     /* Flush write buffer */
     io_channel_flush(channel);
 
@@ -439,6 +461,12 @@ void io_channel_close(io_channel_t* channel) {
 
 void io_channel_free(io_channel_t* channel) {
     if (!channel) {
+        return;
+    }
+
+    /* Dispatch to HTTP implementation */
+    if (channel->type == IO_CHANNEL_HTTP) {
+        io_channel_http_free(channel);
         return;
     }
 

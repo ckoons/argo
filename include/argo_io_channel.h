@@ -24,7 +24,8 @@
 typedef enum {
     IO_CHANNEL_SOCKET,      /* Unix socket */
     IO_CHANNEL_SOCKETPAIR,  /* socketpair(2) for parent-child communication */
-    IO_CHANNEL_NULL         /* Null device (discard all output) */
+    IO_CHANNEL_NULL,        /* Null device (discard all output) */
+    IO_CHANNEL_HTTP         /* HTTP-based (executor to daemon) */
 } io_channel_type_t;
 
 /**
