@@ -46,6 +46,7 @@ static bool is_json_file(const char* filename) {
 
 /* Extract template metadata from JSON file */
 static int extract_template_metadata(const char* path, char* name, size_t name_size,
+                                     char* display_name, size_t display_name_size,
                                      char* description, size_t desc_size) {
     /* Load JSON file */
     size_t json_size;
@@ -68,22 +69,26 @@ static int extract_template_metadata(const char* path, char* name, size_t name_s
         return E_PROTOCOL_FORMAT;
     }
 
-    /* Extract workflow_name field */
-    int name_idx = workflow_json_find_field(json_content, tokens, 0, "workflow_name");
-    if (name_idx >= 0) {
-        workflow_json_extract_string(json_content, &tokens[name_idx], name, name_size);
-    } else {
-        /* Fallback to filename without .json */
-        const char* basename = strrchr(path, '/');
-        basename = basename ? basename + 1 : path;
-        strncpy(name, basename, name_size - 1);
-        name[name_size - 1] = '\0';
+    /* Extract template name from filename (source of truth) */
+    const char* basename = strrchr(path, '/');
+    basename = basename ? basename + 1 : path;
+    strncpy(name, basename, name_size - 1);
+    name[name_size - 1] = '\0';
 
-        /* Remove .json extension */
-        char* ext = strrchr(name, '.');
-        if (ext && strcmp(ext, ".json") == 0) {
-            *ext = '\0';
-        }
+    /* Remove .json extension */
+    char* ext = strrchr(name, '.');
+    if (ext && strcmp(ext, ".json") == 0) {
+        *ext = '\0';
+    }
+
+    /* Extract optional display_name from workflow_name field (for backwards compatibility) */
+    int display_idx = workflow_json_find_field(json_content, tokens, 0, "workflow_name");
+    if (display_idx >= 0) {
+        workflow_json_extract_string(json_content, &tokens[display_idx], display_name, display_name_size);
+    } else {
+        /* Fallback to using template name as display name */
+        strncpy(display_name, name, display_name_size - 1);
+        display_name[display_name_size - 1] = '\0';
     }
 
     /* Extract description field */
@@ -140,6 +145,7 @@ static int scan_template_directory(const char* dir_path, bool is_system,
         workflow_template_t* tmpl = &collection->templates[collection->count];
         int result = extract_template_metadata(full_path,
                                                tmpl->name, sizeof(tmpl->name),
+                                               tmpl->display_name, sizeof(tmpl->display_name),
                                                tmpl->description, sizeof(tmpl->description));
         if (result != ARGO_SUCCESS) {
             LOG_WARN("Failed to parse template: %s", full_path);
@@ -152,7 +158,7 @@ static int scan_template_directory(const char* dir_path, bool is_system,
         tmpl->is_system = is_system;
 
         collection->count++;
-        LOG_DEBUG("Discovered template: %s (%s)", tmpl->name, is_system ? "system" : "user");
+        LOG_INFO("Discovered template: name='%s' display='%s' (%s)", tmpl->name, tmpl->display_name, is_system ? "system" : "user");
     }
 
     closedir(dir);

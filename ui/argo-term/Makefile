@@ -26,10 +26,10 @@ OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SOURCES))
 # Test files
 TEST_SOURCES = $(wildcard $(TEST_DIR)/*.c)
 TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%.o,$(TEST_SOURCES))
-TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%,$(TEST_SOURCES))
+TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,bin/tests/test_%,$(TEST_SOURCES))
 
-# Main target
-TARGET = argo-term
+# Main target (build into bin/)
+TARGET = bin/argo-term
 
 .PHONY: all clean test directories count install uninstall
 
@@ -40,11 +40,13 @@ all: directories $(TARGET)
 directories:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(PARENT_BUILD)
+	@mkdir -p bin/tests
 
-# Build argo-term executable
+# Build argo-term executable into bin/
 $(TARGET): $(OBJECTS) $(ARGO_CORE)
+	@mkdir -p bin
 	$(CC) $(OBJECTS) $(ARGO_CORE) -o $@ $(LDFLAGS)
-	@echo "Built argo-term UI -> ./argo-term"
+	@echo "Built argo-term UI -> $@"
 
 # Compile source files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
@@ -54,8 +56,9 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 $(BUILD_DIR)/test_%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Build test executables
-$(BUILD_DIR)/test_%: $(BUILD_DIR)/test_%.o $(OBJECTS) $(ARGO_CORE)
+# Build test executables into bin/tests/
+bin/tests/test_%: $(BUILD_DIR)/test_%.o $(OBJECTS) $(ARGO_CORE)
+	@mkdir -p bin/tests
 	$(CC) $< $(OBJECTS) $(ARGO_CORE) -o $@ $(LDFLAGS)
 
 # Run tests
@@ -79,7 +82,7 @@ count:
 
 # Clean build artifacts
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -rf $(BUILD_DIR) bin
 
 # Installation targets
 install:

@@ -18,7 +18,8 @@
 
 /* Workflow template */
 typedef struct {
-    char name[WORKFLOW_TEMPLATE_NAME_MAX];
+    char name[WORKFLOW_TEMPLATE_NAME_MAX];           /* From filename (source of truth) */
+    char display_name[WORKFLOW_TEMPLATE_NAME_MAX];   /* Optional from JSON, fallback to name */
     char description[WORKFLOW_TEMPLATE_DESC_MAX];
     char path[WORKFLOW_TEMPLATE_PATH_MAX];
     bool is_system;  /* true = system template, false = user template */
