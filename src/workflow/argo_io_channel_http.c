@@ -9,6 +9,7 @@
 #include "argo_error.h"
 #include "argo_limits.h"
 #include "argo_log.h"
+#include "argo_json.h"
 
 /* HTTP I/O channel context */
 typedef struct {
@@ -58,7 +59,9 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
              ctx->daemon_url, ctx->workflow_id);
 
     /* Build JSON body - escape the output text */
-    char* json_body = malloc(ctx->write_buffer_used * 2 + 100);  /* Extra space for escaping */
+    /* Worst case: every char becomes \uXXXX (6 bytes) + JSON overhead (100 bytes) */
+    size_t max_escaped = ctx->write_buffer_used * 6 + 100;
+    char* json_body = malloc(max_escaped);
     if (!json_body) {
         return E_SYSTEM_MEMORY;
     }
@@ -90,7 +93,7 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
     curl_easy_setopt(ctx->curl, CURLOPT_URL, url);
     curl_easy_setopt(ctx->curl, CURLOPT_POST, 1L);
     curl_easy_setopt(ctx->curl, CURLOPT_POSTFIELDS, json_body);
-    curl_easy_setopt(ctx->curl, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(ctx->curl, CURLOPT_TIMEOUT, (long)IO_HTTP_WRITE_TIMEOUT_SEC);
 
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -123,7 +126,7 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     /* Setup CURL request */
     curl_easy_setopt(ctx->curl, CURLOPT_URL, url);
     curl_easy_setopt(ctx->curl, CURLOPT_HTTPGET, 1L);
-    curl_easy_setopt(ctx->curl, CURLOPT_TIMEOUT, 2L);
+    curl_easy_setopt(ctx->curl, CURLOPT_TIMEOUT, (long)IO_HTTP_READ_TIMEOUT_SEC);
 
     char* response = NULL;
     curl_easy_setopt(ctx->curl, CURLOPT_WRITEFUNCTION, http_io_curl_write_callback);
@@ -133,9 +136,9 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     CURLcode res = curl_easy_perform(ctx->curl);
 
     if (res != CURLE_OK) {
+        LOG_DEBUG("Network error polling input from daemon: %s", curl_easy_strerror(res));
         free(response);
-        LOG_DEBUG("Failed to poll input from daemon: %s", curl_easy_strerror(res));
-        return E_IO_WOULDBLOCK;  /* Treat network errors as "no data yet" */
+        return E_IO_WOULDBLOCK;  /* Treat network errors as "no data yet" for resilience */
     }
 
     /* Check HTTP status */
@@ -158,29 +161,26 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     }
 
     /* Parse JSON response to extract "input" field */
-    const char* input_field = strstr(response, "\"input\"");
-    if (!input_field) {
-        free(response);
-        return E_IO_WOULDBLOCK;  /* No input in response */
-    }
-
-    /* Extract input value */
-    char input_text[ARGO_BUFFER_STANDARD] = {0};
-    int scanned = sscanf(input_field, "\"input\":\"%4095[^\"]\"", input_text);
+    const char* field_path[] = {"input"};
+    char* input_text = NULL;
+    size_t input_len = 0;
+    int result = json_extract_nested_string(response, field_path, 1, &input_text, &input_len);
     free(response);
 
-    if (scanned != 1 || input_text[0] == '\0') {
-        return E_IO_WOULDBLOCK;  /* Empty or malformed input */
+    if (result != ARGO_SUCCESS || !input_text || input_len == 0) {
+        free(input_text);
+        return E_IO_WOULDBLOCK;  /* No input available or empty */
     }
 
     /* Copy to buffer */
-    size_t len = strlen(input_text);
+    size_t len = input_len;
     if (len >= max_len) {
         len = max_len - 1;
     }
     memcpy(buffer, input_text, len);
     buffer[len] = '\0';
 
+    free(input_text);
     return ARGO_SUCCESS;
 }
 

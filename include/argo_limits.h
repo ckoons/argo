@@ -157,4 +157,12 @@
 #define HTTP_METHOD_SIZE 16     /* HTTP method string size (GET, POST, etc.) */
 #define HTTP_PATH_SIZE 256      /* HTTP path buffer size */
 
+/* HTTP I/O channel timeouts (seconds) */
+#define IO_HTTP_WRITE_TIMEOUT_SEC 5  /* Timeout for HTTP POST output */
+#define IO_HTTP_READ_TIMEOUT_SEC 2   /* Timeout for HTTP GET input */
+
+/* HTTP I/O channel polling configuration */
+#define IO_HTTP_POLL_DELAY_USEC 100000      /* 100ms between polls */
+#define IO_HTTP_POLL_MAX_ATTEMPTS 300       /* 30 seconds total timeout */
+
 #endif /* ARGO_LIMITS_H */

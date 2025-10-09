@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 /* External library - header only for struct definitions */
 #define JSMN_HEADER
@@ -17,6 +18,7 @@
 #include "argo_workflow_conditions.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 #include "argo_io_channel.h"
 
 /* Step: user_ask */
@@ -79,15 +81,37 @@ int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
         return result;
     }
 
-    /* Read user input from I/O channel */
+    /* Read user input from I/O channel with polling */
     char input[STEP_INPUT_BUFFER_SIZE];
-    result = io_channel_read_line(ctx->io_channel, input, sizeof(input));
-    if (result == E_IO_EOF) {
-        argo_report_error(E_INPUT_INVALID, "step_user_ask", "EOF reading input");
-        return E_INPUT_INVALID;
-    } else if (result != ARGO_SUCCESS) {
+    int attempts = 0;
+
+    while (attempts < IO_HTTP_POLL_MAX_ATTEMPTS) {
+        result = io_channel_read_line(ctx->io_channel, input, sizeof(input));
+
+        if (result == ARGO_SUCCESS) {
+            break;  /* Got input successfully */
+        }
+
+        if (result == E_IO_EOF) {
+            argo_report_error(E_INPUT_INVALID, "step_user_ask", "EOF reading input");
+            return E_INPUT_INVALID;
+        }
+
+        if (result == E_IO_WOULDBLOCK) {
+            /* No data available yet - wait and retry */
+            usleep(IO_HTTP_POLL_DELAY_USEC);
+            attempts++;
+            continue;
+        }
+
+        /* Other errors */
         argo_report_error(result, "step_user_ask", "failed to read input");
         return result;
+    }
+
+    if (attempts >= IO_HTTP_POLL_MAX_ATTEMPTS) {
+        argo_report_error(E_SYSTEM_TIMEOUT, "step_user_ask", "timeout waiting for user input");
+        return E_SYSTEM_TIMEOUT;
     }
 
     /* Save to context */
