@@ -208,8 +208,10 @@ static void test_json_serialization(void) {
     TEST("JSON serialization");
 
     ci_memory_digest_t* digest = memory_digest_create(8000);
-    strcpy(digest->session_id, "test-session");
-    strcpy(digest->ci_name, "TestCI");
+    strncpy(digest->session_id, "test-session", sizeof(digest->session_id) - 1);
+    digest->session_id[sizeof(digest->session_id) - 1] = '\0';
+    strncpy(digest->ci_name, "TestCI", sizeof(digest->ci_name) - 1);
+    digest->ci_name[sizeof(digest->ci_name) - 1] = '\0';
 
     memory_add_breadcrumb(digest, "Test breadcrumb");
 

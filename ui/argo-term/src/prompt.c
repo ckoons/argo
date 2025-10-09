@@ -12,7 +12,8 @@ static int append_string(char** dest, size_t* remaining, const char* src) {
     if (len >= *remaining) {
         return -1;  /* Buffer too small */
     }
-    strcpy(*dest, src);
+    strncpy(*dest, src, *remaining - 1);
+    (*dest)[len] = '\0';  /* Explicit null termination */
     *dest += len;
     *remaining -= len;
     return 0;

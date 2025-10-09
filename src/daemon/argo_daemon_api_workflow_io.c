@@ -46,6 +46,19 @@ static void unlock_registry(void) {
     }
 }
 
+/* Helper: Extract path parameter (e.g., /api/workflow/input/{id} -> id) */
+static const char* extract_path_param(const char* path, const char* prefix) {
+    if (!path || !prefix) return NULL;
+
+    size_t prefix_len = strlen(prefix);
+    if (strncmp(path, prefix, prefix_len) != 0) return NULL;
+
+    const char* param = path + prefix_len;
+    if (*param == '/') param++;
+
+    return (*param != '\0') ? param : NULL;
+}
+
 /* POST /api/workflow/input/{id} - Enqueue user input for workflow */
 int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
     if (!req || !resp) {

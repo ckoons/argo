@@ -58,25 +58,6 @@ static void capture_response_callback(const ci_response_t* response, void* userd
     }
 }
 
-/* Helper: CURL write callback for HTTP response */
-static size_t http_response_write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t realsize = size * nmemb;
-    response_capture_t* capture = (response_capture_t*)userp;
-
-    size_t available = capture->buffer_size - capture->bytes_written - 1;
-    if (realsize > available) {
-        realsize = available;
-    }
-
-    if (realsize > 0) {
-        memcpy(capture->buffer + capture->bytes_written, contents, realsize);
-        capture->bytes_written += realsize;
-        capture->buffer[capture->bytes_written] = '\0';
-    }
-
-    return size * nmemb;  /* Return original size to avoid curl error */
-}
-
 /* Helper: Generate conversational question using AI */
 static int generate_conversational_question(ci_provider_t* provider,
                                            workflow_persona_t* persona,
