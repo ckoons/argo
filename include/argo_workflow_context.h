@@ -11,6 +11,9 @@
 #define WORKFLOW_CONTEXT_MAX_KEY_LENGTH 256
 #define WORKFLOW_CONTEXT_MAX_VALUE_LENGTH 8192
 
+/* Forward declaration */
+typedef struct io_channel io_channel_t;
+
 /* Workflow Context
  *
  * Stores workflow variables (key/value pairs) during execution.
@@ -29,6 +32,7 @@ typedef struct workflow_context {
     int capacity;          /* Allocated capacity */
     time_t created;        /* When context was created */
     time_t updated;        /* Last update time */
+    io_channel_t* io_channel;  /* Socket-based I/O channel for stdin/stdout */
 } workflow_context_t;
 
 /* Create workflow context

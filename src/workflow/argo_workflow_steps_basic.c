@@ -17,6 +17,7 @@
 #include "argo_workflow_conditions.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_io_channel.h"
 
 /* Step: user_ask */
 int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
@@ -52,21 +53,41 @@ int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
         return result;
     }
 
-    /* Show prompt */
-    printf("%s ", prompt);
-    fflush(stdout);
-
-    /* Read user input */
-    char input[STEP_INPUT_BUFFER_SIZE];
-    if (!fgets(input, sizeof(input), stdin)) {
-        argo_report_error(E_INPUT_INVALID, "step_user_ask", "failed to read input");
-        return E_INPUT_INVALID;
+    /* Check if we have an I/O channel (required for interactive workflows) */
+    if (!ctx->io_channel) {
+        argo_report_error(E_IO_INVALID, "step_user_ask",
+                         "no I/O channel available (executor running detached)");
+        return E_IO_INVALID;
     }
 
-    /* Remove trailing newline */
-    size_t len = strlen(input);
-    if (len > 0 && input[len - 1] == '\n') {
-        input[len - 1] = '\0';
+    /* Send prompt through I/O channel */
+    result = io_channel_write_str(ctx->io_channel, prompt);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_user_ask", "failed to write prompt");
+        return result;
+    }
+
+    result = io_channel_write_str(ctx->io_channel, " ");
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_user_ask", "failed to write space");
+        return result;
+    }
+
+    result = io_channel_flush(ctx->io_channel);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_user_ask", "failed to flush prompt");
+        return result;
+    }
+
+    /* Read user input from I/O channel */
+    char input[STEP_INPUT_BUFFER_SIZE];
+    result = io_channel_read_line(ctx->io_channel, input, sizeof(input));
+    if (result == E_IO_EOF) {
+        argo_report_error(E_INPUT_INVALID, "step_user_ask", "EOF reading input");
+        return E_INPUT_INVALID;
+    } else if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_user_ask", "failed to read input");
+        return result;
     }
 
     /* Save to context */
@@ -108,8 +129,29 @@ int step_display(const char* json, jsmntok_t* tokens, int step_index,
         return result;
     }
 
-    /* Display message */
-    printf("%s\n", output);
+    /* Display message - use I/O channel if available, otherwise stdout */
+    if (ctx->io_channel) {
+        result = io_channel_write_str(ctx->io_channel, output);
+        if (result != ARGO_SUCCESS) {
+            argo_report_error(result, "step_display", "failed to write output");
+            return result;
+        }
+
+        result = io_channel_write_str(ctx->io_channel, "\n");
+        if (result != ARGO_SUCCESS) {
+            argo_report_error(result, "step_display", "failed to write newline");
+            return result;
+        }
+
+        result = io_channel_flush(ctx->io_channel);
+        if (result != ARGO_SUCCESS) {
+            argo_report_error(result, "step_display", "failed to flush output");
+            return result;
+        }
+    } else {
+        /* Fallback to stdout for non-interactive workflows */
+        printf("%s\n", output);
+    }
 
     LOG_DEBUG("Displayed message: %s", output);
     return ARGO_SUCCESS;

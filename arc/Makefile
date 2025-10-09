@@ -141,8 +141,52 @@ install:
 	install -d $(PREFIX)/bin
 	install -m 0755 $(TARGET) $(PREFIX)/bin/arc
 
+# Install shell completions
+install-completion:
+	@echo "Installing shell completions..."
+	@# Detect shell and install appropriate completion
+	@if [ "$$SHELL" = "/bin/bash" ] || [ "$$SHELL" = "/usr/bin/bash" ]; then \
+		mkdir -p $(HOME)/.local/share/bash-completion/completions; \
+		install -m 0644 completions/arc.bash $(HOME)/.local/share/bash-completion/completions/arc; \
+		echo "✓ Bash completion installed to ~/.local/share/bash-completion/completions/arc"; \
+		if ! grep -q "bash-completion/completions/arc" $(HOME)/.bashrc 2>/dev/null; then \
+			echo "  Add to ~/.bashrc: source ~/.local/share/bash-completion/completions/arc"; \
+		else \
+			echo "  (Already configured in ~/.bashrc)"; \
+		fi; \
+	elif [ "$$SHELL" = "/bin/zsh" ] || [ "$$SHELL" = "/usr/bin/zsh" ]; then \
+		mkdir -p $(HOME)/.zsh/completions; \
+		install -m 0644 completions/_arc $(HOME)/.zsh/completions/_arc; \
+		echo "✓ Zsh completion installed to ~/.zsh/completions/_arc"; \
+		echo ""; \
+		if ! grep -q ".zsh/completions" $(HOME)/.zshrc 2>/dev/null; then \
+			echo "  Setup needed - add to ~/.zshrc:"; \
+			echo "    fpath=(~/.zsh/completions \$$fpath)"; \
+			echo "    autoload -U compinit && compinit"; \
+			echo ""; \
+			echo "  Then reload: exec zsh (or start a new shell)"; \
+		else \
+			echo "  ✓ Already configured in ~/.zshrc"; \
+			echo "  Reload current shell: exec zsh (or start a new shell)"; \
+		fi; \
+	elif [ "$$SHELL" = "/usr/bin/fish" ] || [ -d "$(HOME)/.config/fish" ]; then \
+		mkdir -p $(HOME)/.config/fish/completions; \
+		install -m 0644 completions/arc.fish $(HOME)/.config/fish/completions/arc.fish; \
+		echo "✓ Fish completion installed to ~/.config/fish/completions/arc.fish"; \
+		echo "  (Fish auto-loads completions, restart shell to activate)"; \
+	else \
+		echo "⚠ Unknown shell: $$SHELL"; \
+		echo "  Completions available in: completions/"; \
+		echo "    - Bash: completions/arc.bash"; \
+		echo "    - Zsh:  completions/_arc"; \
+		echo "    - Fish: completions/arc.fish"; \
+	fi
+
 uninstall:
 	rm -f $(PREFIX)/bin/arc
+	rm -f $(HOME)/.local/share/bash-completion/completions/arc
+	rm -f $(HOME)/.zsh/completions/_arc
+	rm -f $(HOME)/.config/fish/completions/arc.fish
 
 # Debug
 debug:

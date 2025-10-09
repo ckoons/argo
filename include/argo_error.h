@@ -34,6 +34,11 @@
 #define E_SYSTEM_NETWORK    ARGO_ERROR(ERR_SYSTEM, 1008)
 #define E_SYSTEM_PROCESS    ARGO_ERROR(ERR_SYSTEM, 1009)
 #define E_SYSTEM_THREAD     ARGO_ERROR(ERR_SYSTEM, 1010)
+#define E_SYSTEM_IO         ARGO_ERROR(ERR_SYSTEM, 1011)
+#define E_IO_EOF            ARGO_ERROR(ERR_SYSTEM, 1012)  /* End of file/stream */
+#define E_IO_WOULDBLOCK     ARGO_ERROR(ERR_SYSTEM, 1013)  /* Non-blocking I/O would block */
+#define E_IO_INVALID        ARGO_ERROR(ERR_SYSTEM, 1014)  /* Invalid I/O operation */
+#define E_BUFFER_OVERFLOW   ARGO_ERROR(ERR_SYSTEM, 1015)  /* Buffer overflow */
 
 /* CI errors (CI:2xxx) */
 #define E_CI_TIMEOUT        ARGO_ERROR(ERR_CI, 2001)

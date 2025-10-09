@@ -1,0 +1,119 @@
+#compdef arc
+# © 2025 Casey Koons. All rights reserved.
+# Zsh completion for arc CLI
+#
+# Installation:
+#   mkdir -p ~/.zsh/completions
+#   cp _arc ~/.zsh/completions/
+#
+# Add to ~/.zshrc:
+#   fpath=(~/.zsh/completions $fpath)
+#   autoload -U compinit && compinit
+
+_arc() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    local -a commands
+    commands=(
+        'workflow:Workflow operations'
+        'list:List active workflows and templates'
+        'start:Start a new workflow'
+        'abandon:Terminate a workflow'
+        'status:Show workflow status'
+        'pause:Pause a running workflow'
+        'resume:Resume a paused workflow'
+        'attach:Attach to workflow output'
+        'logs:View workflow logs'
+        'switch:Switch workflow context'
+        'context:Manage workflow contexts'
+        'help:Show help information'
+        'version:Show version information'
+    )
+
+    _arguments -C \
+        '1: :->cmds' \
+        '2: :->args' \
+        '3: :->args2' \
+        && return 0
+
+    case $state in
+        cmds)
+            _describe -t commands 'arc command' commands
+            ;;
+        args)
+            case ${words[2]} in
+                workflow)
+                    local -a workflow_cmds
+                    workflow_cmds=(
+                        'start:Start a new workflow'
+                        'abandon:Terminate a workflow'
+                        'status:Show workflow status'
+                        'pause:Pause a workflow'
+                        'resume:Resume a workflow'
+                        'attach:Attach to workflow'
+                        'logs:View workflow logs'
+                        'describe:Describe a workflow'
+                    )
+                    _describe -t commands 'workflow command' workflow_cmds
+                    ;;
+                start)
+                    # Complete with template names
+                    local -a templates
+                    templates=(${(f)"$(arc list 2>/dev/null | awk '
+                        /TEMPLATES:/ { in_templates=1; next }
+                        in_templates && NF >= 2 && $1 != "SCOPE" && $1 != "--------" {
+                            print $2
+                        }
+                    ')"})
+                    _describe -t templates 'template' templates
+                    ;;
+                abandon|status|pause|resume|attach|logs|switch)
+                    # Complete with active workflow IDs
+                    local -a workflows
+                    workflows=(${(f)"$(arc list 2>/dev/null | awk '
+                        /ACTIVE WORKFLOWS:/ { in_workflows=1; next }
+                        /TEMPLATES:/ { in_workflows=0 }
+                        in_workflows && NF >= 2 && $1 != "CONTEXT" && $1 != "--------" {
+                            print $2
+                        }
+                    ')"})
+                    _describe -t workflows 'workflow' workflows
+                    ;;
+            esac
+            ;;
+        args2)
+            case ${words[2]} in
+                workflow)
+                    case ${words[3]} in
+                        start)
+                            # arc workflow start <template>
+                            local -a templates
+                            templates=(${(f)"$(arc list 2>/dev/null | awk '
+                                /TEMPLATES:/ { in_templates=1; next }
+                                in_templates && NF >= 2 && $1 != "SCOPE" && $1 != "--------" {
+                                    print $2
+                                }
+                            ')"})
+                            _describe -t templates 'template' templates
+                            ;;
+                        abandon|status|pause|resume|attach|logs|describe)
+                            # arc workflow <cmd> <workflow_id>
+                            local -a workflows
+                            workflows=(${(f)"$(arc list 2>/dev/null | awk '
+                                /ACTIVE WORKFLOWS:/ { in_workflows=1; next }
+                                /TEMPLATES:/ { in_workflows=0 }
+                                in_workflows && NF >= 2 && $1 != "CONTEXT" && $1 != "--------" {
+                                    print $2
+                                }
+                            ')"})
+                            _describe -t workflows 'workflow' workflows
+                            ;;
+                    esac
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_arc "$@"
