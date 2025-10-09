@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* External library - header only for struct definitions */
 #define JSMN_HEADER
@@ -17,6 +18,8 @@
 #include "argo_provider.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
+#include "argo_io_channel.h"
 
 /* Helper: Simple callback to capture AI response */
 typedef struct {
@@ -163,14 +166,52 @@ int step_ci_ask(workflow_controller_t* workflow,
         }
     }
 
-    printf("%s", final_prompt);
-    fflush(stdout);
+    /* Check if we have an I/O channel (required for interactive workflows) */
+    if (!ctx->io_channel) {
+        argo_report_error(E_IO_INVALID, "step_ci_ask",
+                         "no I/O channel available (executor running detached)");
+        return E_IO_INVALID;
+    }
 
-    /* Read user input */
+    /* Send prompt through I/O channel */
+    result = io_channel_write_str(ctx->io_channel, final_prompt);
+    result = io_channel_flush(ctx->io_channel);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_ci_ask", "failed to flush prompt");
+        return result;
+    }
+
+    /* Read user input with polling */
     char input[STEP_INPUT_BUFFER_SIZE];
-    if (!fgets(input, sizeof(input), stdin)) {
-        argo_report_error(E_INPUT_INVALID, "step_ci_ask", "failed to read input");
-        return E_INPUT_INVALID;
+    int attempts = 0;
+
+    while (attempts < IO_HTTP_POLL_MAX_ATTEMPTS) {
+        result = io_channel_read_line(ctx->io_channel, input, sizeof(input));
+
+        if (result == ARGO_SUCCESS) {
+            break;  /* Got input successfully */
+        }
+
+        if (result == E_IO_EOF) {
+            argo_report_error(E_INPUT_INVALID, "step_ci_ask", "EOF reading input");
+            return E_INPUT_INVALID;
+        }
+
+        if (result == E_IO_WOULDBLOCK) {
+            /* No data available yet - wait and retry */
+            usleep(IO_HTTP_POLL_DELAY_USEC);
+            attempts++;
+            continue;
+        }
+
+        /* Other errors */
+        argo_report_error(result, "step_ci_ask", "failed to read input");
+        return result;
+    }
+
+    if (attempts >= IO_HTTP_POLL_MAX_ATTEMPTS) {
+        argo_report_error(E_SYSTEM_TIMEOUT, "step_ci_ask", "timeout waiting for user input");
+        return E_SYSTEM_TIMEOUT;
     }
 
     /* Remove trailing newline */

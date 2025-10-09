@@ -153,28 +153,29 @@ int step_display(const char* json, jsmntok_t* tokens, int step_index,
         return result;
     }
 
-    /* Display message - use I/O channel if available, otherwise stdout */
-    if (ctx->io_channel) {
-        result = io_channel_write_str(ctx->io_channel, output);
-        if (result != ARGO_SUCCESS) {
-            argo_report_error(result, "step_display", "failed to write output");
-            return result;
-        }
+    /* Display message through I/O channel (required for executor) */
+    if (!ctx->io_channel) {
+        argo_report_error(E_IO_INVALID, "step_display",
+                         "no I/O channel available (executor running detached)");
+        return E_IO_INVALID;
+    }
 
-        result = io_channel_write_str(ctx->io_channel, "\n");
-        if (result != ARGO_SUCCESS) {
-            argo_report_error(result, "step_display", "failed to write newline");
-            return result;
-        }
+    result = io_channel_write_str(ctx->io_channel, output);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_display", "failed to write output");
+        return result;
+    }
 
-        result = io_channel_flush(ctx->io_channel);
-        if (result != ARGO_SUCCESS) {
-            argo_report_error(result, "step_display", "failed to flush output");
-            return result;
-        }
-    } else {
-        /* Fallback to stdout for non-interactive workflows */
-        printf("%s\n", output);
+    result = io_channel_write_str(ctx->io_channel, "\n");
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_display", "failed to write newline");
+        return result;
+    }
+
+    result = io_channel_flush(ctx->io_channel);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_display", "failed to flush output");
+        return result;
     }
 
     LOG_DEBUG("Displayed message: %s", output);
@@ -348,8 +349,17 @@ int step_user_choose(const char* json, jsmntok_t* tokens, int step_index,
         return E_INPUT_INVALID;
     }
 
-    /* Display prompt and options */
-    printf("\n%s\n", prompt);
+    /* Check if we have an I/O channel (required for interactive workflows) */
+    if (!ctx->io_channel) {
+        argo_report_error(E_IO_INVALID, "step_user_choose",
+                         "no I/O channel available (executor running detached)");
+        return E_IO_INVALID;
+    }
+
+    /* Display prompt and options through I/O channel */
+    result = io_channel_write_str(ctx->io_channel, "\n");
+    result = io_channel_write_str(ctx->io_channel, prompt);
+    result = io_channel_write_str(ctx->io_channel, "\n");
 
     int option_token = options_idx + 1;
     for (int i = 0; i < option_count; i++) {
@@ -362,7 +372,10 @@ int step_user_choose(const char* json, jsmntok_t* tokens, int step_index,
         if (label_idx >= 0) {
             char label[STEP_SAVE_TO_BUFFER_SIZE];
             workflow_json_extract_string(json, &tokens[label_idx], label, sizeof(label));
-            printf("  %d. %s\n", i + 1, label);
+
+            char option_line[ARGO_BUFFER_STANDARD];
+            snprintf(option_line, sizeof(option_line), "  %d. %s\n", i + 1, label);
+            result = io_channel_write_str(ctx->io_channel, option_line);
         }
 
         /* Skip to next option */
@@ -370,14 +383,47 @@ int step_user_choose(const char* json, jsmntok_t* tokens, int step_index,
         option_token += option_tokens;
     }
 
-    /* Read user input */
-    printf("\nSelect option (1-%d): ", option_count);
-    fflush(stdout);
+    /* Send selection prompt */
+    char selection_prompt[ARGO_BUFFER_SMALL];
+    snprintf(selection_prompt, sizeof(selection_prompt), "\nSelect option (1-%d): ", option_count);
+    result = io_channel_write_str(ctx->io_channel, selection_prompt);
+    result = io_channel_flush(ctx->io_channel);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_user_choose", "failed to flush prompt");
+        return result;
+    }
 
+    /* Read user input with polling */
     char input[STEP_INPUT_BUFFER_SIZE];
-    if (!fgets(input, sizeof(input), stdin)) {
-        argo_report_error(E_INPUT_INVALID, "step_user_choose", "failed to read input");
-        return E_INPUT_INVALID;
+    int attempts = 0;
+
+    while (attempts < IO_HTTP_POLL_MAX_ATTEMPTS) {
+        result = io_channel_read_line(ctx->io_channel, input, sizeof(input));
+
+        if (result == ARGO_SUCCESS) {
+            break;  /* Got input successfully */
+        }
+
+        if (result == E_IO_EOF) {
+            argo_report_error(E_INPUT_INVALID, "step_user_choose", "EOF reading input");
+            return E_INPUT_INVALID;
+        }
+
+        if (result == E_IO_WOULDBLOCK) {
+            /* No data available yet - wait and retry */
+            usleep(IO_HTTP_POLL_DELAY_USEC);
+            attempts++;
+            continue;
+        }
+
+        /* Other errors */
+        argo_report_error(result, "step_user_choose", "failed to read input");
+        return result;
+    }
+
+    if (attempts >= IO_HTTP_POLL_MAX_ATTEMPTS) {
+        argo_report_error(E_SYSTEM_TIMEOUT, "step_user_choose", "timeout waiting for user input");
+        return E_SYSTEM_TIMEOUT;
     }
 
     /* Remove trailing newline */
