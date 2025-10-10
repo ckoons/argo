@@ -13,6 +13,7 @@
 #include "argo_workflow_registry.h"
 #include "argo_error.h"
 #include "argo_limits.h"
+#include "argo_log.h"
 
 /* External global daemon context */
 extern argo_daemon_t* g_api_daemon;
@@ -95,6 +96,8 @@ int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
+    LOG_DEBUG("api_workflow_input_post: Workflow ID: %s", workflow_id);
+
     /* Parse JSON body for input text */
     if (!req->body) {
         http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing request body");
@@ -115,6 +118,8 @@ int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
+    LOG_DEBUG("api_workflow_input_post: Extracted input: '%s'", input_text);
+
     /* Get locked registry */
     workflow_registry_t* registry = get_locked_registry(resp);
     if (!registry) {
@@ -122,6 +127,7 @@ int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
     }
 
     /* Enqueue input */
+    LOG_DEBUG("api_workflow_input_post: Enqueuing input for workflow %s", workflow_id);
     int result = workflow_registry_enqueue_input(registry, workflow_id, input_text);
     if (result == E_NOT_FOUND) {
         unlock_registry();
@@ -138,6 +144,8 @@ int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
     }
 
     unlock_registry();
+
+    LOG_DEBUG("api_workflow_input_post: Input successfully enqueued for %s", workflow_id);
 
     /* Return success */
     char response_json[ARGO_BUFFER_MEDIUM];
@@ -166,6 +174,8 @@ int api_workflow_input_get(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
+    LOG_DEBUG("api_workflow_input_get: Polling for input for workflow %s", workflow_id);
+
     /* Get locked registry */
     registry = get_locked_registry(resp);
     if (!registry) {
@@ -176,17 +186,22 @@ int api_workflow_input_get(http_request_t* req, http_response_t* resp) {
     /* Check if workflow exists */
     workflow_instance_t* workflow = workflow_registry_get_workflow(registry, workflow_id);
     if (!workflow) {
+        LOG_DEBUG("api_workflow_input_get: Workflow not found: %s", workflow_id);
         http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
         result = E_NOT_FOUND;
         goto cleanup;
     }
 
     /* Dequeue input (may return NULL if queue empty) */
+    LOG_DEBUG("api_workflow_input_get: Dequeuing input from workflow %s", workflow_id);
     input = workflow_registry_dequeue_input(registry, workflow_id);
     if (!input) {
+        LOG_DEBUG("api_workflow_input_get: No input available for %s", workflow_id);
         http_response_set_json(resp, HTTP_STATUS_NO_CONTENT, "");
         goto cleanup;
     }
+
+    LOG_DEBUG("api_workflow_input_get: Returning input: '%s'", input);
 
     /* Build response with input */
     char response_json[ARGO_BUFFER_STANDARD];

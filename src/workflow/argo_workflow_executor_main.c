@@ -102,6 +102,11 @@ int main(int argc, char** argv) {
     printf("PID:         %d\n", getpid());
     printf("=========================================\n\n");
 
+    /* Initialize logging system */
+    log_init(".argo/logs");
+    log_set_level(LOG_DEBUG);
+    LOG_DEBUG("Executor debug logging enabled for workflow: %s", workflow_id);
+
     /* Setup signal handlers */
     signal(SIGTERM, signal_handler);
     signal(SIGINT, signal_handler);

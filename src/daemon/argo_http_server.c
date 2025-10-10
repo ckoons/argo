@@ -16,6 +16,7 @@
 #include "argo_http_server.h"
 #include "argo_error.h"
 #include "argo_limits.h"
+#include "argo_log.h"
 
 /* Thread argument for connection handling */
 typedef struct {
@@ -216,9 +217,21 @@ static void* handle_connection(void* arg) {
     req.client_fd = client_fd;
 
     int result = parse_http_request(buffer, bytes, &req);
+
+    /* Log incoming request */
+    LOG_INFO("HTTP %s %s",
+             req.method == HTTP_METHOD_GET ? "GET" :
+             req.method == HTTP_METHOD_POST ? "POST" :
+             req.method == HTTP_METHOD_DELETE ? "DELETE" : "UNKNOWN",
+             req.path);
+    if (req.body && strlen(req.body) > 0) {
+        LOG_DEBUG("Request body: %s", req.body);
+    }
+
     free(buffer);
 
     if (result != ARGO_SUCCESS) {
+        LOG_ERROR("Failed to parse HTTP request");
         /* Send 400 Bad Request */
         const char* error_resp =
             "HTTP/1.1 400 Bad Request\r\n"
@@ -246,6 +259,20 @@ static void* handle_connection(void* arg) {
         const char* not_found = "{\"status\":\"error\",\"message\":\"Not found\"}";
         resp.body = (char*)not_found;
         resp.body_length = strlen(not_found);
+    }
+
+    /* Log response */
+    LOG_INFO("HTTP Response %d for %s %s",
+             resp.status_code,
+             req.method == HTTP_METHOD_GET ? "GET" :
+             req.method == HTTP_METHOD_POST ? "POST" :
+             req.method == HTTP_METHOD_DELETE ? "DELETE" : "UNKNOWN",
+             req.path);
+    if (resp.status_code != HTTP_STATUS_OK) {
+        LOG_WARN("Non-200 response: %d", resp.status_code);
+        if (resp.body) {
+            LOG_DEBUG("Response body: %s", resp.body);
+        }
     }
 
     /* Send response */

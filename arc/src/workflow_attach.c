@@ -80,12 +80,21 @@ static int send_input_to_daemon(const char* workflow_id, const char* input) {
     arc_http_response_t* response = NULL;
     int result = arc_http_post(endpoint, json_body, &response);
     if (result != ARGO_SUCCESS || !response) {
+        LOG_USER_ERROR("Failed to connect to daemon for input\n");
         return -1;
     }
 
-    int success = (response->status_code == 200);
+    if (response->status_code != 200) {
+        LOG_USER_ERROR("Daemon rejected input (HTTP %d)\n", response->status_code);
+        if (response->body) {
+            LOG_USER_ERROR("  Response: %s\n", response->body);
+        }
+        arc_http_response_free(response);
+        return -1;
+    }
+
     arc_http_response_free(response);
-    return success ? 0 : -1;
+    return 0;
 }
 
 /* Input thread - reads stdin and sends to daemon via HTTP */

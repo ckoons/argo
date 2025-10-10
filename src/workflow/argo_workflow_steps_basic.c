@@ -62,12 +62,15 @@ int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
         return E_IO_INVALID;
     }
 
+    LOG_DEBUG("step_user_ask: Sending prompt via I/O channel: '%s'", prompt);
+
     /* Send prompt through I/O channel */
     result = io_channel_write_str(ctx->io_channel, prompt);
     if (result != ARGO_SUCCESS) {
         argo_report_error(result, "step_user_ask", "failed to write prompt");
         return result;
     }
+    LOG_DEBUG("step_user_ask: Prompt sent successfully");
 
     result = io_channel_write_str(ctx->io_channel, " ");
     if (result != ARGO_SUCCESS) {
@@ -85,10 +88,14 @@ int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
     char input[STEP_INPUT_BUFFER_SIZE];
     int attempts = 0;
 
+    LOG_DEBUG("step_user_ask: Polling for user input (max attempts: %d)", IO_HTTP_POLL_MAX_ATTEMPTS);
+
     while (attempts < IO_HTTP_POLL_MAX_ATTEMPTS) {
+        LOG_DEBUG("step_user_ask: Poll attempt %d/%d", attempts + 1, IO_HTTP_POLL_MAX_ATTEMPTS);
         result = io_channel_read_line(ctx->io_channel, input, sizeof(input));
 
         if (result == ARGO_SUCCESS) {
+            LOG_DEBUG("step_user_ask: Got input: '%s'", input);
             break;  /* Got input successfully */
         }
 

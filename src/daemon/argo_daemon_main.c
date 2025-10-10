@@ -19,6 +19,7 @@
 #include "argo_limits.h"
 #include "argo_urls.h"
 #include "argo_workflow_registry.h"
+#include "argo_log.h"
 
 /* Localhost address */
 #define LOCALHOST_ADDR "127.0.0.1"
@@ -173,6 +174,11 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Final port: %d\n", port);
     fprintf(stderr, "============================\n");
     fflush(stderr);
+
+    /* Initialize logging system */
+    log_init(".argo/logs");
+    log_set_level(LOG_DEBUG);
+    LOG_DEBUG("Daemon debug logging enabled (PID %d)", getpid());
 
     /* Kill any existing daemon on this port */
     kill_existing_daemon(port);

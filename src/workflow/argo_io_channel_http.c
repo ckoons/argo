@@ -51,13 +51,17 @@ static size_t http_io_curl_write_callback(void* contents, size_t size, size_t nm
 /* POST output to daemon (internal) */
 static int http_flush_output_internal(http_io_context_t* ctx) {
     if (ctx->write_buffer_used == 0) {
+        LOG_DEBUG("http_flush_output: Nothing to flush");
         return ARGO_SUCCESS;  /* Nothing to flush */
     }
+
+    LOG_DEBUG("http_flush_output: Flushing %zu bytes to daemon", ctx->write_buffer_used);
 
     /* Build URL with query parameter */
     char url[ARGO_BUFFER_MEDIUM];
     snprintf(url, sizeof(url), "%s/api/workflow/output?workflow_name=%s",
              ctx->daemon_url, ctx->workflow_id);
+    LOG_DEBUG("http_flush_output: POST to %s", url);
 
     /* Build JSON body - escape the output text */
     size_t max_escaped = ctx->write_buffer_used * JSON_ESCAPE_MAX_MULTIPLIER + JSON_OVERHEAD_BYTES;
@@ -121,6 +125,10 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
     /* Perform request */
     CURLcode res = curl_easy_perform(ctx->curl);
 
+    long http_code = 0;
+    curl_easy_getinfo(ctx->curl, CURLINFO_RESPONSE_CODE, &http_code);
+    LOG_DEBUG("http_flush_output: HTTP response code: %ld", http_code);
+
     free(response);  /* Discard response */
 
     curl_slist_free_all(headers);
@@ -130,6 +138,13 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
         LOG_ERROR("Failed to flush output to daemon: %s", curl_easy_strerror(res));
         return E_SYSTEM_NETWORK;
     }
+
+    if (http_code != HTTP_STATUS_OK) {
+        LOG_ERROR("HTTP error flushing output: %ld", http_code);
+        return E_SYSTEM_NETWORK;
+    }
+
+    LOG_DEBUG("http_flush_output: Success - cleared write buffer");
 
     /* Clear write buffer */
     ctx->write_buffer_used = 0;
@@ -143,6 +158,8 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     char url[ARGO_BUFFER_MEDIUM];
     snprintf(url, sizeof(url), "%s/api/workflow/input?workflow_name=%s",
              ctx->daemon_url, ctx->workflow_id);
+
+    LOG_DEBUG("http_poll_input: GET from %s", url);
 
     /* Setup CURL request */
     curl_easy_setopt(ctx->curl, CURLOPT_URL, url);
@@ -165,8 +182,10 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     /* Check HTTP status */
     long http_code = 0;
     curl_easy_getinfo(ctx->curl, CURLINFO_RESPONSE_CODE, &http_code);
+    LOG_DEBUG("http_poll_input: HTTP response code: %ld", http_code);
 
     if (http_code == HTTP_STATUS_NOT_FOUND || http_code == HTTP_STATUS_NO_CONTENT) {
+        LOG_DEBUG("http_poll_input: No input available (HTTP %ld)", http_code);
         free(response);
         return E_IO_WOULDBLOCK;  /* No input available */
     }
@@ -178,8 +197,11 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     }
 
     if (!response) {
+        LOG_DEBUG("http_poll_input: No response body");
         return E_IO_WOULDBLOCK;  /* No data */
     }
+
+    LOG_DEBUG("http_poll_input: Got response body: %s", response);
 
     /* Parse JSON response to extract "input" field */
     const char* field_path[] = {"input"};
@@ -189,9 +211,12 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     free(response);
 
     if (result != ARGO_SUCCESS || !input_text || input_len == 0) {
+        LOG_DEBUG("http_poll_input: No input field found or empty");
         free(input_text);
         return E_IO_WOULDBLOCK;  /* No input available or empty */
     }
+
+    LOG_DEBUG("http_poll_input: Extracted input: '%s' (len=%zu)", input_text, input_len);
 
     /* Copy to buffer */
     size_t len = input_len;
