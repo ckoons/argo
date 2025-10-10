@@ -54,9 +54,9 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
         return ARGO_SUCCESS;  /* Nothing to flush */
     }
 
-    /* Build URL */
+    /* Build URL with query parameter */
     char url[ARGO_BUFFER_MEDIUM];
-    snprintf(url, sizeof(url), "%s/api/workflow/output/%s",
+    snprintf(url, sizeof(url), "%s/api/workflow/output?workflow_name=%s",
              ctx->daemon_url, ctx->workflow_id);
 
     /* Build JSON body - escape the output text */
@@ -109,12 +109,19 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
     curl_easy_setopt(ctx->curl, CURLOPT_POSTFIELDS, json_body);
     curl_easy_setopt(ctx->curl, CURLOPT_TIMEOUT, (long)IO_HTTP_WRITE_TIMEOUT_SEC);
 
+    /* Discard response body (don't write to stdout) */
+    char* response = NULL;
+    curl_easy_setopt(ctx->curl, CURLOPT_WRITEFUNCTION, http_io_curl_write_callback);
+    curl_easy_setopt(ctx->curl, CURLOPT_WRITEDATA, &response);
+
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
     curl_easy_setopt(ctx->curl, CURLOPT_HTTPHEADER, headers);
 
     /* Perform request */
     CURLcode res = curl_easy_perform(ctx->curl);
+
+    free(response);  /* Discard response */
 
     curl_slist_free_all(headers);
     free(json_body);
@@ -132,9 +139,9 @@ static int http_flush_output_internal(http_io_context_t* ctx) {
 
 /* GET input from daemon (internal) */
 static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t max_len) {
-    /* Build URL */
+    /* Build URL with query parameter */
     char url[ARGO_BUFFER_MEDIUM];
-    snprintf(url, sizeof(url), "%s/api/workflow/input/%s",
+    snprintf(url, sizeof(url), "%s/api/workflow/input?workflow_name=%s",
              ctx->daemon_url, ctx->workflow_id);
 
     /* Setup CURL request */
@@ -159,7 +166,7 @@ static int http_poll_input_internal(http_io_context_t* ctx, char* buffer, size_t
     long http_code = 0;
     curl_easy_getinfo(ctx->curl, CURLINFO_RESPONSE_CODE, &http_code);
 
-    if (http_code == HTTP_STATUS_NOT_FOUND) {
+    if (http_code == HTTP_STATUS_NOT_FOUND || http_code == HTTP_STATUS_NO_CONTENT) {
         free(response);
         return E_IO_WOULDBLOCK;  /* No input available */
     }

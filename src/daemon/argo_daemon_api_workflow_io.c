@@ -46,29 +46,52 @@ static void unlock_registry(void) {
     }
 }
 
-/* Helper: Extract path parameter (e.g., /api/workflow/input/{id} -> id) */
-static const char* extract_path_param(const char* path, const char* prefix) {
-    if (!path || !prefix) return NULL;
+/* Helper: Extract query parameter from URL (e.g., /api/workflow/input?workflow_name=foo -> "foo") */
+static const char* extract_query_param(const char* path, const char* param_name) {
+    if (!path || !param_name) return NULL;
 
-    size_t prefix_len = strlen(prefix);
-    if (strncmp(path, prefix, prefix_len) != 0) return NULL;
+    /* Find query string start */
+    const char* query = strchr(path, '?');
+    if (!query) return NULL;
+    query++;  /* Skip '?' */
 
-    const char* param = path + prefix_len;
-    if (*param == '/') param++;
+    /* Search for parameter name */
+    char search_pattern[128];
+    snprintf(search_pattern, sizeof(search_pattern), "%s=", param_name);
 
-    return (*param != '\0') ? param : NULL;
+    const char* param_start = strstr(query, search_pattern);
+    if (!param_start) return NULL;
+
+    /* Skip to value */
+    param_start += strlen(search_pattern);
+
+    /* Find end of value (next '&' or end of string) */
+    const char* param_end = strchr(param_start, '&');
+    if (!param_end) param_end = param_start + strlen(param_start);
+
+    /* Allocate and copy parameter value */
+    size_t param_len = param_end - param_start;
+    if (param_len == 0) return NULL;
+
+    static char param_value[ARGO_BUFFER_NAME];
+    if (param_len >= sizeof(param_value)) param_len = sizeof(param_value) - 1;
+
+    memcpy(param_value, param_start, param_len);
+    param_value[param_len] = '\0';
+
+    return param_value;
 }
 
-/* POST /api/workflow/input/{id} - Enqueue user input for workflow */
+/* POST /api/workflow/input?workflow_name=<name> - Enqueue user input for workflow */
 int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
     if (!req || !resp) {
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
         return E_SYSTEM_MEMORY;
     }
 
-    const char* workflow_id = extract_path_param(req->path, "/api/workflow/input");
+    const char* workflow_id = extract_query_param(req->path, "workflow_name");
     if (!workflow_id) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow_name parameter");
         return E_INVALID_PARAMS;
     }
 
@@ -126,7 +149,7 @@ int api_workflow_input_post(http_request_t* req, http_response_t* resp) {
     return ARGO_SUCCESS;
 }
 
-/* GET /api/workflow/input/{id} - Dequeue input for executor (one item) */
+/* GET /api/workflow/input?workflow_name=<name> - Dequeue input for executor (one item) */
 int api_workflow_input_get(http_request_t* req, http_response_t* resp) {
     int result = ARGO_SUCCESS;
     workflow_registry_t* registry = NULL;
@@ -137,9 +160,9 @@ int api_workflow_input_get(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    const char* workflow_id = extract_path_param(req->path, "/api/workflow/input");
+    const char* workflow_id = extract_query_param(req->path, "workflow_name");
     if (!workflow_id) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow_name parameter");
         return E_INVALID_PARAMS;
     }
 
@@ -180,7 +203,7 @@ error:
     return result;
 }
 
-/* GET /api/workflow/output/{id}?since={offset} - Stream workflow log output */
+/* GET /api/workflow/output?workflow_name=<name>&since=<offset> - Stream workflow log output */
 int api_workflow_output_get(http_request_t* req, http_response_t* resp) {
     int result = ARGO_SUCCESS;
     workflow_registry_t* registry = NULL;
@@ -193,9 +216,9 @@ int api_workflow_output_get(http_request_t* req, http_response_t* resp) {
         return E_INVALID_PARAMS;
     }
 
-    const char* workflow_id = extract_path_param(req->path, "/api/workflow/output");
+    const char* workflow_id = extract_query_param(req->path, "workflow_name");
     if (!workflow_id) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow_name parameter");
         return E_INVALID_PARAMS;
     }
 
