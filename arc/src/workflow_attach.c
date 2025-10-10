@@ -7,7 +7,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
-#include <sys/un.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <pthread.h>
 #include <errno.h>
 #include "arc_commands.h"
 #include "arc_context.h"
@@ -19,6 +21,18 @@
 #include "argo_output.h"
 
 #define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
+#define DAEMON_PORT 9876
+#define INPUT_BUFFER_SIZE 4096
+
+/* Thread synchronization */
+typedef struct {
+    int socket_fd;
+    const char* workflow_id;
+    pthread_t output_thread;
+    pthread_t input_thread;
+    volatile bool should_stop;
+    off_t* final_cursor;
+} attach_context_t;
 
 /* Get cursor environment variable name for workflow */
 static void get_cursor_env_name(const char* workflow_id, char* env_name, size_t size) {
@@ -60,48 +74,105 @@ static int get_log_path(const char* workflow_id, char* path, size_t path_size) {
     return ARGO_SUCCESS;
 }
 
-/* Send user input to workflow via socket */
-static int send_input_to_workflow(const char* workflow_id, const char* input) {
-    const char* home = getenv("HOME");
-    if (!home) home = ".";
-
-    /* Build socket path */
-    char socket_path[512];
-    snprintf(socket_path, sizeof(socket_path),
-            "%s/.argo/sockets/%s.sock", home, workflow_id);
-
-    /* Connect to socket */
-    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+/* Connect to daemon input socket via TCP */
+static int connect_to_daemon(const char* workflow_id) {
+    /* Create TCP socket */
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
         LOG_USER_ERROR("Failed to create socket: %s\n", strerror(errno));
-        return E_SYSTEM_SOCKET;
+        return -1;
     }
 
-    struct sockaddr_un addr;
+    /* Connect to daemon on localhost:9876 */
+    struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(DAEMON_PORT);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        LOG_USER_ERROR("Failed to connect to workflow socket: %s\n", strerror(errno));
+        LOG_USER_ERROR("Failed to connect to daemon: %s\n", strerror(errno));
         close(sock);
-        return E_SYSTEM_SOCKET;
+        return -1;
     }
 
-    /* Send input with newline */
-    size_t input_len = strlen(input);
-    ssize_t written = write(sock, input, input_len);
-    if (written < 0 || (size_t)written != input_len) {
-        LOG_USER_ERROR("Failed to send input: %s\n", strerror(errno));
+    /* Send handshake JSON */
+    char handshake[512];
+    snprintf(handshake, sizeof(handshake),
+            "{\"workflow_id\":\"%s\"}\n", workflow_id);
+
+    ssize_t written = write(sock, handshake, strlen(handshake));
+    if (written < 0) {
+        LOG_USER_ERROR("Failed to send handshake: %s\n", strerror(errno));
         close(sock);
-        return E_SYSTEM_SOCKET;
+        return -1;
     }
 
-    /* Send newline */
-    write(sock, "\n", 1);
+    /* Read response */
+    char response[256];
+    ssize_t bytes = read(sock, response, sizeof(response) - 1);
+    if (bytes <= 0) {
+        LOG_USER_ERROR("Failed to read handshake response\n");
+        close(sock);
+        return -1;
+    }
+    response[bytes] = '\0';
 
-    close(sock);
-    return ARGO_SUCCESS;
+    /* Check for "ok" status */
+    if (strstr(response, "\"status\":\"ok\"") == NULL) {
+        LOG_USER_ERROR("Handshake failed: %s\n", response);
+        close(sock);
+        return -1;
+    }
+
+    return sock;
+}
+
+/* Input thread - reads stdin and sends to daemon */
+static void* input_thread_func(void* arg) {
+    attach_context_t* ctx = (attach_context_t*)arg;
+    char buffer[INPUT_BUFFER_SIZE];
+
+    while (!ctx->should_stop) {
+        /* Read line from stdin */
+        if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+            break;  /* EOF or error */
+        }
+
+        /* Remove trailing newline if present */
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len-1] == '\n') {
+            buffer[len-1] = '\0';
+            len--;
+        }
+
+        /* Check for detach command (Ctrl+D results in empty line) */
+        if (len == 0) {
+            ctx->should_stop = true;
+            break;
+        }
+
+        /* Send as JSON */
+        char json_msg[INPUT_BUFFER_SIZE + 100];
+        snprintf(json_msg, sizeof(json_msg), "{\"input\":\"%s\"}\n", buffer);
+
+        ssize_t written = write(ctx->socket_fd, json_msg, strlen(json_msg));
+        if (written < 0) {
+            if (!ctx->should_stop) {  /* Only log if not shutting down */
+                LOG_USER_ERROR("Failed to send input: %s\n", strerror(errno));
+            }
+            break;
+        }
+
+        /* Read acknowledgment */
+        char response[256];
+        ssize_t bytes = read(ctx->socket_fd, response, sizeof(response) - 1);
+        if (bytes <= 0) {
+            break;  /* Connection closed */
+        }
+    }
+
+    return NULL;
 }
 
 /* Read and display log from cursor position, following until EOF */
@@ -144,7 +215,7 @@ static int display_log_backlog(const char* log_path, off_t start_pos, off_t* end
     return ARGO_SUCCESS;
 }
 
-/* Follow log file until user presses Enter (streaming mode) */
+/* Follow log file with simultaneous input thread */
 static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final_pos, const char* workflow_id) {
     int result;
     off_t current_pos = start_pos;
@@ -154,6 +225,30 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
     if (result != ARGO_SUCCESS) {
         *final_pos = current_pos;
         return result;
+    }
+
+    /* Connect to daemon for input */
+    int socket_fd = connect_to_daemon(workflow_id);
+    if (socket_fd < 0) {
+        LOG_USER_INFO("Failed to connect for input - output only mode\n");
+        socket_fd = -1;  /* Continue in read-only mode */
+    }
+
+    /* Setup attach context for threads */
+    attach_context_t ctx = {
+        .socket_fd = socket_fd,
+        .workflow_id = workflow_id,
+        .should_stop = false,
+        .final_cursor = final_pos
+    };
+
+    /* Start input thread if we have a socket */
+    if (socket_fd >= 0) {
+        if (pthread_create(&ctx.input_thread, NULL, input_thread_func, &ctx) != 0) {
+            LOG_USER_INFO("Failed to create input thread\n");
+            close(socket_fd);
+            socket_fd = -1;
+        }
     }
 
     /* Now follow like 'tail -f' until Enter pressed */
@@ -175,8 +270,6 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
     char buffer[ARC_READ_CHUNK_SIZE];
     char input_char;
     bool should_exit = false;
-    char line_buffer[1024] = {0};
-    int line_pos = 0;
 
     while (!should_exit) {
         /* Check for Ctrl+D (EOF) */
@@ -199,56 +292,18 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
             write(STDOUT_FILENO, buffer, bytes_read);
             current_pos += bytes_read;
 
-            /* Check for [WAITING_FOR_INPUT] marker line-by-line */
-            for (ssize_t i = 0; i < bytes_read; i++) {
-                if (buffer[i] == '\n') {
-                    line_buffer[line_pos] = '\0';
-
-                    /* Check if this line contains waiting marker */
-                    if (strstr(line_buffer, "[WAITING_FOR_INPUT")) {
-                        /* Extract prompt if provided */
-                        char* prompt_start = strchr(line_buffer, ':');
-                        char* prompt_end = strchr(line_buffer, ']');
-
-                        /* Restore stdin to blocking mode temporarily */
-                        fcntl(STDIN_FILENO, F_SETFL, stdin_flags);
-
-                        /* Show prompt */
-                        if (prompt_start && prompt_end && prompt_start < prompt_end) {
-                            prompt_start++; /* Skip ':' */
-                            *prompt_end = '\0';
-                            printf("%s ", prompt_start);
-                        } else {
-                            printf("You: ");
-                        }
-                        fflush(stdout);
-
-                        /* Read user input */
-                        char user_input[4096];
-                        if (fgets(user_input, sizeof(user_input), stdin)) {
-                            /* Remove trailing newline */
-                            size_t len = strlen(user_input);
-                            if (len > 0 && user_input[len - 1] == '\n') {
-                                user_input[len - 1] = '\0';
-                            }
-
-                            /* Send to workflow via socket */
-                            send_input_to_workflow(workflow_id, user_input);
-                        }
-
-                        /* Restore non-blocking mode */
-                        fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
-                    }
-
-                    line_pos = 0;
-                } else if (line_pos < (int)sizeof(line_buffer) - 1) {
-                    line_buffer[line_pos++] = buffer[i];
-                }
-            }
+            /* Input is now handled by separate thread - just display output */
         } else {
             /* No new data, sleep briefly */
             usleep(100000);  /* 100ms */
         }
+    }
+
+    /* Signal input thread to stop and wait for it */
+    ctx.should_stop = true;
+    if (socket_fd >= 0) {
+        pthread_join(ctx.input_thread, NULL);
+        close(socket_fd);
     }
 
     /* Restore stdin flags */
