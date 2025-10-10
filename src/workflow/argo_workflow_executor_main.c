@@ -113,8 +113,8 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
-    /* TODO: LOG_INFO causes executor to hang - logging system needs investigation
-     * For now, using printf for step messages (output redirected to log file by orchestrator) */
+    /* Note: Executor runs as background process with stdout/stderr redirected to log file.
+     * Using fprintf(stderr, ...) for all output - this is correct for daemon processes. */
 
     /* Create registry */
     registry = registry_create();
@@ -158,13 +158,13 @@ int main(int argc, char** argv) {
     }
 
     /* Execute workflow steps */
-    printf("Starting workflow execution...\n\n");
+    fprintf(stderr, "Starting workflow execution...\n\n");
 
     /* Execute until EXIT step or error */
     while (!g_should_stop && strcmp(g_workflow->current_step_id, EXECUTOR_STEP_EXIT) != 0) {
         /* Safety: prevent infinite loops */
         if (g_workflow->step_count >= EXECUTOR_MAX_STEPS) {
-            LOG_ERROR("Maximum step count exceeded (%d)", EXECUTOR_MAX_STEPS);
+            fprintf(stderr, "ERROR: Maximum step count exceeded (%d)\n", EXECUTOR_MAX_STEPS);
             result = E_INPUT_INVALID;
             break;
         }
@@ -175,9 +175,9 @@ int main(int argc, char** argv) {
         struct stat st;
         if (stat(log_path, &st) == 0) {
             if (st.st_size > MAX_WORKFLOW_LOG_SIZE) {
-                LOG_ERROR("Log file exceeded maximum size (%lld > %d bytes)",
+                fprintf(stderr, "ERROR: Log file exceeded maximum size (%lld > %d bytes)\n",
                          (long long)st.st_size, MAX_WORKFLOW_LOG_SIZE);
-                LOG_ERROR("Aborting to prevent runaway loop");
+                fprintf(stderr, "ERROR: Aborting to prevent runaway loop\n");
                 result = E_RESOURCE_LIMIT;
                 break;
             }
@@ -188,15 +188,15 @@ int main(int argc, char** argv) {
                        g_workflow->current_step_id);
 
         /* Execute current step */
-        printf("Executing step %d: %s\n", g_workflow->step_count + 1, g_workflow->current_step_id);
+        fprintf(stderr, "Executing step %d: %s\n", g_workflow->step_count + 1, g_workflow->current_step_id);
         result = workflow_execute_current_step(g_workflow);
 
         if (result == ARGO_SUCCESS) {
             if (g_workflow->previous_step_id[0]) {
-                printf("Step %s completed\n", g_workflow->previous_step_id);
+                fprintf(stderr, "Step %s completed\n", g_workflow->previous_step_id);
             }
         } else {
-            fprintf(stderr, "Step %s failed with error: [%s] %s\n",
+            fprintf(stderr, "ERROR: Step %s failed with error: [%s] %s\n",
                      g_workflow->current_step_id,
                      argo_error_string(result),
                      argo_error_message(result));
@@ -205,18 +205,18 @@ int main(int argc, char** argv) {
     }
 
     if (g_should_stop) {
-        printf("Workflow stopped by signal\n");
+        fprintf(stderr, "Workflow stopped by signal\n");
         exit_code = 2;
     } else if (strcmp(g_workflow->current_step_id, EXECUTOR_STEP_EXIT) == 0 && result == ARGO_SUCCESS) {
-        printf("=========================================\n");
-        printf("Workflow completed successfully\n");
-        printf("Total steps executed: %d\n", g_workflow->step_count);
-        printf("=========================================\n");
+        fprintf(stderr, "=========================================\n");
+        fprintf(stderr, "Workflow completed successfully\n");
+        fprintf(stderr, "Total steps executed: %d\n", g_workflow->step_count);
+        fprintf(stderr, "=========================================\n");
         exit_code = 0;
     } else {
-        printf("=========================================\n");
-        printf("Workflow failed\n");
-        printf("=========================================\n");
+        fprintf(stderr, "=========================================\n");
+        fprintf(stderr, "Workflow failed\n");
+        fprintf(stderr, "=========================================\n");
         exit_code = 1;
     }
 
