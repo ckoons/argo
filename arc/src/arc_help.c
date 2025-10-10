@@ -8,6 +8,7 @@
 /* General help */
 static void show_general_help(void) {
     printf("arc - Argo Workflow CLI\n\n");
+    printf("Terminal-facing client for Argo daemon. Communicates via HTTP API.\n\n");
     printf("Usage:\n");
     printf("  arc help [command]          Show help for a specific command\n");
     printf("  arc switch [workflow_name]  Set active workflow context\n");
@@ -25,6 +26,8 @@ static void show_general_help(void) {
     printf("  --env <env>                     Filter/create in specific environment\n");
     printf("  ARC_ENV=<env>                   Set default environment for terminal\n");
     printf("  Environments: test, dev, stage, prod (default: dev)\n\n");
+    printf("Prerequisites:\n");
+    printf("  Start daemon first: argo-daemon --port 9876\n\n");
     printf("For more details: arc help <command>\n");
 }
 

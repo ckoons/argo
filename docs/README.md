@@ -66,6 +66,7 @@ Find:
 
 | File | Purpose | Audience |
 |------|---------|----------|
+| [`USAGE.md`](guide/USAGE.md) | Complete usage guide for arc, daemon, executor | Users |
 | [`WORKFLOW_CONSTRUCTION.md`](guide/WORKFLOW_CONSTRUCTION.md) | Complete guide to building workflows | Users |
 | [`WORKFLOW.md`](guide/WORKFLOW.md) | Workflow concepts and design | Users |
 | [`ARC_TERMINAL.md`](guide/ARC_TERMINAL.md) | Arc CLI reference | Users |
