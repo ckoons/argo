@@ -10,7 +10,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Component definitions: path:budget
 COMPONENTS=(
-    ".:10000"           # argo core
+    ".:16000"           # argo core
     "arc:5000"          # arc CLI
     "ui/argo-term:3000" # terminal UI
 )

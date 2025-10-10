@@ -7,7 +7,7 @@
 set -e
 
 # Default budget
-DEFAULT_BUDGET=10000
+DEFAULT_BUDGET=16000
 
 # Parse arguments
 COMPONENT_PATH="${1:-.}"

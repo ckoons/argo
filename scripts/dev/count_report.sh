@@ -16,7 +16,7 @@ fi
 
 # Component definitions: path:budget
 COMPONENTS=(
-    ".:10000"
+    ".:16000"
     "arc:5000"
     "ui/argo-term:3000"
 )
@@ -111,7 +111,7 @@ echo "DEPLOYMENT SCENARIOS"
 echo "====================================================================="
 
 # Calculate totals for different combinations
-ARGO_JSON=$("$SCRIPT_DIR/count_component.sh" "." --budget 10000 2>/dev/null)
+ARGO_JSON=$("$SCRIPT_DIR/count_component.sh" "." --budget 16000 2>/dev/null)
 ARGO_LINES=$(echo "$ARGO_JSON" | grep '"budget_lines"' | sed 's/.*: *\([0-9]*\).*/\1/')
 
 ARC_LINES=0

@@ -20,7 +20,7 @@ TIMESTAMP=$(date +%s)
 
 # Component definitions
 COMPONENTS=(
-    ".:10000:argo"
+    ".:16000:argo"
     "arc:5000:arc"
     "ui/argo-term:3000:argo-term"
 )

@@ -183,7 +183,7 @@ echo ""
 printf "  Alternate (no #includes):      %5d lines\n" "$diet_total_no_inc"
 printf "  Include directives:              %3d lines\n" "$((include_count + provider_includes))"
 
-budget=10000
+budget=16000
 remaining=$((budget - diet_total))
 percent_used=$((diet_total * 100 / budget))
 percent_used_no_inc=$((diet_total_no_inc * 100 / budget))
@@ -191,7 +191,7 @@ percent_used_no_inc=$((diet_total_no_inc * 100 / budget))
 echo ""
 echo "Budget Status:"
 echo "--------------"
-printf "  Budget:                        10,000 lines\n"
+printf "  Budget:                        16,000 lines\n"
 printf "  Used (primary):                 %5d lines (%d%%)\n" "$diet_total" "$percent_used"
 printf "  Used (no includes):             %5d lines (%d%%)\n" "$diet_total_no_inc" "$percent_used_no_inc"
 
