@@ -153,30 +153,9 @@ int step_display(const char* json, jsmntok_t* tokens, int step_index,
         return result;
     }
 
-    /* Display message through I/O channel (required for executor) */
-    if (!ctx->io_channel) {
-        argo_report_error(E_IO_INVALID, "step_display",
-                         "no I/O channel available (executor running detached)");
-        return E_IO_INVALID;
-    }
-
-    result = io_channel_write_str(ctx->io_channel, output);
-    if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "step_display", "failed to write output");
-        return result;
-    }
-
-    result = io_channel_write_str(ctx->io_channel, "\n");
-    if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "step_display", "failed to write newline");
-        return result;
-    }
-
-    result = io_channel_flush(ctx->io_channel);
-    if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "step_display", "failed to flush output");
-        return result;
-    }
+    /* Display message to stdout (redirected to log file by daemon) */
+    printf("%s\n", output);
+    fflush(stdout);
 
     LOG_DEBUG("Displayed message: %s", output);
     return ARGO_SUCCESS;
