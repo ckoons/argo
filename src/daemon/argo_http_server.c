@@ -148,11 +148,17 @@ static int parse_http_request(const char* buffer, size_t len, http_request_t* re
 
 /* Find matching route */
 static route_handler_fn find_route(http_server_t* server, http_request_t* req) {
+    /* Extract path without query string */
+    const char* query_start = strchr(req->path, '?');
+    size_t path_len = query_start ? (size_t)(query_start - req->path) : strlen(req->path);
+
     for (size_t i = 0; i < server->route_count; i++) {
         route_t* route = &server->routes[i];
 
-        /* Exact match */
-        if (route->method == req->method && strcmp(route->path, req->path) == 0) {
+        /* Match method and path (ignoring query string) */
+        if (route->method == req->method &&
+            strlen(route->path) == path_len &&
+            strncmp(route->path, req->path, path_len) == 0) {
             return route->handler;
         }
     }

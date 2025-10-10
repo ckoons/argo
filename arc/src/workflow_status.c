@@ -31,9 +31,9 @@ int arc_workflow_status(int argc, char** argv) {
         }
     }
 
-    /* Build request URL */
+    /* Build request URL with query parameter */
     char endpoint[ARGO_PATH_MAX];
-    snprintf(endpoint, sizeof(endpoint), "/api/workflow/status/%s", workflow_name);
+    snprintf(endpoint, sizeof(endpoint), "/api/workflow/status?workflow_name=%s", workflow_name);
 
     /* Send GET request to daemon */
     arc_http_response_t* response = NULL;

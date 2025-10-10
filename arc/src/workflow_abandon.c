@@ -44,9 +44,9 @@ int arc_workflow_abandon(int argc, char** argv) {
         return ARC_EXIT_SUCCESS;
     }
 
-    /* Build request URL */
+    /* Build request URL with query parameter */
     char endpoint[ARGO_PATH_MAX];
-    snprintf(endpoint, sizeof(endpoint), "/api/workflow/abandon/%s", workflow_name);
+    snprintf(endpoint, sizeof(endpoint), "/api/workflow/abandon?workflow_name=%s", workflow_name);
 
     /* Send DELETE request to daemon */
     arc_http_response_t* response = NULL;
