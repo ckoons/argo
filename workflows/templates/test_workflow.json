@@ -1,0 +1,27 @@
+{
+  "workflow_name": "test_workflow",
+  "workflow_version": "1.0.0",
+  "category": "test",
+  "description": "Minimal two-step test workflow",
+
+  "phases": [
+    {
+      "phase": "TEST",
+      "description": "Test basic execution",
+      "steps": [
+        {
+          "step": 1,
+          "type": "display",
+          "message": "Step 1: Starting test workflow",
+          "next_step": 2
+        },
+        {
+          "step": 2,
+          "type": "display",
+          "message": "Step 2: Test workflow complete",
+          "next_step": "EXIT"
+        }
+      ]
+    }
+  ]
+}
