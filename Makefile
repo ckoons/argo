@@ -15,6 +15,19 @@ include Makefile.help
 # Default target
 all: directories $(BUILD_DIR)/stubs.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) $(EXECUTOR_BINARY) $(DAEMON_BINARY)
 
+# Full build - clean, build all components, install
+full-build: clean-all all-components install-all
+	@echo ""
+	@echo "=========================================="
+	@echo "Full build complete!"
+	@echo "=========================================="
+	@echo "  - All components built"
+	@echo "  - All binaries installed to ~/.local/bin/"
+	@echo "  - Arc installed to ~/.local/bin/arc"
+	@echo "  - Daemon ready: argo-daemon --port 9876"
+	@echo "=========================================="
+	@echo ""
+
 # .PHONY declarations
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
@@ -32,7 +45,7 @@ all: directories $(BUILD_DIR)/stubs.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) 
         test-shutdown-signals test-concurrent-workflows test-env-precedence \
         test-shared-services test-workflow-registry test-valgrind build-asan \
         test-asan test-asan-full help help-test help-count restart-daemon \
-        code-analysis code-analysis-quick code-coverage find-dead-code
+        code-analysis code-analysis-quick code-coverage find-dead-code full-build
 
 # Code Analysis Targets
 code-analysis:

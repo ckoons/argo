@@ -6,29 +6,24 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <pthread.h>
 #include <errno.h>
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "arc_error.h"
 #include "arc_constants.h"
+#include "arc_http_client.h"
 #include "argo_workflow_registry.h"
 #include "argo_init.h"
 #include "argo_error.h"
 #include "argo_output.h"
 
 #define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
-#define DAEMON_PORT 9876
 #define INPUT_BUFFER_SIZE 4096
 
 /* Thread synchronization */
 typedef struct {
-    int socket_fd;
     const char* workflow_id;
-    pthread_t output_thread;
     pthread_t input_thread;
     volatile bool should_stop;
     off_t* final_cursor;
@@ -74,61 +69,26 @@ static int get_log_path(const char* workflow_id, char* path, size_t path_size) {
     return ARGO_SUCCESS;
 }
 
-/* Connect to daemon input socket via TCP */
-static int connect_to_daemon(const char* workflow_id) {
-    /* Create TCP socket */
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        LOG_USER_ERROR("Failed to create socket: %s\n", strerror(errno));
+/* Send user input to daemon via HTTP */
+static int send_input_to_daemon(const char* workflow_id, const char* input) {
+    char endpoint[512];
+    char json_body[INPUT_BUFFER_SIZE + 100];
+
+    snprintf(endpoint, sizeof(endpoint), "/api/workflow/input?workflow_name=%s", workflow_id);
+    snprintf(json_body, sizeof(json_body), "{\"input\":\"%s\"}", input);
+
+    arc_http_response_t* response = NULL;
+    int result = arc_http_post(endpoint, json_body, &response);
+    if (result != ARGO_SUCCESS || !response) {
         return -1;
     }
 
-    /* Connect to daemon on localhost:9876 */
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(DAEMON_PORT);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        LOG_USER_ERROR("Failed to connect to daemon: %s\n", strerror(errno));
-        close(sock);
-        return -1;
-    }
-
-    /* Send handshake JSON */
-    char handshake[512];
-    snprintf(handshake, sizeof(handshake),
-            "{\"workflow_id\":\"%s\"}\n", workflow_id);
-
-    ssize_t written = write(sock, handshake, strlen(handshake));
-    if (written < 0) {
-        LOG_USER_ERROR("Failed to send handshake: %s\n", strerror(errno));
-        close(sock);
-        return -1;
-    }
-
-    /* Read response */
-    char response[256];
-    ssize_t bytes = read(sock, response, sizeof(response) - 1);
-    if (bytes <= 0) {
-        LOG_USER_ERROR("Failed to read handshake response\n");
-        close(sock);
-        return -1;
-    }
-    response[bytes] = '\0';
-
-    /* Check for "ok" status */
-    if (strstr(response, "\"status\":\"ok\"") == NULL) {
-        LOG_USER_ERROR("Handshake failed: %s\n", response);
-        close(sock);
-        return -1;
-    }
-
-    return sock;
+    int success = (response->status_code == 200);
+    arc_http_response_free(response);
+    return success ? 0 : -1;
 }
 
-/* Input thread - reads stdin and sends to daemon */
+/* Input thread - reads stdin and sends to daemon via HTTP */
 static void* input_thread_func(void* arg) {
     attach_context_t* ctx = (attach_context_t*)arg;
     char buffer[INPUT_BUFFER_SIZE];
@@ -152,23 +112,12 @@ static void* input_thread_func(void* arg) {
             break;
         }
 
-        /* Send as JSON */
-        char json_msg[INPUT_BUFFER_SIZE + 100];
-        snprintf(json_msg, sizeof(json_msg), "{\"input\":\"%s\"}\n", buffer);
-
-        ssize_t written = write(ctx->socket_fd, json_msg, strlen(json_msg));
-        if (written < 0) {
-            if (!ctx->should_stop) {  /* Only log if not shutting down */
-                LOG_USER_ERROR("Failed to send input: %s\n", strerror(errno));
+        /* Send input via HTTP */
+        if (send_input_to_daemon(ctx->workflow_id, buffer) < 0) {
+            if (!ctx->should_stop) {
+                LOG_USER_ERROR("Failed to send input to daemon\n");
             }
             break;
-        }
-
-        /* Read acknowledgment */
-        char response[256];
-        ssize_t bytes = read(ctx->socket_fd, response, sizeof(response) - 1);
-        if (bytes <= 0) {
-            break;  /* Connection closed */
         }
     }
 
@@ -227,28 +176,17 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
         return result;
     }
 
-    /* Connect to daemon for input */
-    int socket_fd = connect_to_daemon(workflow_id);
-    if (socket_fd < 0) {
-        LOG_USER_INFO("Failed to connect for input - output only mode\n");
-        socket_fd = -1;  /* Continue in read-only mode */
-    }
-
     /* Setup attach context for threads */
     attach_context_t ctx = {
-        .socket_fd = socket_fd,
         .workflow_id = workflow_id,
         .should_stop = false,
         .final_cursor = final_pos
     };
 
-    /* Start input thread if we have a socket */
-    if (socket_fd >= 0) {
-        if (pthread_create(&ctx.input_thread, NULL, input_thread_func, &ctx) != 0) {
-            LOG_USER_INFO("Failed to create input thread\n");
-            close(socket_fd);
-            socket_fd = -1;
-        }
+    /* Start input thread for HTTP-based user input */
+    if (pthread_create(&ctx.input_thread, NULL, input_thread_func, &ctx) != 0) {
+        LOG_USER_INFO("Failed to create input thread - output only mode\n");
+        /* Continue without input thread */
     }
 
     /* Now follow like 'tail -f' until input thread signals stop */
@@ -280,10 +218,7 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
     }
 
     /* Wait for input thread to finish */
-    if (socket_fd >= 0) {
-        pthread_join(ctx.input_thread, NULL);
-        close(socket_fd);
-    }
+    pthread_join(ctx.input_thread, NULL);
 
     close(fd);
     *final_pos = current_pos;

@@ -14,7 +14,6 @@
 
 /* Project includes */
 #include "argo_http_server.h"
-#include "argo_daemon_input_socket.h"
 #include "argo_error.h"
 #include "argo_limits.h"
 
@@ -211,14 +210,6 @@ static void* handle_connection(void* arg) {
         return NULL;
     }
     buffer[bytes] = '\0';
-
-    /* Protocol detection: HTTP starts with method, JSON input starts with { */
-    if (bytes > 0 && buffer[0] == '{') {
-        /* JSON input socket connection - hand off to input socket handler */
-        free(buffer);
-        input_socket_handle_connection(client_fd);
-        return NULL;
-    }
 
     /* Parse HTTP request */
     http_request_t req = {0};
