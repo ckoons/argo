@@ -31,4 +31,23 @@ all: directories $(BUILD_DIR)/stubs.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) 
         install-all uninstall uninstall-arc uninstall-term uninstall-all test-thread-safety \
         test-shutdown-signals test-concurrent-workflows test-env-precedence \
         test-shared-services test-workflow-registry test-valgrind build-asan \
-        test-asan test-asan-full help help-test help-count restart-daemon
+        test-asan test-asan-full help help-test help-count restart-daemon \
+        code-analysis code-analysis-quick code-coverage find-dead-code
+
+# Code Analysis Targets
+code-analysis:
+	@echo "Running comprehensive code analysis..."
+	@./scripts/analyze_code.sh
+
+code-analysis-quick:
+	@echo "Running quick unused function check..."
+	@cppcheck --enable=unusedFunction --quiet src/ arc/src/ 2>&1 | grep "The function" | wc -l | xargs echo "Unused functions:"
+
+code-coverage:
+	@echo "Setting up code coverage analysis..."
+	@./scripts/setup_coverage.sh
+
+find-dead-code:
+	@echo "Running dead code detection..."
+	@./scripts/find_dead_code.sh
+
