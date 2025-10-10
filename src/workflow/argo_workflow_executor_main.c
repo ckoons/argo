@@ -113,6 +113,9 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
+    /* TODO: LOG_INFO causes executor to hang - logging system needs investigation
+     * For now, using printf for step messages (output redirected to log file by orchestrator) */
+
     /* Create registry */
     registry = registry_create();
     if (!registry) {
@@ -156,13 +159,9 @@ int main(int argc, char** argv) {
 
     /* Execute workflow steps */
     printf("Starting workflow execution...\n\n");
-    printf("DEBUG: current_step_id = '%s', EXIT = '%s'\n", g_workflow->current_step_id, EXECUTOR_STEP_EXIT);
-    printf("DEBUG: step_count = %d\n\n", g_workflow->step_count);
 
     /* Execute until EXIT step or error */
     while (!g_should_stop && strcmp(g_workflow->current_step_id, EXECUTOR_STEP_EXIT) != 0) {
-        printf("DEBUG: Loop iteration, step_count=%d, current_step_id='%s'\n", g_workflow->step_count, g_workflow->current_step_id);
-
         /* Safety: prevent infinite loops */
         if (g_workflow->step_count >= EXECUTOR_MAX_STEPS) {
             LOG_ERROR("Maximum step count exceeded (%d)", EXECUTOR_MAX_STEPS);
@@ -170,13 +169,10 @@ int main(int argc, char** argv) {
             break;
         }
 
-        printf("DEBUG: About to check log file size\n");
-
         /* Safety: check log file size to prevent runaway loops */
         char log_path[ARGO_PATH_MAX];
         snprintf(log_path, sizeof(log_path), ".argo/logs/%s.log", g_workflow_id);
         struct stat st;
-        printf("DEBUG: About to stat log file: %s\n", log_path);
         if (stat(log_path, &st) == 0) {
             if (st.st_size > MAX_WORKFLOW_LOG_SIZE) {
                 LOG_ERROR("Log file exceeded maximum size (%lld > %d bytes)",
@@ -187,72 +183,40 @@ int main(int argc, char** argv) {
             }
         }
 
-        printf("DEBUG: About to report progress\n");
-        fflush(stdout);
-
         /* Report progress to daemon */
         report_progress(g_workflow_id, g_workflow->step_count, EXECUTOR_MAX_STEPS,
                        g_workflow->current_step_id);
 
-        printf("DEBUG: Progress reported, about to execute step\n");
-        fflush(stdout);
-
         /* Execute current step */
-        printf("DEBUG: About to LOG_INFO for step %d\n", g_workflow->step_count);
-        fflush(stdout);
         printf("Executing step %d: %s\n", g_workflow->step_count + 1, g_workflow->current_step_id);
-        fflush(stdout);
-        printf("DEBUG: About to call workflow_execute_current_step\n");
-        fflush(stdout);
         result = workflow_execute_current_step(g_workflow);
-        printf("DEBUG: workflow_execute_current_step returned %d\n", result);
-        fflush(stdout);
 
         if (result == ARGO_SUCCESS) {
-            printf("DEBUG: Step completed, previous_step_id='%s'\n",
-                   g_workflow->previous_step_id[0] ? g_workflow->previous_step_id : "(empty)");
-            fflush(stdout);
             if (g_workflow->previous_step_id[0]) {
-                printf("DEBUG: About to LOG_INFO completion\n");
-                fflush(stdout);
-                LOG_INFO("Step %s completed", g_workflow->previous_step_id);
-                printf("DEBUG: LOG_INFO completed\n");
-                fflush(stdout);
+                printf("Step %s completed\n", g_workflow->previous_step_id);
             }
         } else {
-            LOG_ERROR("Step %s failed with error: [%s] %s",
+            fprintf(stderr, "Step %s failed with error: [%s] %s\n",
                      g_workflow->current_step_id,
                      argo_error_string(result),
                      argo_error_message(result));
             break;
         }
-
-        printf("DEBUG: End of loop iteration, current_step_id='%s'\n", g_workflow->current_step_id);
-        fflush(stdout);
     }
 
-    printf("DEBUG: Exited while loop, current_step_id='%s'\n", g_workflow->current_step_id);
-    fflush(stdout);
-
-    printf("DEBUG: About to check completion status\n");
-    fflush(stdout);
-
     if (g_should_stop) {
-        LOG_INFO("Workflow stopped by signal");
+        printf("Workflow stopped by signal\n");
         exit_code = 2;
     } else if (strcmp(g_workflow->current_step_id, EXECUTOR_STEP_EXIT) == 0 && result == ARGO_SUCCESS) {
-        printf("DEBUG: About to print completion messages\n");
-        fflush(stdout);
         printf("=========================================\n");
         printf("Workflow completed successfully\n");
         printf("Total steps executed: %d\n", g_workflow->step_count);
         printf("=========================================\n");
-        fflush(stdout);
         exit_code = 0;
     } else {
-        LOG_INFO("=========================================");
-        LOG_INFO("Workflow failed");
-        LOG_INFO("=========================================");
+        printf("=========================================\n");
+        printf("Workflow failed\n");
+        printf("=========================================\n");
         exit_code = 1;
     }
 

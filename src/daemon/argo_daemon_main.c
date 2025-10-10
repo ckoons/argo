@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -17,6 +18,7 @@
 #include "argo_env_utils.h"
 #include "argo_limits.h"
 #include "argo_urls.h"
+#include "argo_workflow_registry.h"
 
 /* Localhost address */
 #define LOCALHOST_ADDR "127.0.0.1"
@@ -62,12 +64,41 @@ static void kill_existing_daemon(uint16_t port) {
     }
 }
 
-/* Signal handler */
+/* Signal handler for shutdown */
 static void signal_handler(int signum) {
     (void)signum;
-    printf("\nReceived shutdown signal\n");
+    fprintf(stderr, "\nReceived shutdown signal\n");
     if (g_daemon) {
         argo_daemon_stop(g_daemon);
+    }
+}
+
+/* SIGCHLD handler to reap completed workflow executors and auto-remove from registry */
+static void sigchld_handler(int signum) {
+    (void)signum;
+    int status;
+    pid_t pid;
+
+    /* Reap all terminated children */
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        if (!g_daemon || !g_daemon->workflow_registry) {
+            continue;
+        }
+
+        /* Find workflow by PID and remove it */
+        pthread_mutex_lock(&g_daemon->workflow_registry_lock);
+
+        /* Iterate through all workflows to find one with matching PID */
+        for (int i = 0; i < g_daemon->workflow_registry->workflow_count; i++) {
+            workflow_instance_t* wf = &g_daemon->workflow_registry->workflows[i];
+            if (wf->pid == pid) {
+                /* Workflow executor completed - remove from registry */
+                workflow_registry_remove_workflow(g_daemon->workflow_registry, wf->id);
+                break;
+            }
+        }
+
+        pthread_mutex_unlock(&g_daemon->workflow_registry_lock);
     }
 }
 
@@ -156,6 +187,7 @@ int main(int argc, char** argv) {
     /* Setup signal handlers */
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
+    signal(SIGCHLD, sigchld_handler);  /* Auto-remove completed workflows */
 
     /* Start daemon (blocks until stopped) */
     fprintf(stderr, "Starting daemon on port %d...\n", port);
