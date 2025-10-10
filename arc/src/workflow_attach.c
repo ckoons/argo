@@ -251,63 +251,39 @@ static int follow_log_stream(const char* log_path, off_t start_pos, off_t* final
         }
     }
 
-    /* Now follow like 'tail -f' until Enter pressed */
+    /* Now follow like 'tail -f' until input thread signals stop */
     int fd = open(log_path, O_RDONLY);
     if (fd < 0) {
         *final_pos = current_pos;
         return ARGO_SUCCESS;  /* No file yet, that's ok */
     }
 
-    /* Set stdin to non-blocking for Enter detection */
-    int stdin_flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-    fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
-
     /* Seek to current position */
     lseek(fd, current_pos, SEEK_SET);
 
-    LOG_USER_INFO("\n[Streaming output - Press Ctrl+D to detach]\n");
+    LOG_USER_INFO("\n[Streaming output - Press Ctrl+D on empty line to detach]\n");
 
     char buffer[ARC_READ_CHUNK_SIZE];
-    char input_char;
-    bool should_exit = false;
 
-    while (!should_exit) {
-        /* Check for Ctrl+D (EOF) */
-        ssize_t bytes = read(STDIN_FILENO, &input_char, 1);
-        if (bytes > 0) {
-            if (input_char == 4) {  /* Ctrl+D is ASCII 4 (EOT) */
-                should_exit = true;
-                break;
-            }
-        } else if (bytes == 0) {
-            /* EOF from stdin (Ctrl+D) */
-            should_exit = true;
-            break;
-        }
-
+    /* Loop until input thread signals stop (via ctx.should_stop) */
+    while (!ctx.should_stop) {
         /* Read new data from log */
         ssize_t bytes_read = read(fd, buffer, sizeof(buffer));
         if (bytes_read > 0) {
             /* Write to stdout */
             write(STDOUT_FILENO, buffer, bytes_read);
             current_pos += bytes_read;
-
-            /* Input is now handled by separate thread - just display output */
         } else {
             /* No new data, sleep briefly */
             usleep(100000);  /* 100ms */
         }
     }
 
-    /* Signal input thread to stop and wait for it */
-    ctx.should_stop = true;
+    /* Wait for input thread to finish */
     if (socket_fd >= 0) {
         pthread_join(ctx.input_thread, NULL);
         close(socket_fd);
     }
-
-    /* Restore stdin flags */
-    fcntl(STDIN_FILENO, F_SETFL, stdin_flags);
 
     close(fd);
     *final_pos = current_pos;

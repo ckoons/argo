@@ -33,8 +33,9 @@ TEST_SOURCES = $(wildcard $(TEST_DIR)/*.c)
 TEST_OBJECTS = $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/test_%.o,$(TEST_SOURCES))
 TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,bin/tests/test_%,$(TEST_SOURCES))
 
-# Main target (build into bin/)
-TARGET = bin/arc
+# Main target (build into ../bin/ when called from parent, bin/ when standalone)
+# This ensures arc ALWAYS builds to the main project bin/ directory
+TARGET = ../bin/arc
 
 .PHONY: all clean test test-arc-unit test-arc-cli test-arc test-arc-workflow test-arc-background test-arc-full test-arc-all directories count install uninstall
 
@@ -45,11 +46,12 @@ all: directories $(TARGET)
 directories:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(PARENT_BUILD)
+	@mkdir -p ../bin/tests
 	@mkdir -p bin/tests
 
-# Build arc executable into bin/ (links daemon + workflow + core)
+# Build arc executable into ../bin/ (links daemon + workflow + core)
 $(TARGET): $(OBJECTS) $(ARGO_CORE) $(ARGO_DAEMON) $(ARGO_WORKFLOW)
-	@mkdir -p bin
+	@mkdir -p ../bin
 	$(CC) $(OBJECTS) $(ARGO_DAEMON) $(ARGO_WORKFLOW) $(ARGO_CORE) -o $@ $(LDFLAGS)
 	@echo "Built arc CLI -> $@"
 
