@@ -9,6 +9,7 @@
 /* Project includes */
 #include "argo_daemon.h"
 #include "argo_daemon_api.h"
+#include "argo_daemon_input_socket.h"
 #include "argo_error.h"
 #include "argo_http_server.h"
 #include "argo_registry.h"
@@ -166,6 +167,13 @@ int argo_daemon_start(argo_daemon_t* daemon) {
     /* Register API routes */
     argo_daemon_register_api_routes(daemon);
 
+    /* Initialize input socket subsystem */
+    int result = input_socket_init(daemon);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "argo_daemon_start", "input socket init failed");
+        return result;
+    }
+
     LOG_INFO("Argo Daemon starting on port %d", daemon->port);
 
     /* Start HTTP server (blocking) */
@@ -177,5 +185,6 @@ void argo_daemon_stop(argo_daemon_t* daemon) {
     if (!daemon) return;
 
     LOG_INFO("Stopping Argo Daemon");
+    input_socket_shutdown();
     http_server_stop(daemon->http_server);
 }
