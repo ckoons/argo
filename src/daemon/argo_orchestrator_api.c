@@ -19,8 +19,37 @@
 /* Log file path pattern */
 #define LOG_PATH_PATTERN "%s/.argo/logs/%s.log"
 
-/* Workflow executor binary path (relative to argo installation) */
-#define EXECUTOR_BINARY "./bin/argo_workflow_executor"
+/* Find executor in common locations */
+static const char* find_executor_binary(void) {
+    static char executor_path[ARGO_PATH_MAX];
+    static char home_local_path[ARGO_PATH_MAX];
+
+    /* Build HOME/.local/bin path */
+    const char* home = getenv("HOME");
+    if (home) {
+        snprintf(home_local_path, sizeof(home_local_path),
+                "%s/.local/bin/argo_workflow_executor", home);
+    }
+
+    const char* locations[] = {
+        home ? home_local_path : NULL,          /* ~/.local/bin */
+        "./bin/argo_workflow_executor",          /* Local build */
+        "/usr/local/bin/argo_workflow_executor", /* System install */
+        NULL
+    };
+
+    for (int i = 0; locations[i]; i++) {
+        /* Check if file exists and is executable */
+        if (access(locations[i], X_OK) == 0) {
+            strncpy(executor_path, locations[i], sizeof(executor_path) - 1);
+            executor_path[sizeof(executor_path) - 1] = '\0';
+            return executor_path;
+        }
+    }
+
+    /* Fallback - just use the name and let execvp search PATH */
+    return "argo_workflow_executor";
+}
 
 /* Get log file path for workflow */
 static int get_log_path(const char* workflow_id, char* path, size_t path_size) {
@@ -99,17 +128,26 @@ int workflow_exec_start(const char* workflow_id,
         close(STDIN_FILENO);
 
         /* Execute workflow executor binary */
+        const char* executor_bin = find_executor_binary();
+
         char* args[5];
-        args[0] = EXECUTOR_BINARY;
+        args[0] = (char*)executor_bin;
         args[1] = (char*)workflow_id;
         args[2] = (char*)template_path;
         args[3] = (char*)branch;
         args[4] = NULL;
 
-        execv(EXECUTOR_BINARY, args);
+        /* Use execvp to search PATH if needed (for the fallback case) */
+        if (strchr(executor_bin, '/')) {
+            /* Has a path - use execv */
+            execv(executor_bin, args);
+        } else {
+            /* No path - use execvp to search PATH */
+            execvp(executor_bin, args);
+        }
 
         /* If execv returns, it failed */
-        FORK_ERROR("Failed to execute workflow executor: %s\n", strerror(errno));
+        FORK_ERROR("Failed to execute workflow executor: %s (path: %s)\n", strerror(errno), executor_bin);
         exit(1);
     }
 
