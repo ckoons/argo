@@ -24,6 +24,7 @@
 #include "argo_claude.h"
 #include "argo_api_providers.h"
 #include "argo_ollama.h"
+#include "argo_mock.h"
 
 /* Helper: Generate unique task ID (thread-safe) */
 static void generate_task_id(char* id_out, size_t len) {
@@ -114,6 +115,11 @@ ci_provider_t* workflow_create_provider_by_name(const char* provider_name,
             return claude_code_create_provider(workflow_id);
         }
         return ollama_create_provider(model_name);
+    }
+
+    /* Mock provider (for testing) */
+    if (strcmp(provider_name, "mock") == 0) {
+        return mock_provider_create(model_name);
     }
 
     /* Unknown provider - fall back to claude_code */
