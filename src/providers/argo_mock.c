@@ -14,7 +14,7 @@
 /* Mock provider context */
 typedef struct {
     ci_provider_t provider;        /* Base provider (MUST be first) */
-    char model[256];               /* Model name */
+    char model[MOCK_MODEL_SIZE];   /* Model name */
     char* response_content;        /* Response buffer */
     size_t response_capacity;      /* Buffer capacity */
     char* last_prompt;             /* Last prompt received */
@@ -149,7 +149,7 @@ ci_provider_t* mock_provider_create(const char* model) {
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = true;
     ctx->provider.supports_memory = false;
-    ctx->provider.max_context = 100000;  /* Arbitrary large number */
+    ctx->provider.max_context = MOCK_CONTEXT_WINDOW;
 
     LOG_INFO("Created mock provider for model %s", ctx->model);
     return &ctx->provider;

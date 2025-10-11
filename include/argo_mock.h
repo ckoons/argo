@@ -7,6 +7,10 @@
 
 /* Mock provider for testing workflows without real AI */
 
+/* Mock provider constants */
+#define MOCK_MODEL_SIZE 256
+#define MOCK_CONTEXT_WINDOW 100000  /* Arbitrary large number for testing */
+
 /* Create mock provider with default responses */
 ci_provider_t* mock_provider_create(const char* model);
 
