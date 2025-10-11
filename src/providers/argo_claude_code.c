@@ -360,7 +360,7 @@ static void claude_code_cleanup(ci_provider_t* provider) {
 
     /* Save memory digest if exists */
     if (ctx->memory_digest) {
-        /* TODO: Auto-save memory digest to session file */
+        /* Future enhancement: Auto-save memory digest to session file for persistence across sessions */
         memory_digest_destroy(ctx->memory_digest);
     }
 
