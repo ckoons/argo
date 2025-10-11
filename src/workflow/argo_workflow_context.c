@@ -185,18 +185,19 @@ int workflow_context_substitute(workflow_context_t* ctx,
     size_t remaining = output_size - 1;
 
     while (*src && remaining > 0) {
-        if (*src == '{') {
-            /* Find end of variable name */
-            const char* end = strchr(src + 1, '}');
+        /* Check for {{ variable }} pattern */
+        if (src[0] == '{' && src[1] == '{') {
+            /* Find end of variable name (look for }}) */
+            const char* end = strstr(src + 2, "}}");
             if (!end) {
-                /* No closing brace, copy literal */
+                /* No closing braces, copy literal */
                 *dst++ = *src++;
                 remaining--;
                 continue;
             }
 
-            /* Extract variable name */
-            size_t var_len = end - src - 1;
+            /* Extract variable name (between {{ and }}) */
+            size_t var_len = end - (src + 2);
             char var_name[WORKFLOW_CONTEXT_MAX_KEY_LENGTH];
 
             if (var_len >= sizeof(var_name)) {
@@ -204,8 +205,10 @@ int workflow_context_substitute(workflow_context_t* ctx,
                 return E_INPUT_TOO_LARGE;
             }
 
-            strncpy(var_name, src + 1, var_len);
+            strncpy(var_name, src + 2, var_len);
             var_name[var_len] = '\0';
+
+            LOG_DEBUG("Substituting variable: {{%s}}", var_name);
 
             /* Get variable value */
             const char* value = workflow_context_get(ctx, var_name);
@@ -213,6 +216,7 @@ int workflow_context_substitute(workflow_context_t* ctx,
             if (value) {
                 /* Substitute value */
                 size_t value_len = strlen(value);
+                LOG_DEBUG("  Found value: '%s' (len=%zu)", value, value_len);
                 if (value_len > remaining) {
                     argo_report_error(E_INPUT_TOO_LARGE, "workflow_context_substitute", "output buffer too small");
                     return E_INPUT_TOO_LARGE;
@@ -222,17 +226,18 @@ int workflow_context_substitute(workflow_context_t* ctx,
                 remaining -= value_len;
             } else {
                 /* Variable not found, keep placeholder */
-                size_t placeholder_len = end - src + 1;
+                LOG_DEBUG("  Variable not found, keeping placeholder");
+                size_t placeholder_len = (end + 2) - src;
                 if (placeholder_len > remaining) {
                     argo_report_error(E_INPUT_TOO_LARGE, "workflow_context_substitute", "output buffer too small");
                     return E_INPUT_TOO_LARGE;
                 }
-                strncpy(dst, src, placeholder_len);
+                memcpy(dst, src, placeholder_len);
                 dst += placeholder_len;
                 remaining -= placeholder_len;
             }
 
-            src = end + 1;
+            src = end + 2;  /* Skip past }} */
         } else {
             /* Copy literal character */
             *dst++ = *src++;

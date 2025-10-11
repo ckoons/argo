@@ -1,61 +1,36 @@
 {
   "workflow_name": "test_interactive_chat",
-  "workflow_version": "1.0.0",
-  "category": "test",
-  "description": "Test interactive chat with Claude Code - accepts user input and responds",
   "provider": "claude_code",
   "model": "claude-sonnet-4-5",
-
   "phases": [
     {
       "phase": "CHAT",
-      "description": "Interactive chat test",
       "steps": [
         {
           "step": 1,
           "type": "display",
-          "message": "=== Interactive Chat Test ===\nThis workflow will prompt you for input and send it to Claude Code.\n",
+          "message": "=== Simple Chat Loop ===\nPress Ctrl+D to exit.\n",
           "next_step": 2
         },
         {
           "step": 2,
           "type": "user_ask",
-          "prompt": "\nYour question:",
-          "save_to": "user_question",
+          "prompt": "You:",
+          "save_to": "user_input",
           "next_step": 3
         },
         {
           "step": 3,
-          "type": "ci_ask",
-          "prompt_template": "{{user_question}}",
-          "save_to": "claude_response",
+          "type": "ci_analyze",
+          "task": "{{user_input}}",
+          "save_to": "ci_response",
           "next_step": 4
         },
         {
           "step": 4,
           "type": "display",
-          "message": "\nClaude says: {{claude_response}}\n",
-          "next_step": 5
-        },
-        {
-          "step": 5,
-          "type": "user_ask",
-          "prompt": "\nAsk another question? (yes/no):",
-          "save_to": "continue_chat",
-          "next_step": 6
-        },
-        {
-          "step": 6,
-          "type": "decide",
-          "condition": "{{continue_chat}} == yes",
-          "on_true": 2,
-          "on_false": 7
-        },
-        {
-          "step": 7,
-          "type": "display",
-          "message": "\nGoodbye! Chat session complete.\n",
-          "next_step": "EXIT"
+          "message": "Claude: {{ci_response}}\n",
+          "next_step": 2
         }
       ]
     }

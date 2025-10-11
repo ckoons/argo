@@ -114,11 +114,10 @@ int step_ci_ask(workflow_controller_t* workflow,
         return result;
     }
 
-    /* Show persona greeting if available through I/O channel */
-    if (persona && persona->greeting[0] != '\0' && ctx->io_channel) {
-        io_channel_write_str(ctx->io_channel, persona->greeting);
-        io_channel_write_str(ctx->io_channel, "\n");
-        io_channel_flush(ctx->io_channel);
+    /* Show persona greeting if available - write to stdout (log file) */
+    if (persona && persona->greeting[0] != '\0') {
+        printf("%s\n", persona->greeting);
+        fflush(stdout);
     }
 
     /* Optionally use AI to present a more conversational prompt */
@@ -175,13 +174,9 @@ int step_ci_ask(workflow_controller_t* workflow,
         return E_IO_INVALID;
     }
 
-    /* Send prompt through I/O channel */
-    result = io_channel_write_str(ctx->io_channel, final_prompt);
-    result = io_channel_flush(ctx->io_channel);
-    if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "step_ci_ask", "failed to flush prompt");
-        return result;
-    }
+    /* Send prompt to stdout (log file) */
+    printf("%s", final_prompt);
+    fflush(stdout);
 
     /* Read user input with polling */
     char input[STEP_INPUT_BUFFER_SIZE];
@@ -264,11 +259,27 @@ int step_ci_analyze(workflow_controller_t* workflow,
         return E_PROTOCOL_FORMAT;
     }
 
-    char task[STEP_TASK_BUFFER_SIZE];
-    int result = workflow_json_extract_string(json, &tokens[task_idx], task, sizeof(task));
+    char task_template[STEP_TASK_BUFFER_SIZE];
+    int result = workflow_json_extract_string(json, &tokens[task_idx], task_template, sizeof(task_template));
     if (result != ARGO_SUCCESS) {
         return result;
     }
+
+    /* Substitute variables in task */
+    char task[STEP_TASK_BUFFER_SIZE];
+    LOG_DEBUG("step_ci_analyze: task_template = '%s'", task_template);
+    LOG_DEBUG("step_ci_analyze: context has %d variables", ctx ? ctx->count : 0);
+    if (ctx && ctx->count > 0) {
+        for (int i = 0; i < ctx->count; i++) {
+            LOG_DEBUG("  context[%d]: %s = '%s'", i, ctx->keys[i], ctx->values[i]);
+        }
+    }
+    result = workflow_context_substitute(ctx, task_template, task, sizeof(task));
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "step_ci_analyze", "variable substitution failed");
+        return result;
+    }
+    LOG_DEBUG("step_ci_analyze: task after substitution = '%s'", task);
 
     /* Find save_to field */
     int save_to_idx = workflow_json_find_field(json, tokens, step_index, STEP_FIELD_SAVE_TO);
@@ -291,8 +302,8 @@ int step_ci_analyze(workflow_controller_t* workflow,
         } else {
             snprintf(analysis_msg, sizeof(analysis_msg), "[CI Analysis] %s\n", task);
         }
-        io_channel_write_str(ctx->io_channel, analysis_msg);
-        io_channel_flush(ctx->io_channel);
+        printf("%s", analysis_msg);
+        fflush(stdout);
     }
 
     /* If provider available, use AI to perform analysis */
@@ -322,13 +333,10 @@ int step_ci_analyze(workflow_controller_t* workflow,
             /* Fall back to placeholder result */
             result = workflow_context_set(ctx, save_to, "{\"analyzed\": true}");
         } else {
-            /* Display AI response through I/O channel */
-            if (ctx->io_channel) {
-                io_channel_write_str(ctx->io_channel, "\n[AI Response]\n");
-                io_channel_write_str(ctx->io_channel, response);
-                io_channel_write_str(ctx->io_channel, "\n");
-                io_channel_flush(ctx->io_channel);
-            }
+            /* Display AI response to stdout (log file) */
+            printf("\n[AI Response]\n%s\n", response);
+            fflush(stdout);
+
             /* Save AI response to context */
             result = workflow_context_set(ctx, save_to, response);
         }

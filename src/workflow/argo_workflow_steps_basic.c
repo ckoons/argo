@@ -115,6 +115,30 @@ int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
     return ARGO_SUCCESS;
 }
 
+/* Helper: Process escape sequences in string */
+static void process_escape_sequences(char* str) {
+    if (!str) return;
+
+    char* src = str;
+    char* dst = str;
+
+    while (*src) {
+        if (*src == '\\' && *(src + 1)) {
+            switch (*(src + 1)) {
+                case 'n':  *dst++ = '\n'; src += 2; break;
+                case 't':  *dst++ = '\t'; src += 2; break;
+                case 'r':  *dst++ = '\r'; src += 2; break;
+                case '\\': *dst++ = '\\'; src += 2; break;
+                case '"':  *dst++ = '"';  src += 2; break;
+                default:   *dst++ = *src++; break;
+            }
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+}
+
 /* Step: display */
 int step_display(const char* json, jsmntok_t* tokens, int step_index,
                  workflow_context_t* ctx) {
@@ -144,8 +168,11 @@ int step_display(const char* json, jsmntok_t* tokens, int step_index,
         return result;
     }
 
+    /* Process escape sequences (\n, \t, etc.) */
+    process_escape_sequences(output);
+
     /* Display message to stdout (redirected to log file by daemon) */
-    printf("%s\n", output);
+    printf("%s", output);
     fflush(stdout);
 
     LOG_DEBUG("Displayed message: %s", output);

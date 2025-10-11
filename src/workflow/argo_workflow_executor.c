@@ -429,6 +429,19 @@ int workflow_execute_current_step(workflow_controller_t* workflow) {
         return result;
     }
 
+    /* Minimal debug output: step ID, type, and context variables */
+    printf("[Step %s: %s]", workflow->current_step_id, type);
+    if (workflow->context && workflow->context->count > 0) {
+        printf(" {");
+        for (int i = 0; i < workflow->context->count; i++) {
+            if (i > 0) printf(", ");
+            printf("%s=\"%s\"", workflow->context->keys[i], workflow->context->values[i]);
+        }
+        printf("}");
+    }
+    printf("\n");
+    fflush(stdout);
+
     char next_step[WORKFLOW_STEP_ID_MAX];
 
     /* Find step handler in dispatch table */

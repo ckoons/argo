@@ -1,0 +1,41 @@
+{
+  "workflow_name": "test_variable_flow",
+  "description": "Integration test for variable substitution flow",
+  "phases": [
+    {
+      "phase": "TEST",
+      "steps": [
+        {
+          "step": 1,
+          "type": "display",
+          "message": "=== Variable Flow Test ===\n",
+          "next_step": 2
+        },
+        {
+          "step": 2,
+          "type": "display",
+          "message": "Before: name={{name}} (should be placeholder)\n",
+          "next_step": 3
+        },
+        {
+          "step": 3,
+          "type": "display",
+          "message": "Setting name=TestUser and age=42\n",
+          "next_step": 4
+        },
+        {
+          "step": 4,
+          "type": "display",
+          "message": "After: name={{name}} age={{age}}\n",
+          "next_step": 5
+        },
+        {
+          "step": 5,
+          "type": "display",
+          "message": "Complete - variables should be substituted above\n",
+          "next_step": "EXIT"
+        }
+      ]
+    }
+  ]
+}

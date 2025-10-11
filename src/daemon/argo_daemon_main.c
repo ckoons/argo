@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -43,22 +44,22 @@ static void kill_existing_daemon(uint16_t port) {
 
     /* Try to connect */
     if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
-        /* Port is in use - send shutdown request to existing daemon */
+        /* Port is in use - kill existing daemon using lsof */
         close(sock);
 
-        fprintf(stderr, "Port %d is in use, requesting existing daemon to shutdown...\n", port);
+        fprintf(stderr, "Port %d is in use, killing existing daemon...\n", port);
 
-        /* Send HTTP GET to /api/shutdown */
-        char shutdown_url[ARGO_BUFFER_MEDIUM];
-        snprintf(shutdown_url, sizeof(shutdown_url),
-                "curl -s -X POST http://%s:%d/api/shutdown >/dev/null 2>&1",
-                LOCALHOST_ADDR, port);
-        system(shutdown_url);
+        /* Use lsof to find the PID listening on this port and kill it */
+        char kill_cmd[ARGO_BUFFER_MEDIUM];
+        snprintf(kill_cmd, sizeof(kill_cmd),
+                "lsof -ti tcp:%d | xargs kill -9 2>/dev/null",
+                port);
+        system(kill_cmd);
 
         /* Wait for port to become free */
-        sleep(2);
+        sleep(1);
 
-        fprintf(stderr, "Previous daemon should be stopped.\n");
+        fprintf(stderr, "Previous daemon killed.\n");
     } else {
         /* Port is free */
         close(sock);
@@ -175,8 +176,27 @@ int main(int argc, char** argv) {
     fprintf(stderr, "============================\n");
     fflush(stderr);
 
+    /* Initialize .argo directory structure */
+    const char* home = getenv("HOME");
+    if (!home) {
+        fprintf(stderr, "Error: HOME environment variable not set\n");
+        return 1;
+    }
+
+    char argo_dir[ARGO_PATH_MAX];
+    snprintf(argo_dir, sizeof(argo_dir), "%s/.argo", home);
+    mkdir(argo_dir, ARGO_DIR_PERMISSIONS);
+
+    char logs_dir[ARGO_PATH_MAX];
+    snprintf(logs_dir, sizeof(logs_dir), "%s/.argo/logs", home);
+    mkdir(logs_dir, ARGO_DIR_PERMISSIONS);
+
     /* Initialize logging system */
-    log_init(".argo/logs");
+    int log_result = log_init(logs_dir);
+    if (log_result != ARGO_SUCCESS) {
+        fprintf(stderr, "Warning: Failed to initialize logging to %s (error %d)\n", logs_dir, log_result);
+        fprintf(stderr, "Continuing without file logging...\n");
+    }
     log_set_level(LOG_DEBUG);
     LOG_DEBUG("Daemon debug logging enabled (PID %d)", getpid());
 
