@@ -56,6 +56,7 @@ int argo_daemon_register_api_routes(argo_daemon_t* daemon) {
                          "/api/workflow/input", api_workflow_input_post);
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
                          "/api/workflow/input", api_workflow_input_get);
+    /* Note: No POST /api/workflow/output - executor writes to stdout/log file only */
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
                          "/api/workflow/output", api_workflow_output_get);
 

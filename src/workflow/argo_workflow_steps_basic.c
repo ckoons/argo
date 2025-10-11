@@ -62,27 +62,11 @@ int step_user_ask(const char* json, jsmntok_t* tokens, int step_index,
         return E_IO_INVALID;
     }
 
-    LOG_DEBUG("step_user_ask: Sending prompt via I/O channel: '%s'", prompt);
+    LOG_DEBUG("step_user_ask: Sending prompt to stdout (log file): '%s'", prompt);
 
-    /* Send prompt through I/O channel */
-    result = io_channel_write_str(ctx->io_channel, prompt);
-    if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "step_user_ask", "failed to write prompt");
-        return result;
-    }
-    LOG_DEBUG("step_user_ask: Prompt sent successfully");
-
-    result = io_channel_write_str(ctx->io_channel, " ");
-    if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "step_user_ask", "failed to write space");
-        return result;
-    }
-
-    result = io_channel_flush(ctx->io_channel);
-    if (result != ARGO_SUCCESS) {
-        argo_report_error(result, "step_user_ask", "failed to flush prompt");
-        return result;
-    }
+    /* Send prompt to stdout (which is redirected to log file by daemon) */
+    printf("%s ", prompt);
+    fflush(stdout);
 
     /* Read user input from I/O channel with polling */
     char input[STEP_INPUT_BUFFER_SIZE];
