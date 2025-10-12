@@ -5,29 +5,13 @@
 #include "argo_http_server.h"
 #include "argo_daemon.h"
 
-/* Workflow API handlers */
-int api_workflow_start(http_request_t* req, http_response_t* resp);
-int api_workflow_list(http_request_t* req, http_response_t* resp);
-int api_workflow_status(http_request_t* req, http_response_t* resp);
-int api_workflow_pause(http_request_t* req, http_response_t* resp);
-int api_workflow_resume(http_request_t* req, http_response_t* resp);
-int api_workflow_abandon(http_request_t* req, http_response_t* resp);
+/* TODO: Unix pivot - workflow API handlers removed, will be replaced with bash-based workflows */
+/* Stub declarations for API handlers that were deleted with workflow engine */
 
-/* Executor progress reporting */
-int api_workflow_progress(http_request_t* req, http_response_t* resp);
-
-/* Interactive workflow I/O */
-int api_workflow_input_post(http_request_t* req, http_response_t* resp);
-int api_workflow_input_get(http_request_t* req, http_response_t* resp);
-int api_workflow_output_get(http_request_t* req, http_response_t* resp);
-
-/* Registry API handlers */
-int api_registry_list_ci(http_request_t* req, http_response_t* resp);
-
-/* Global daemon context for API handlers */
+/* Global daemon context (defined in argo_daemon_api_routes.c) */
 extern argo_daemon_t* g_api_daemon;
 
-/* Initialize API routes */
+/* Register API routes */
 int argo_daemon_register_api_routes(argo_daemon_t* daemon);
 
 #endif /* ARGO_DAEMON_API_H */

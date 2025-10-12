@@ -27,38 +27,12 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
     daemon->port = port;
     daemon->should_shutdown = false;
 
-    /* Initialize workflow registry mutex */
-    if (pthread_mutex_init(&daemon->workflow_registry_lock, NULL) != 0) {
-        argo_report_error(E_SYSTEM_THREAD, "argo_daemon_create", "mutex init failed");
-        free(daemon);
-        return NULL;
-    }
-
-    /* Create and load workflow registry - SINGLE INSTANCE */
-    daemon->workflow_registry = workflow_registry_create(".argo/workflows/registry/active_workflow_registry.json");
-    if (!daemon->workflow_registry) {
-        argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "workflow registry creation failed");
-        pthread_mutex_destroy(&daemon->workflow_registry_lock);
-        free(daemon);
-        return NULL;
-    }
-
-    /* Load registry from disk */
-    int result = workflow_registry_load(daemon->workflow_registry);
-    if (result != ARGO_SUCCESS && result != E_SYSTEM_FILE) {
-        argo_report_error(result, "argo_daemon_create", "failed to load workflow registry");
-        /* Continue anyway - empty registry is OK */
-    }
-
-    /* Cleanup dead workflows on startup */
-    workflow_registry_cleanup_dead_workflows(daemon->workflow_registry);
+    /* TODO: Unix pivot - workflow registry removed, will be replaced with bash-based workflows */
 
     /* Create HTTP server */
     daemon->http_server = http_server_create(port);
     if (!daemon->http_server) {
         argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "HTTP server creation failed");
-        workflow_registry_destroy(daemon->workflow_registry);
-        pthread_mutex_destroy(&daemon->workflow_registry_lock);
         free(daemon);
         return NULL;
     }
@@ -101,11 +75,7 @@ void argo_daemon_destroy(argo_daemon_t* daemon) {
         http_server_destroy(daemon->http_server);
     }
 
-    /* Save and destroy workflow registry */
-    if (daemon->workflow_registry) {
-        workflow_registry_destroy(daemon->workflow_registry);
-        pthread_mutex_destroy(&daemon->workflow_registry_lock);
-    }
+    /* TODO: Unix pivot - workflow registry cleanup removed */
 
     free(daemon);
 }
@@ -136,9 +106,7 @@ int daemon_handle_version(http_request_t* req, http_response_t* resp) {
 int daemon_handle_shutdown(http_request_t* req, http_response_t* resp) {
     (void)req;  /* Unused */
 
-    /* Get daemon from global context */
-    extern argo_daemon_t* g_api_daemon;
-
+    /* Get daemon from global context (defined in argo_daemon_api_routes.c) */
     if (g_api_daemon) {
         g_api_daemon->should_shutdown = true;
     }

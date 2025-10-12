@@ -8,15 +8,13 @@
 #include "argo_http_server.h"
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
-#include "argo_workflow_registry.h"
 
 /* Daemon structure */
 typedef struct {
     http_server_t* http_server;
     ci_registry_t* registry;
     lifecycle_manager_t* lifecycle;
-    workflow_registry_t* workflow_registry;  /* Single shared registry */
-    pthread_mutex_t workflow_registry_lock;  /* Protect registry access */
+    /* TODO: workflow_registry removed during Unix pivot, will be replaced with bash-based workflows */
     uint16_t port;
     bool should_shutdown;  /* Graceful shutdown flag */
 } argo_daemon_t;

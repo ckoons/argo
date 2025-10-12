@@ -15,7 +15,6 @@
 
 /* Project includes */
 #include "argo_ci.h"
-#include "argo_ci_defaults.h"
 #include "argo_ci_common.h"
 #include "argo_api_common.h"
 #include "argo_error.h"
@@ -88,15 +87,12 @@ ci_provider_t* ollama_create_provider(const char* model_name) {
         strncpy(ctx->model, OLLAMA_DEFAULT_MODEL, sizeof(ctx->model) - 1);
     }
 
-    /* Look up model defaults */
-    const ci_model_config_t* config = ci_get_model_defaults(ctx->model);
-    if (config) {
-        ctx->provider.supports_streaming = config->supports_streaming;
-        ctx->provider.supports_memory = false;  /* Ollama doesn't track memory */
-        ctx->provider.max_context = config->max_context;
-        strncpy(ctx->provider.name, "ollama", sizeof(ctx->provider.name) - 1);
-        strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
-    }
+    /* Set provider metadata */
+    strncpy(ctx->provider.name, "ollama", sizeof(ctx->provider.name) - 1);
+    strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
+    ctx->provider.supports_streaming = true;
+    ctx->provider.supports_memory = false;
+    ctx->provider.max_context = OLLAMA_DEFAULT_CONTEXT_SIZE;
 
     /* Set endpoint */
     strncpy(ctx->endpoint, OLLAMA_DEFAULT_ENDPOINT, sizeof(ctx->endpoint) - 1);
@@ -524,4 +520,23 @@ static int connect_to_ollama(const char* host, int port) {
     }
 
     return sock_fd;
+}
+
+/* Check if Ollama server is running */
+bool ollama_is_running(void) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return false;
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(OLLAMA_DEFAULT_PORT);
+    addr.sin_addr.s_addr = inet_addr(LOCALHOST_IP);
+
+    /* Set timeout for connect */
+    struct timeval tv = {1, 0};
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    int result = connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+    close(sock);
+    return result == 0;
 }

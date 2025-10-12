@@ -13,7 +13,7 @@ include Makefile.clean
 include Makefile.help
 
 # Default target
-all: directories $(BUILD_DIR)/stubs.c $(CORE_LIB) $(DAEMON_LIB) $(DAEMON_BINARY)
+all: directories $(CORE_LIB) $(DAEMON_LIB) $(DAEMON_BINARY)
 
 # Full build - clean, build all components, install
 full-build: clean-all all-components install-all

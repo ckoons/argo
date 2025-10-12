@@ -12,8 +12,8 @@
 #include "argo_error.h"
 #include "argo_log.h"
 
-/* Global daemon context for API handlers (defined in argo_daemon_api_workflow.c) */
-extern argo_daemon_t* g_api_daemon;
+/* Global daemon context for API handlers */
+argo_daemon_t* g_api_daemon = NULL;
 
 /* GET /api/registry/ci - List CIs */
 int api_registry_list_ci(http_request_t* req, http_response_t* resp) {
@@ -35,34 +35,13 @@ int argo_daemon_register_api_routes(argo_daemon_t* daemon) {
 
     g_api_daemon = daemon;
 
-    /* Workflow routes */
-    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
-                         "/api/workflow/start", api_workflow_start);
-    http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
-                         "/api/workflow/list", api_workflow_list);
-    http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
-                         "/api/workflow/status", api_workflow_status);
-    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
-                         "/api/workflow/pause", api_workflow_pause);
-    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
-                         "/api/workflow/resume", api_workflow_resume);
-    http_server_add_route(daemon->http_server, HTTP_METHOD_DELETE,
-                         "/api/workflow/abandon", api_workflow_abandon);
-    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
-                         "/api/workflow/progress", api_workflow_progress);
-
-    /* Interactive workflow I/O routes */
-    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
-                         "/api/workflow/input", api_workflow_input_post);
-    http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
-                         "/api/workflow/input", api_workflow_input_get);
-    /* Note: No POST /api/workflow/output - executor writes to stdout/log file only */
-    http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
-                         "/api/workflow/output", api_workflow_output_get);
+    /* TODO: Unix pivot - workflow API routes removed, will be replaced with bash-based workflows */
+    /* Old JSON workflow routes deleted */
 
     /* Registry routes */
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
                          "/api/registry/ci", api_registry_list_ci);
 
+    LOG_INFO("API routes registered (workflow routes pending Unix pivot)");
     return ARGO_SUCCESS;
 }

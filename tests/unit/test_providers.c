@@ -8,7 +8,6 @@
 #include "../include/argo_provider.h"
 #include "../include/argo_registry.h"
 #include "../include/argo_ollama.h"
-#include "../include/argo_claude.h"
 #include "../include/argo_api_providers.h"
 #include "../include/argo_error.h"
 

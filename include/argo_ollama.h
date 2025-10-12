@@ -4,7 +4,9 @@
 #define ARGO_OLLAMA_H
 
 #include "argo_ci.h"
-#include "argo_ci_defaults.h"
+
+/* Ollama default context size */
+#define OLLAMA_DEFAULT_CONTEXT_SIZE 128000
 
 /* Ollama configuration */
 #define OLLAMA_DEFAULT_ENDPOINT "http://localhost"
@@ -37,7 +39,6 @@ ci_provider_t* ollama_create_provider(const char* model_name);
 int ollama_list_models(char*** models, int* count);
 int ollama_pull_model(const char* model_name);
 bool ollama_is_running(void);
-int ollama_get_model_info(const char* model_name, ci_model_config_t* config);
 
 /* Streaming control */
 void ollama_set_streaming(ci_provider_t* provider, bool enabled);

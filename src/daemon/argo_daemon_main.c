@@ -19,7 +19,6 @@
 #include "argo_env_utils.h"
 #include "argo_limits.h"
 #include "argo_urls.h"
-#include "argo_workflow_registry.h"
 #include "argo_log.h"
 
 /* Localhost address */
@@ -75,7 +74,7 @@ static void signal_handler(int signum) {
     }
 }
 
-/* SIGCHLD handler to reap completed workflow executors and auto-remove from registry */
+/* SIGCHLD handler to reap completed workflow executors */
 static void sigchld_handler(int signum) {
     (void)signum;
     int status;
@@ -83,24 +82,8 @@ static void sigchld_handler(int signum) {
 
     /* Reap all terminated children */
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        if (!g_daemon || !g_daemon->workflow_registry) {
-            continue;
-        }
-
-        /* Find workflow by PID and remove it */
-        pthread_mutex_lock(&g_daemon->workflow_registry_lock);
-
-        /* Iterate through all workflows to find one with matching PID */
-        for (int i = 0; i < g_daemon->workflow_registry->workflow_count; i++) {
-            workflow_instance_t* wf = &g_daemon->workflow_registry->workflows[i];
-            if (wf->pid == pid) {
-                /* Workflow executor completed - remove from registry */
-                workflow_registry_remove_workflow(g_daemon->workflow_registry, wf->id);
-                break;
-            }
-        }
-
-        pthread_mutex_unlock(&g_daemon->workflow_registry_lock);
+        /* TODO: Unix pivot - workflow registry cleanup removed, will be replaced with bash-based process tracking */
+        (void)pid;  /* Process reaped, logging could be added here */
     }
 }
 
