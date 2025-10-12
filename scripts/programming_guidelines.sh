@@ -213,6 +213,39 @@ else
 fi
 echo ""
 
+# 12. Hard-coded URLs check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "12. HARD-CODED URLS/ENDPOINTS CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Look for complete URLs in .c files (not just constants)
+# Exclude: comments, defines, daemon_client.c (URL builder itself), providers (external APIs)
+HARDCODED_URLS=$(grep -rn '"http://\|"https://' src/ --include="*.c" | \
+  grep -v '^\s*//' | \
+  grep -v '^\s*\*' | \
+  grep -v '#define' | \
+  grep -v 'argo_daemon_client.c' | \
+  grep -v 'src/providers/' | \
+  wc -l | tr -d ' ')
+
+if [ "$HARDCODED_URLS" -gt 0 ]; then
+  echo "⚠ WARN: Found $HARDCODED_URLS hard-coded internal daemon URLs"
+  echo ""
+  echo "Details:"
+  grep -rn '"http://\|"https://' src/ --include="*.c" | \
+    grep -v '^\s*//' | \
+    grep -v '^\s*\*' | \
+    grep -v '#define' | \
+    grep -v 'argo_daemon_client.c' | \
+    grep -v 'src/providers/' | head -5
+  echo ""
+  echo "Action: Use argo_get_daemon_url() for daemon connections"
+  echo "Note: Provider URLs (external APIs) are acceptable"
+  WARNINGS=$((WARNINGS + 1))
+else
+  echo "✓ PASS: No hard-coded daemon URLs (external API URLs acceptable)"
+fi
+echo ""
+
 # Summary
 echo "=========================================="
 echo "SUMMARY"
