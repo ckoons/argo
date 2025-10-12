@@ -31,9 +31,9 @@ int arc_workflow_status(int argc, char** argv) {
         }
     }
 
-    /* Build request URL with query parameter */
+    /* Build request URL with path parameter */
     char endpoint[ARGO_PATH_MAX];
-    snprintf(endpoint, sizeof(endpoint), "/api/workflow/status?workflow_name=%s", workflow_name);
+    snprintf(endpoint, sizeof(endpoint), "/api/workflow/status/%s", workflow_name);
 
     /* Send GET request to daemon */
     arc_http_response_t* response = NULL;
@@ -59,31 +59,37 @@ int arc_workflow_status(int argc, char** argv) {
         return ARC_EXIT_ERROR;
     }
 
-    /* Parse JSON response and display (simplified) */
+    /* Parse JSON response and display */
     if (response->body) {
         /* Extract key fields from JSON */
-        char template_name[ARGO_BUFFER_NAME] = {0};
-        char status[ARGO_BUFFER_TINY] = {0};
+        char script[ARGO_PATH_MAX] = {0};
+        char state[ARGO_BUFFER_TINY] = {0};
         int pid = 0;
+        int exit_code = 0;
 
-        const char* template_str = strstr(response->body, "\"template\"");
-        const char* status_str = strstr(response->body, "\"status\"");
+        const char* script_str = strstr(response->body, "\"script\"");
+        const char* state_str = strstr(response->body, "\"state\"");
         const char* pid_str = strstr(response->body, "\"pid\"");
+        const char* exit_str = strstr(response->body, "\"exit_code\"");
 
-        if (template_str) {
-            sscanf(template_str, "\"template\":\"%127[^\"]\"", template_name);
+        if (script_str) {
+            sscanf(script_str, "\"script\":\"%511[^\"]\"", script);
         }
-        if (status_str) {
-            sscanf(status_str, "\"status\":\"%31[^\"]\"", status);
+        if (state_str) {
+            sscanf(state_str, "\"state\":\"%31[^\"]\"", state);
         }
         if (pid_str) {
             sscanf(pid_str, "\"pid\":%d", &pid);
         }
+        if (exit_str) {
+            sscanf(exit_str, "\"exit_code\":%d", &exit_code);
+        }
 
         LOG_USER_STATUS("\nWORKFLOW: %s\n", workflow_name);
-        LOG_USER_STATUS("  Template:       %s\n", template_name);
-        LOG_USER_STATUS("  Status:         %s\n", status);
+        LOG_USER_STATUS("  Script:         %s\n", script);
+        LOG_USER_STATUS("  State:          %s\n", state);
         LOG_USER_STATUS("  PID:            %d\n", pid);
+        LOG_USER_STATUS("  Exit code:      %d\n", exit_code);
         LOG_USER_STATUS("  Logs:           ~/.argo/logs/%s.log\n\n", workflow_name);
     }
 

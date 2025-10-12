@@ -16,9 +16,6 @@ int main(int argc, char** argv) {
     if (strcmp(argv[1], "help") == 0) {
         return arc_cmd_help(argc - 2, argv + 2);
     }
-    else if (strcmp(argv[1], "switch") == 0) {
-        return arc_cmd_switch(argc - 2, argv + 2);
-    }
     else if (strcmp(argv[1], "workflow") == 0) {
         return arc_cmd_workflow(argc - 2, argv + 2);
     }

@@ -16,10 +16,9 @@ TEST_DIR = tests
 BUILD_DIR = build
 PARENT_BUILD = ../build
 
-# Argo libraries (arc needs all three: core + daemon + workflow)
+# Argo libraries (arc needs core + daemon for HTTP client)
 ARGO_CORE = $(PARENT_BUILD)/libargo_core.a
 ARGO_DAEMON = $(PARENT_BUILD)/libargo_daemon.a
-ARGO_WORKFLOW = $(PARENT_BUILD)/libargo_workflow.a
 
 # Source files
 SOURCES = $(wildcard $(SRC_DIR)/*.c)
@@ -49,10 +48,10 @@ directories:
 	@mkdir -p ../bin/tests
 	@mkdir -p bin/tests
 
-# Build arc executable into ../bin/ (links daemon + workflow + core)
-$(TARGET): $(OBJECTS) $(ARGO_CORE) $(ARGO_DAEMON) $(ARGO_WORKFLOW)
+# Build arc executable into ../bin/ (links daemon + core)
+$(TARGET): $(OBJECTS) $(ARGO_CORE) $(ARGO_DAEMON)
 	@mkdir -p ../bin
-	$(CC) $(OBJECTS) $(ARGO_DAEMON) $(ARGO_WORKFLOW) $(ARGO_CORE) -o $@ $(LDFLAGS)
+	$(CC) $(OBJECTS) $(ARGO_DAEMON) $(ARGO_CORE) -o $@ $(LDFLAGS)
 	@echo "Built arc CLI -> $@"
 
 # Compile source files
@@ -64,9 +63,9 @@ $(BUILD_DIR)/test_%.o: $(TEST_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build test executables into bin/tests/ (exclude main.o to avoid duplicate main)
-bin/tests/test_%: $(BUILD_DIR)/test_%.o $(TEST_OBJECTS_LIB) $(ARGO_CORE) $(ARGO_DAEMON) $(ARGO_WORKFLOW)
+bin/tests/test_%: $(BUILD_DIR)/test_%.o $(TEST_OBJECTS_LIB) $(ARGO_CORE) $(ARGO_DAEMON)
 	@mkdir -p bin/tests
-	$(CC) $< $(TEST_OBJECTS_LIB) $(ARGO_DAEMON) $(ARGO_WORKFLOW) $(ARGO_CORE) -o $@ $(LDFLAGS)
+	$(CC) $< $(TEST_OBJECTS_LIB) $(ARGO_DAEMON) $(ARGO_CORE) -o $@ $(LDFLAGS)
 
 # Unit tests (C tests)
 test-arc-unit: $(TEST_TARGETS)

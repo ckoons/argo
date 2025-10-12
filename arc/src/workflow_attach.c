@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -13,12 +14,9 @@
 #include "arc_error.h"
 #include "arc_constants.h"
 #include "arc_http_client.h"
-#include "argo_workflow_registry.h"
-#include "argo_init.h"
 #include "argo_error.h"
 #include "argo_output.h"
 
-#define WORKFLOW_REGISTRY_PATH ".argo/workflows/registry/active_workflow_registry.json"
 #define INPUT_BUFFER_SIZE 4096
 
 /* Thread synchronization */
@@ -253,42 +251,21 @@ int arc_workflow_attach(int argc, char** argv) {
         }
     }
 
-    /* Initialize argo */
-    int result = argo_init();
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to initialize argo\n");
-        return ARC_EXIT_ERROR;
-    }
-
-    /* Load workflow registry */
-    workflow_registry_t* registry = workflow_registry_create(WORKFLOW_REGISTRY_PATH);
-    if (!registry) {
-        LOG_USER_ERROR("Failed to create workflow registry\n");
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
-    result = workflow_registry_load(registry);
-    if (result != ARGO_SUCCESS) {
-        LOG_USER_ERROR("Failed to load workflow registry\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
-    /* Verify workflow exists */
-    workflow_instance_t* wf = workflow_registry_get_workflow(registry, workflow_id);
-    if (!wf) {
-        LOG_USER_ERROR("Workflow not found: %s\n", workflow_id);
-        LOG_USER_INFO("Try: arc list\n");
-        workflow_registry_destroy(registry);
-        argo_exit();
-        return ARC_EXIT_ERROR;
-    }
-
     /* Get log path */
     char log_path[512];
     get_log_path(workflow_id, log_path, sizeof(log_path));
+
+    /* Check if log file exists (workflow must have been started) */
+    struct stat st;
+    if (stat(log_path, &st) < 0) {
+        LOG_USER_ERROR("Workflow log not found: %s\n", workflow_id);
+        LOG_USER_INFO("  Log path: %s\n", log_path);
+        LOG_USER_INFO("  Workflow may not exist or hasn't started yet\n");
+        LOG_USER_INFO("Try: arc workflow list\n");
+        return ARC_EXIT_ERROR;
+    }
+
+    int result;
 
     /* Get cursor position for this terminal */
     off_t cursor = get_cursor_position(workflow_id);
@@ -309,10 +286,6 @@ int arc_workflow_attach(int argc, char** argv) {
         set_cursor_position(workflow_id, final_pos);
         LOG_USER_INFO("\n[Detached from workflow: %s]\n", workflow_id);
     }
-
-    /* Cleanup */
-    workflow_registry_destroy(registry);
-    argo_exit();
 
     return (result == ARGO_SUCCESS) ? ARC_EXIT_SUCCESS : ARC_EXIT_ERROR;
 }
