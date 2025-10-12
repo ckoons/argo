@@ -45,7 +45,8 @@ full-build: clean-all all-components install-all
         test-shutdown-signals test-concurrent-workflows test-env-precedence \
         test-shared-services test-workflow-registry test-valgrind build-asan \
         test-asan test-asan-full help help-test help-count restart-daemon \
-        code-analysis code-analysis-quick code-coverage find-dead-code full-build
+        code-analysis code-analysis-quick code-coverage find-dead-code full-build \
+        programming-guidelines
 
 # Code Analysis Targets
 code-analysis:
@@ -63,4 +64,14 @@ code-coverage:
 find-dead-code:
 	@echo "Running dead code detection..."
 	@./scripts/find_dead_code.sh
+
+# Programming Guidelines Check
+programming-guidelines:
+	@echo ""
+	@echo "=========================================="
+	@echo "Running Programming Guidelines Check"
+	@echo "=========================================="
+	@./scripts/programming_guidelines.sh /tmp/argo_programming_guidelines_report.txt
+	@echo ""
+	@echo "Full report available at: /tmp/argo_programming_guidelines_report.txt"
 
