@@ -97,6 +97,8 @@ Makefile organization and build system documentation.
 
 Design documents, architecture decisions, and future plans.
 
+**Important**: See [`plans/PIVOT_STATUS.md`](plans/PIVOT_STATUS.md) for current architecture status after the Unix workflow pivot.
+
 ## Documentation Conventions
 
 ### File Naming
