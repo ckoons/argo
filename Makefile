@@ -32,7 +32,7 @@ full-build: clean-all all-components install-all
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
         test-workflow test-integration test-persistence test-workflow-loader \
-        test-session test-env test-api test-api-calls test-harnesses test-http \
+        test-session test-env test-config test-api test-api-calls test-harnesses test-http \
         test-json test-claude-providers test-arc test-arc-workflow test-arc-background \
         test-arc-full test-arc-all count-core clean distclean check debug \
         update-models harnesses harness-init-basic harness-env-inspect harness-reinit \

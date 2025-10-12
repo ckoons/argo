@@ -4,7 +4,7 @@
 
 # Quick tests - fast, no external dependencies
 # Note: Many tests removed during Unix pivot (memory, workflow, providers, integration, persistence, session, claude-providers, api-common)
-test-quick: test-registry test-lifecycle test-messaging test-env test-http test-json
+test-quick: test-registry test-lifecycle test-messaging test-env test-config test-http test-json
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -102,6 +102,13 @@ test-env: $(ENV_TEST_TARGET)
 	@echo "Environment Utilities Tests"
 	@echo "=========================================="
 	@./$(ENV_TEST_TARGET)
+
+test-config: $(CONFIG_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Configuration System Tests"
+	@echo "=========================================="
+	@./$(CONFIG_TEST_TARGET)
 
 test-thread-safety: $(THREAD_SAFETY_TEST_TARGET)
 	@echo ""
