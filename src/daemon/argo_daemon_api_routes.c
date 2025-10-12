@@ -35,13 +35,20 @@ int argo_daemon_register_api_routes(argo_daemon_t* daemon) {
 
     g_api_daemon = daemon;
 
-    /* TODO: Unix pivot - workflow API routes removed, will be replaced with bash-based workflows */
-    /* Old JSON workflow routes deleted */
+    /* Workflow routes (bash-based) */
+    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
+                         "/api/workflow/start", api_workflow_start);
+    http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
+                         "/api/workflow/list", api_workflow_list);
+    http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
+                         "/api/workflow/status", api_workflow_status);
+    http_server_add_route(daemon->http_server, HTTP_METHOD_DELETE,
+                         "/api/workflow/abandon", api_workflow_abandon);
 
     /* Registry routes */
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
                          "/api/registry/ci", api_registry_list_ci);
 
-    LOG_INFO("API routes registered (workflow routes pending Unix pivot)");
+    LOG_INFO("API routes registered (workflow API ready)");
     return ARGO_SUCCESS;
 }

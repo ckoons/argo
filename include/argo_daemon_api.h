@@ -5,11 +5,14 @@
 #include "argo_http_server.h"
 #include "argo_daemon.h"
 
-/* TODO: Unix pivot - workflow API handlers removed, will be replaced with bash-based workflows */
-/* Stub declarations for API handlers that were deleted with workflow engine */
-
 /* Global daemon context (defined in argo_daemon_api_routes.c) */
 extern argo_daemon_t* g_api_daemon;
+
+/* Workflow API handlers (bash-based) */
+int api_workflow_start(http_request_t* req, http_response_t* resp);
+int api_workflow_list(http_request_t* req, http_response_t* resp);
+int api_workflow_status(http_request_t* req, http_response_t* resp);
+int api_workflow_abandon(http_request_t* req, http_response_t* resp);
 
 /* Register API routes */
 int argo_daemon_register_api_routes(argo_daemon_t* daemon);

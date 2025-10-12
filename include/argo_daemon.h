@@ -9,12 +9,15 @@
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
 
+/* Forward declaration */
+typedef struct workflow_registry workflow_registry_t;
+
 /* Daemon structure */
 typedef struct {
     http_server_t* http_server;
     ci_registry_t* registry;
     lifecycle_manager_t* lifecycle;
-    /* TODO: workflow_registry removed during Unix pivot, will be replaced with bash-based workflows */
+    workflow_registry_t* workflow_registry;  /* Bash workflow tracking (Phase 3) */
     uint16_t port;
     bool should_shutdown;  /* Graceful shutdown flag */
 } argo_daemon_t;
@@ -31,5 +34,12 @@ void argo_daemon_stop(argo_daemon_t* daemon);
 int daemon_handle_health(http_request_t* req, http_response_t* resp);
 int daemon_handle_version(http_request_t* req, http_response_t* resp);
 int daemon_handle_shutdown(http_request_t* req, http_response_t* resp);
+
+/* Workflow execution (bash-based) */
+int daemon_execute_bash_workflow(argo_daemon_t* daemon,
+                                 const char* script_path,
+                                 char** args,
+                                 int arg_count,
+                                 const char* workflow_id);
 
 #endif /* ARGO_DAEMON_H */

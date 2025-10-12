@@ -13,8 +13,17 @@
 #include "argo_http_server.h"
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
+#include "argo_workflow_registry.h"
 #include "argo_limits.h"
 #include "argo_log.h"
+
+/* System includes for fork/exec */
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <time.h>
 
 /* Create daemon */
 argo_daemon_t* argo_daemon_create(uint16_t port) {
@@ -27,12 +36,19 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
     daemon->port = port;
     daemon->should_shutdown = false;
 
-    /* TODO: Unix pivot - workflow registry removed, will be replaced with bash-based workflows */
+    /* Create workflow registry (Phase 3) */
+    daemon->workflow_registry = workflow_registry_create();
+    if (!daemon->workflow_registry) {
+        argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "workflow registry creation failed");
+        free(daemon);
+        return NULL;
+    }
 
     /* Create HTTP server */
     daemon->http_server = http_server_create(port);
     if (!daemon->http_server) {
         argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "HTTP server creation failed");
+        workflow_registry_destroy(daemon->workflow_registry);
         free(daemon);
         return NULL;
     }
@@ -42,6 +58,7 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
     if (!daemon->registry) {
         argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "registry creation failed");
         http_server_destroy(daemon->http_server);
+        workflow_registry_destroy(daemon->workflow_registry);
         free(daemon);
         return NULL;
     }
@@ -52,10 +69,12 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
         argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "lifecycle manager creation failed");
         registry_destroy(daemon->registry);
         http_server_destroy(daemon->http_server);
+        workflow_registry_destroy(daemon->workflow_registry);
         free(daemon);
         return NULL;
     }
 
+    LOG_INFO("Daemon created with workflow registry");
     return daemon;
 }
 
@@ -75,9 +94,12 @@ void argo_daemon_destroy(argo_daemon_t* daemon) {
         http_server_destroy(daemon->http_server);
     }
 
-    /* TODO: Unix pivot - workflow registry cleanup removed */
+    if (daemon->workflow_registry) {
+        workflow_registry_destroy(daemon->workflow_registry);
+    }
 
     free(daemon);
+    LOG_INFO("Daemon destroyed");
 }
 
 /* Health check handler */
@@ -146,4 +168,104 @@ void argo_daemon_stop(argo_daemon_t* daemon) {
 
     LOG_INFO("Stopping Argo Daemon");
     http_server_stop(daemon->http_server);
+}
+
+/* Execute bash workflow script */
+int daemon_execute_bash_workflow(argo_daemon_t* daemon,
+                                 const char* script_path,
+                                 char** args,
+                                 int arg_count,
+                                 const char* workflow_id) {
+    if (!daemon || !script_path || !workflow_id) {
+        return E_INPUT_NULL;
+    }
+
+    /* Create workflow entry */
+    workflow_entry_t entry = {0};
+    strncpy(entry.workflow_id, workflow_id, sizeof(entry.workflow_id) - 1);
+    strncpy(entry.workflow_name, script_path, sizeof(entry.workflow_name) - 1);
+    entry.state = WORKFLOW_STATE_PENDING;
+    entry.start_time = time(NULL);
+    entry.end_time = 0;
+    entry.exit_code = 0;
+    entry.current_step = 0;
+    entry.total_steps = 1;  /* Bash scripts don't have steps */
+
+    /* Add to registry before forking */
+    int result = workflow_registry_add(daemon->workflow_registry, &entry);
+    if (result != ARGO_SUCCESS) {
+        argo_report_error(result, "daemon_execute_bash_workflow",
+                         "Failed to add workflow to registry");
+        return result;
+    }
+
+    /* Fork process */
+    pid_t pid = fork();
+    if (pid < 0) {
+        /* Fork failed */
+        argo_report_error(E_SYSTEM_FORK, "daemon_execute_bash_workflow", "fork failed");
+        workflow_registry_update_state(daemon->workflow_registry, workflow_id,
+                                      WORKFLOW_STATE_FAILED);
+        return E_SYSTEM_FORK;
+    }
+
+    if (pid == 0) {
+        /* Child process - execute bash script */
+
+        /* Create log directory if needed */
+        const char* home = getenv("HOME");
+        if (!home) home = ".";
+
+        char log_dir[ARGO_PATH_MAX];
+        snprintf(log_dir, sizeof(log_dir), "%s/.argo/logs", home);
+        mkdir(log_dir, 0755);
+
+        /* Redirect stdout/stderr to log file */
+        char log_path[ARGO_PATH_MAX];
+        snprintf(log_path, sizeof(log_path), "%s/%s.log", log_dir, workflow_id);
+
+        int log_fd = open(log_path, O_CREAT | O_WRONLY | O_APPEND, 0644);
+        if (log_fd >= 0) {
+            dup2(log_fd, STDOUT_FILENO);
+            dup2(log_fd, STDERR_FILENO);
+            close(log_fd);
+        }
+
+        /* Build argv for bash execution */
+        char** exec_args = malloc(sizeof(char*) * (arg_count + 3));
+        if (!exec_args) {
+            fprintf(stderr, "Failed to allocate exec args\n");
+            exit(E_SYSTEM_MEMORY);
+        }
+
+        exec_args[0] = "/bin/bash";
+        exec_args[1] = (char*)script_path;
+        for (int i = 0; i < arg_count; i++) {
+            exec_args[i + 2] = args[i];
+        }
+        exec_args[arg_count + 2] = NULL;
+
+        /* Execute bash script */
+        execv("/bin/bash", exec_args);
+
+        /* If execv returns, it failed */
+        fprintf(stderr, "Failed to execute script: %s\n", script_path);
+        exit(E_SYSTEM_PROCESS);
+    }
+
+    /* Parent process - update registry with PID */
+    workflow_registry_update_state(daemon->workflow_registry, workflow_id,
+                                  WORKFLOW_STATE_RUNNING);
+
+    /* Store PID in registry entry */
+    /* Note: workflow_entry_t has executor_pid field */
+    const workflow_entry_t* wf_entry = workflow_registry_find(daemon->workflow_registry, workflow_id);
+    if (wf_entry) {
+        /* Need to cast away const to update - this is a limitation of current API */
+        workflow_entry_t* mutable_entry = (workflow_entry_t*)wf_entry;
+        mutable_entry->executor_pid = pid;
+    }
+
+    LOG_INFO("Started bash workflow: %s (PID: %d)", workflow_id, pid);
+    return ARGO_SUCCESS;
 }
