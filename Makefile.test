@@ -3,11 +3,31 @@
 # Test target definitions, test harnesses, validation
 
 # Quick tests - fast, no external dependencies
-# Note: Many tests removed during Unix pivot (memory, workflow, providers, integration, persistence, session, claude-providers, api-common)
 test-quick: test-registry test-lifecycle test-messaging test-env test-config test-isolated-env test-workflow-registry test-http test-json
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
+	@echo "=========================================="
+
+# Integration tests - requires daemon + arc binaries
+test-integration-bash: $(DAEMON_BINARY) arc
+	@echo ""
+	@echo "=========================================="
+	@echo "Bash Workflow Integration Tests"
+	@echo "=========================================="
+	@./tests/integration/test_bash_workflows.sh
+
+test-integration-daemon: $(DAEMON_BINARY)
+	@echo ""
+	@echo "=========================================="
+	@echo "Daemon API Integration Tests"
+	@echo "=========================================="
+	@./tests/integration/test_daemon_api.sh
+
+test-integration-all: test-integration-bash test-integration-daemon
+	@echo ""
+	@echo "=========================================="
+	@echo "All Integration Tests Complete"
 	@echo "=========================================="
 
 # All safe tests - includes API availability checks but no costs
@@ -341,13 +361,16 @@ test-harnesses: harnesses
 	@echo "Harness Tests Complete"
 	@echo "=========================================="
 
-# Run all local tests: unit tests + harnesses (no API costs)
-test-all: test-quick test-harnesses
+# Run all local tests: unit tests + harnesses + integration tests (no API costs)
+test-all: test-quick test-integration-all test-harnesses arc
+	@$(MAKE) -C arc test-arc-unit
 	@echo ""
 	@echo "=========================================="
 	@echo "ALL LOCAL TESTS COMPLETE"
-	@echo "  Unit Tests: PASSED (95 tests)"
-	@echo "  Harnesses:  PASSED (4 tests)"
+	@echo "  Unit Tests:        PASSED"
+	@echo "  Integration Tests: PASSED"
+	@echo "  Arc Tests:         PASSED"
+	@echo "  Harnesses:         PASSED"
 	@echo "=========================================="
 	@echo ""
 	@echo "To run tests with live API calls (costs money):"
