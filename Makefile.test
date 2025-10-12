@@ -24,7 +24,14 @@ test-integration-daemon: $(DAEMON_BINARY)
 	@echo "=========================================="
 	@./tests/integration/test_daemon_api.sh
 
-test-integration-all: test-integration-bash test-integration-daemon
+test-integration-complete: $(DAEMON_BINARY) arc
+	@echo ""
+	@echo "=========================================="
+	@echo "Complete End-to-End Integration Tests"
+	@echo "=========================================="
+	@./tests/integration/test_complete_e2e.sh
+
+test-integration-all: test-integration-bash test-integration-daemon test-integration-complete
 	@echo ""
 	@echo "=========================================="
 	@echo "All Integration Tests Complete"
