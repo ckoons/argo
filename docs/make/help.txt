@@ -71,6 +71,15 @@ UTILITY SCRIPTS
   scripts              Build utility scripts only
   update-models        Update model defaults from providers
 
+CODE QUALITY
+------------
+  programming-guidelines   Run comprehensive programming standards check
+                          (Output: /tmp/argo_programming_guidelines_report.txt)
+  code-analysis           Run comprehensive code analysis
+  code-analysis-quick     Quick unused function check
+  find-dead-code          Run dead code detection
+  code-coverage           Setup code coverage analysis
+
 MEMORY TESTING
 --------------
   test-valgrind        Run valgrind leak detection
