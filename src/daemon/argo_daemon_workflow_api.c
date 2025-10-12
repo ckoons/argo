@@ -90,29 +90,38 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
         return result;
     }
 
-    /* Build JSON response */
-    char* json_response = malloc(count * 256 + 100);  /* Rough estimate */
+    /* Build JSON response with safe string operations */
+    size_t json_size = count * 256 + 100;
+    char* json_response = malloc(json_size);
     if (!json_response) {
         free(entries);
         http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
         return E_SYSTEM_MEMORY;
     }
 
-    strcpy(json_response, "{\"workflows\":[");
+    /* Initialize with opening bracket using snprintf */
+    size_t offset = 0;
+    offset += snprintf(json_response, json_size, "{\"workflows\":[");
 
+    /* Append each workflow entry safely */
     for (int i = 0; i < count; i++) {
-        char entry_json[256];
-        snprintf(entry_json, sizeof(entry_json),
+        offset += snprintf(json_response + offset, json_size - offset,
                 "%s{\"workflow_id\":\"%s\",\"script\":\"%s\",\"state\":\"%s\",\"pid\":%d}",
                 (i > 0 ? "," : ""),
                 entries[i].workflow_id,
                 entries[i].workflow_name,
                 workflow_state_to_string(entries[i].state),
                 entries[i].executor_pid);
-        strcat(json_response, entry_json);
+
+        /* Safety check: prevent buffer overflow */
+        if (offset >= json_size - 10) {
+            LOG_ERROR("JSON response buffer too small");
+            break;
+        }
     }
 
-    strcat(json_response, "]}");
+    /* Append closing bracket safely */
+    snprintf(json_response + offset, json_size - offset, "]}");
 
     http_response_set_json(resp, HTTP_STATUS_OK, json_response);
     free(json_response);
