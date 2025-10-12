@@ -97,25 +97,15 @@ $(DAEMON_LIB): $(DAEMON_OBJECTS)
 	ar rcs $@ $^
 	@echo "Created daemon library: $@"
 
-# Build workflow library
-$(WORKFLOW_LIB): $(WORKFLOW_OBJECTS)
-	ar rcs $@ $^
-	@echo "Created workflow library: $@"
-
-# Build workflow executor binary (needs core + daemon + workflow)
-$(EXECUTOR_BINARY): $(EXECUTOR_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
-	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
-	@echo "Built workflow executor: $@"
-
-# Build daemon binary (needs core + daemon + workflow)
-$(DAEMON_BINARY): $(DAEMON_SOURCE) $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
-	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+# Build daemon binary (needs core + daemon)
+$(DAEMON_BINARY): $(DAEMON_SOURCE) $(CORE_LIB) $(DAEMON_LIB)
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@echo "Built daemon: $@"
 
-# Build script executables into bin/utils/ (need core + daemon + workflow)
-bin/utils/%: $(SCRIPT_DIR)/utils/%.c $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+# Build script executables into bin/utils/ (need core + daemon)
+bin/utils/%: $(SCRIPT_DIR)/utils/%.c $(CORE_LIB) $(DAEMON_LIB)
 	@mkdir -p bin/utils
-	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@ln -sf ../$@ $(SCRIPT_DIR)/$(@F)
 	@echo "Built utility: $@"
 
@@ -131,7 +121,7 @@ bin/tests/harness_%: $(TEST_INTEGRATION_DIR)/harness_%.c $(CORE_LIB)
 	@$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
 
 # Component builds
-arc: $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB)
+arc: $(CORE_LIB) $(DAEMON_LIB)
 	@$(MAKE) -C arc
 
 ui: arc
@@ -140,26 +130,26 @@ ui: arc
 ui-argo-term: arc
 	@$(MAKE) -C ui/argo-term
 
-all-components: $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) $(DAEMON_BINARY) $(EXECUTOR_BINARY) arc ui
+all-components: $(CORE_LIB) $(DAEMON_LIB) $(DAEMON_BINARY) arc ui
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
 
 # Stress test builds (from tests/stress/)
-$(CONCURRENCY_STRESS_TEST_TARGET): tests/stress/test_concurrency_stress.c $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB)
+$(CONCURRENCY_STRESS_TEST_TARGET): tests/stress/test_concurrency_stress.c $(DAEMON_LIB) $(CORE_LIB)
 	@mkdir -p bin/tests
 	@echo "Building concurrency stress test..."
-	@$(CC) $(CFLAGS) -I./tests/stress $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+	@$(CC) $(CFLAGS) -I./tests/stress $< $(DAEMON_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 
-$(SOAK_TEST_TARGET): tests/stress/test_soak.c $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB)
+$(SOAK_TEST_TARGET): tests/stress/test_soak.c $(DAEMON_LIB) $(CORE_LIB)
 	@mkdir -p bin/tests
 	@echo "Building soak test..."
-	@$(CC) $(CFLAGS) -I./tests/stress $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+	@$(CC) $(CFLAGS) -I./tests/stress $< $(DAEMON_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 
 # Stress test collection
 stress-tests: $(CONCURRENCY_STRESS_TEST_TARGET) $(SOAK_TEST_TARGET)
 	@echo "Built all stress tests"
 
 # Harness collection
-harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_WORKFLOW_CONTEXT) $(HARNESS_CONTROL_FLOW) $(HARNESS_CI_INTERACTIVE) $(HARNESS_LOOP) $(HARNESS_PERSONA) $(HARNESS_WORKFLOW_CHAIN)
+harnesses: $(HARNESS_INIT_BASIC) $(HARNESS_ENV_INSPECT) $(HARNESS_REINIT) $(HARNESS_INIT_ERROR) $(HARNESS_SOCKET) $(HARNESS_TERMINAL) $(HARNESS_CI_INTERACTIVE)
 	@echo "Built all test harnesses"
