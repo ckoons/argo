@@ -24,6 +24,70 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+#include <signal.h>
+
+/* Global daemon pointer for signal handler */
+static argo_daemon_t* g_daemon_for_sigchld = NULL;
+
+/* SIGCHLD handler - reap completed workflow processes */
+static void sigchld_handler(int sig) {
+    (void)sig;  /* Unused */
+
+    if (!g_daemon_for_sigchld || !g_daemon_for_sigchld->workflow_registry) {
+        return;
+    }
+
+    /* Reap all terminated children without blocking */
+    int status;
+    pid_t pid;
+
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        /* Find workflow by PID */
+        workflow_entry_t* entries = NULL;
+        int count = 0;
+        int result = workflow_registry_list(g_daemon_for_sigchld->workflow_registry,
+                                           &entries, &count);
+        if (result != ARGO_SUCCESS || !entries) {
+            continue;
+        }
+
+        /* Find matching workflow */
+        for (int i = 0; i < count; i++) {
+            if (entries[i].executor_pid == pid) {
+                /* Update workflow state based on exit status */
+                workflow_state_t new_state;
+                int exit_code = 0;
+
+                if (WIFEXITED(status)) {
+                    exit_code = WEXITSTATUS(status);
+                    new_state = (exit_code == 0) ? WORKFLOW_STATE_COMPLETED : WORKFLOW_STATE_FAILED;
+                } else if (WIFSIGNALED(status)) {
+                    new_state = WORKFLOW_STATE_ABANDONED;
+                    exit_code = WTERMSIG(status);
+                } else {
+                    new_state = WORKFLOW_STATE_FAILED;
+                }
+
+                /* Update workflow registry */
+                workflow_registry_update_state(g_daemon_for_sigchld->workflow_registry,
+                                              entries[i].workflow_id, new_state);
+
+                /* Update exit code and end time */
+                const workflow_entry_t* entry = workflow_registry_find(
+                    g_daemon_for_sigchld->workflow_registry, entries[i].workflow_id);
+                if (entry) {
+                    workflow_entry_t* mutable_entry = (workflow_entry_t*)entry;
+                    mutable_entry->exit_code = exit_code;
+                    mutable_entry->end_time = time(NULL);
+                }
+
+                break;
+            }
+        }
+
+        free(entries);
+    }
+}
 
 /* Create daemon */
 argo_daemon_t* argo_daemon_create(uint16_t port) {
@@ -142,6 +206,20 @@ int daemon_handle_shutdown(http_request_t* req, http_response_t* resp) {
 /* Start daemon */
 int argo_daemon_start(argo_daemon_t* daemon) {
     if (!daemon) return E_INVALID_PARAMS;
+
+    /* Set global daemon for SIGCHLD handler */
+    g_daemon_for_sigchld = daemon;
+
+    /* Install SIGCHLD handler for workflow process reaping */
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sigchld_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;  /* Restart interrupted syscalls, ignore SIGSTOP */
+    if (sigaction(SIGCHLD, &sa, NULL) < 0) {
+        argo_report_error(E_SYSTEM_PROCESS, "argo_daemon_start", "failed to install SIGCHLD handler");
+        return E_SYSTEM_PROCESS;
+    }
 
     /* Register basic routes */
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,

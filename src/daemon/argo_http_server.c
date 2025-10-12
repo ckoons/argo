@@ -156,10 +156,24 @@ static route_handler_fn find_route(http_server_t* server, http_request_t* req) {
     for (size_t i = 0; i < server->route_count; i++) {
         route_t* route = &server->routes[i];
 
-        /* Match method and path (ignoring query string) */
-        if (route->method == req->method &&
-            strlen(route->path) == path_len &&
+        /* Skip if method doesn't match */
+        if (route->method != req->method) {
+            continue;
+        }
+
+        size_t route_len = strlen(route->path);
+
+        /* Exact match */
+        if (route_len == path_len &&
             strncmp(route->path, req->path, path_len) == 0) {
+            return route->handler;
+        }
+
+        /* Prefix match for routes with path parameters */
+        /* If route path is shorter and request starts with it, check for separator */
+        if (route_len < path_len &&
+            strncmp(route->path, req->path, route_len) == 0 &&
+            req->path[route_len] == '/') {
             return route->handler;
         }
     }
