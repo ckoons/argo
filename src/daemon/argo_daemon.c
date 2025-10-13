@@ -116,11 +116,11 @@ static void log_rotation_task(void* context) {
 
         if (age > LOG_MAX_AGE_SECONDS) {
             LOG_DEBUG("Log %s exceeds max age (%ld days), rotating",
-                     entry->d_name, age / (24 * 60 * 60));
+                     entry->d_name, age / SECONDS_PER_DAY);
             needs_rotation = true;
         } else if (st.st_size > LOG_MAX_SIZE_BYTES) {
             LOG_DEBUG("Log %s exceeds max size (%ld MB), rotating",
-                     entry->d_name, st.st_size / (1024 * 1024));
+                     entry->d_name, st.st_size / BYTES_PER_MEGABYTE);
             needs_rotation = true;
         }
 
