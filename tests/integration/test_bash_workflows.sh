@@ -190,7 +190,8 @@ fi
 
 # Test 2: Start bash workflow
 test_start "Start bash workflow"
-output=$("$ARC_BIN" workflow start "$TEST_HELLO" 2>&1 || true)
+# Redirect stdin to prevent auto-attach in TTY environments
+output=$("$ARC_BIN" workflow start "$TEST_HELLO" </dev/null 2>&1 || true)
 if output_contains "$output" "Started workflow" && output_contains "$output" "wf_"; then
     WORKFLOW_ID=$(echo "$output" | grep -o 'wf_[0-9_]*' | head -1)
     test_pass
@@ -252,7 +253,8 @@ fi
 # Test 6: Start failing workflow
 test_start "Start failing workflow"
 if [ -f "$TEST_FAILING" ]; then
-    output=$("$ARC_BIN" workflow start "$TEST_FAILING" 2>&1 || true)
+    # Redirect stdin to prevent auto-attach in TTY environments
+    output=$("$ARC_BIN" workflow start "$TEST_FAILING" </dev/null 2>&1 || true)
     if output_contains "$output" "Started workflow"; then
         FAILING_ID=$(echo "$output" | grep -o 'wf_[0-9_]*' | head -1)
         test_pass
@@ -283,7 +285,8 @@ fi
 # Test 8: Start long-running workflow
 test_start "Start long-running workflow"
 if [ -f "$TEST_LONG" ]; then
-    output=$("$ARC_BIN" workflow start "$TEST_LONG" 2>&1 || true)
+    # Redirect stdin to prevent auto-attach behavior
+    output=$("$ARC_BIN" workflow start "$TEST_LONG" </dev/null 2>&1 || true)
     if output_contains "$output" "Started workflow"; then
         LONG_ID=$(echo "$output" | grep -o 'wf_[0-9_]*' | head -1)
         test_pass
