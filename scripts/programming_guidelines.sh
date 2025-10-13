@@ -280,7 +280,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 VALIDATE_SCRIPT_PATH=$(grep -rn "validate_script_path" src/daemon/ --include="*.c" | wc -l | tr -d ' ')
 if [ "$VALIDATE_SCRIPT_PATH" -gt 0 ]; then
   echo "✓ PASS: Workflow script path validation implemented"
-  # Input validation implemented
 else
   echo "⚠ WARN: No workflow script path validation found"
   echo "Action: Implement validate_script_path() to prevent command injection"
@@ -296,7 +295,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 IS_SAFE_ENV_VAR=$(grep -rn "is_safe_env_var" src/daemon/ --include="*.c" | wc -l | tr -d ' ')
 if [ "$IS_SAFE_ENV_VAR" -gt 0 ]; then
   echo "✓ PASS: Environment variable sanitization implemented"
-  # Environment sanitization implemented
 else
   echo "⚠ WARN: No environment variable sanitization found"
   echo "Action: Implement is_safe_env_var() to block dangerous env vars (LD_PRELOAD, PATH, etc.)"
@@ -312,7 +310,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 CURL_TIMEOUT=$(grep -rn "curl.*--max-time" src/foundation/argo_http.c 2>/dev/null | wc -l | tr -d ' ')
 if [ "$CURL_TIMEOUT" -gt 0 ]; then
   echo "✓ PASS: AI provider timeout enforcement implemented"
-  # Timeout enforcement implemented
 else
   echo "⚠ WARN: No timeout enforcement in HTTP client"
   echo "Action: Add --max-time flag to curl commands to prevent indefinite hangs"
@@ -330,14 +327,13 @@ THREAD_SAFETY_DOCS=$(grep -rn "THREAD SAFETY:" include/ --include="*.h" | wc -l 
 if [ "$STRUCTS_WITH_MUTEX" -gt 0 ]; then
   if [ "$THREAD_SAFETY_DOCS" -ge "$STRUCTS_WITH_MUTEX" ]; then
     echo "✓ PASS: Thread safety documented for critical data structures"
-    # Thread safety documented
   else
     echo "⚠ WARN: $STRUCTS_WITH_MUTEX structs with mutexes, but only $THREAD_SAFETY_DOCS thread safety docs"
     echo "Action: Add THREAD SAFETY comments to document mutex protection"
     WARNINGS=$((WARNINGS + 1))
   fi
 else
-  # No multithreading complexity
+  echo "✓ PASS: No multithreading complexity"
 fi
 echo ""
 
@@ -378,7 +374,6 @@ if [ "$UNCHECKED_CALLS" -gt 5 ]; then
   WARNINGS=$((WARNINGS + 1))
 else
   echo "✓ PASS: Most critical function return values appear to be checked"
-  # Critical return values mostly checked
 fi
 echo ""
 
@@ -408,10 +403,9 @@ if [ "$FOPEN_COUNT" -gt 0 ]; then
     WARNINGS=$((WARNINGS + 1))
   else
     echo "✓ PASS: File descriptor open/close ratio looks healthy"
-    # File descriptor management healthy
   fi
 else
-  # No file operations
+  echo "✓ PASS: No file operations found"
 fi
 echo ""
 
@@ -438,7 +432,6 @@ if [ "$DIRECT_STATE_WRITES" -gt 5 ]; then
   WARNINGS=$((WARNINGS + 1))
 else
   echo "✓ PASS: Workflow state transitions properly use registry API"
-  # State transitions validated
 fi
 echo ""
 

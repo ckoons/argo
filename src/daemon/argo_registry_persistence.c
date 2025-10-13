@@ -57,6 +57,53 @@ int registry_save_state(ci_registry_t* registry, const char* filepath) {
     return ARGO_SUCCESS;
 }
 
+/* Helper: Extract string field from JSON entry */
+static int extract_string_field(const char* ptr, const char* entry_end, const char* field_name,
+                                char* out_buffer, size_t buffer_size) {
+    char search_str[64];
+    snprintf(search_str, sizeof(search_str), "\"%s\":", field_name);
+
+    const char* field_start = strstr(ptr, search_str);
+    if (!field_start || field_start >= entry_end) {
+        return -1;
+    }
+
+    field_start = strchr(field_start + strlen(search_str), '"');
+    if (!field_start || field_start >= entry_end) {
+        return -1;
+    }
+
+    field_start++;  /* Skip opening quote */
+    const char* field_end = strchr(field_start, '"');
+    if (!field_end || field_end >= entry_end) {
+        return -1;
+    }
+
+    size_t len = field_end - field_start;
+    if (len >= buffer_size) {
+        len = buffer_size - 1;
+    }
+
+    strncpy(out_buffer, field_start, len);
+    out_buffer[len] = '\0';
+    return 0;
+}
+
+/* Helper: Extract integer field from JSON entry */
+static int extract_int_field(const char* ptr, const char* entry_end, const char* field_name) {
+    char search_str[64];
+    snprintf(search_str, sizeof(search_str), "\"%s\":", field_name);
+
+    const char* field_start = strstr(ptr, search_str);
+    if (!field_start || field_start >= entry_end) {
+        return 0;
+    }
+
+    int value = 0;
+    sscanf(field_start + strlen(search_str), "%d", &value);
+    return value;
+}
+
 /* Load registry state from file */
 int registry_load_state(ci_registry_t* registry, const char* filepath) {
     ARGO_CHECK_NULL(registry);
@@ -108,68 +155,13 @@ int registry_load_state(ci_registry_t* registry, const char* filepath) {
         char name[REGISTRY_NAME_MAX] = {0};
         char role[REGISTRY_ROLE_MAX] = {0};
         char model[REGISTRY_MODEL_MAX] = {0};
-        int port = 0;
-        int status = 0;
 
-        /* Find name */
-        const char* name_start = strstr(ptr, "\"name\":");
-        if (name_start && name_start < entry_end) {
-            name_start = strchr(name_start + 7, '"');
-            if (name_start && name_start < entry_end) {
-                name_start++;
-                const char* name_end = strchr(name_start, '"');
-                if (name_end && name_end < entry_end) {
-                    size_t len = name_end - name_start;
-                    if (len < REGISTRY_NAME_MAX) {
-                        strncpy(name, name_start, len);
-                    }
-                }
-            }
-        }
+        extract_string_field(ptr, entry_end, "name", name, sizeof(name));
+        extract_string_field(ptr, entry_end, "role", role, sizeof(role));
+        extract_string_field(ptr, entry_end, "model", model, sizeof(model));
 
-        /* Find role */
-        const char* role_start = strstr(ptr, "\"role\":");
-        if (role_start && role_start < entry_end) {
-            role_start = strchr(role_start + 7, '"');
-            if (role_start && role_start < entry_end) {
-                role_start++;
-                const char* role_end = strchr(role_start, '"');
-                if (role_end && role_end < entry_end) {
-                    size_t len = role_end - role_start;
-                    if (len < REGISTRY_ROLE_MAX) {
-                        strncpy(role, role_start, len);
-                    }
-                }
-            }
-        }
-
-        /* Find model */
-        const char* model_start = strstr(ptr, "\"model\":");
-        if (model_start && model_start < entry_end) {
-            model_start = strchr(model_start + 8, '"');
-            if (model_start && model_start < entry_end) {
-                model_start++;
-                const char* model_end = strchr(model_start, '"');
-                if (model_end && model_end < entry_end) {
-                    size_t len = model_end - model_start;
-                    if (len < REGISTRY_MODEL_MAX) {
-                        strncpy(model, model_start, len);
-                    }
-                }
-            }
-        }
-
-        /* Find port */
-        const char* port_field = strstr(ptr, "\"port\":");
-        if (port_field && port_field < entry_end) {
-            sscanf(port_field + 7, "%d", &port);
-        }
-
-        /* Find status */
-        const char* status_field = strstr(ptr, "\"status\":");
-        if (status_field && status_field < entry_end) {
-            sscanf(status_field + 9, "%d", &status);
-        }
+        int port = extract_int_field(ptr, entry_end, "port");
+        int status = extract_int_field(ptr, entry_end, "status");
 
         /* Add CI to registry */
         if (name[0] && role[0] && model[0] && port > 0) {

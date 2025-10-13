@@ -151,6 +151,100 @@ void log_rotation_task(void* context) {
     closedir(dir);
 }
 
+/* Helper: Setup log file for workflow retry */
+static int setup_retry_log(const char* workflow_id, int retry_count, int max_retries) {
+    const char* home = getenv("HOME");
+    if (!home) home = ".";
+
+    char log_dir[ARGO_PATH_MAX];
+    snprintf(log_dir, sizeof(log_dir), "%s/.argo/logs", home);
+    mkdir(log_dir, ARGO_DIR_PERMISSIONS);
+
+    char log_path[ARGO_PATH_MAX];
+    snprintf(log_path, sizeof(log_path), "%s/%s.log", log_dir, workflow_id);
+
+    int log_fd = open(log_path, O_CREAT | O_WRONLY | O_APPEND, ARGO_FILE_PERMISSIONS);
+    if (log_fd >= 0) {
+        dprintf(log_fd, "\n=== RETRY ATTEMPT %d/%d ===\n\n", retry_count, max_retries);
+        dup2(log_fd, STDOUT_FILENO);
+        dup2(log_fd, STDERR_FILENO);
+        close(log_fd);
+    }
+
+    return log_fd >= 0 ? 0 : -1;
+}
+
+/* Helper: Retry workflow execution */
+static pid_t retry_workflow_execution(workflow_entry_t* entry, workflow_entry_t* mutable_entry) {
+    /* Calculate exponential backoff delay */
+    int delay = RETRY_DELAY_BASE_SECONDS * (1 << (mutable_entry->retry_count - 1));
+
+    LOG_INFO("Workflow %s failed, retry %d/%d in %d seconds",
+            entry->workflow_id,
+            mutable_entry->retry_count, mutable_entry->max_retries, delay);
+
+    sleep(delay);
+
+    /* Re-execute workflow by forking */
+    pid_t retry_pid = fork();
+    if (retry_pid == 0) {
+        /* Child process - setup logging and execute */
+        setup_retry_log(entry->workflow_id, mutable_entry->retry_count,
+                       mutable_entry->max_retries);
+
+        /* Execute script */
+        char* exec_args[] = {"/bin/bash", (char*)entry->workflow_name, NULL};
+        execv("/bin/bash", exec_args);
+
+        /* If execv returns, it failed */
+        fprintf(stderr, "Failed to execute retry: %s\n", entry->workflow_name);
+        _exit(E_SYSTEM_PROCESS);
+    }
+
+    return retry_pid;
+}
+
+/* Helper: Handle workflow process failure */
+static void handle_workflow_failure(argo_daemon_t* daemon, workflow_entry_t* entry) {
+    /* Get mutable entry for updates */
+    const workflow_entry_t* found_entry = workflow_registry_find(
+        daemon->workflow_registry, entry->workflow_id);
+    if (!found_entry) {
+        return;
+    }
+    workflow_entry_t* mutable_entry = (workflow_entry_t*)found_entry;
+
+    /* Check if retry is allowed */
+    bool should_retry = (mutable_entry->retry_count < mutable_entry->max_retries);
+
+    if (should_retry) {
+        /* Retry the workflow */
+        mutable_entry->retry_count++;
+        mutable_entry->last_retry_time = time(NULL);
+
+        pid_t retry_pid = retry_workflow_execution(entry, mutable_entry);
+
+        if (retry_pid > 0) {
+            /* Parent - update PID and state */
+            mutable_entry->executor_pid = retry_pid;
+            workflow_registry_update_state(daemon->workflow_registry,
+                                          entry->workflow_id,
+                                          WORKFLOW_STATE_RUNNING);
+        }
+    } else {
+        /* No retry - finalize workflow */
+        workflow_state_t new_state = WORKFLOW_STATE_FAILED;
+        int exit_code = 1;  /* Assume non-zero exit */
+
+        workflow_registry_update_state(daemon->workflow_registry,
+                                      entry->workflow_id, new_state);
+        mutable_entry->exit_code = exit_code;
+        mutable_entry->end_time = time(NULL);
+        LOG_INFO("Workflow %s failed after %d attempts", entry->workflow_id,
+                mutable_entry->retry_count);
+    }
+}
+
 /* Workflow completion detection and retry task */
 void workflow_completion_task(void* context) {
     argo_daemon_t* daemon = (argo_daemon_t*)context;
@@ -177,83 +271,7 @@ void workflow_completion_task(void* context) {
         /* Check if process still exists using kill(pid, 0) */
         if (entry->executor_pid > 0 && kill(entry->executor_pid, 0) != 0) {
             /* Process doesn't exist - workflow completed/failed */
-            /* Get mutable entry for updates */
-            const workflow_entry_t* found_entry = workflow_registry_find(
-                daemon->workflow_registry, entry->workflow_id);
-            if (!found_entry) {
-                continue;
-            }
-            workflow_entry_t* mutable_entry = (workflow_entry_t*)found_entry;
-
-            /* Assume failure if process disappeared (exit code unknown after reaping) */
-            workflow_state_t new_state = WORKFLOW_STATE_FAILED;
-            int exit_code = 1;  /* Assume non-zero exit */
-            bool should_retry = (mutable_entry->retry_count < mutable_entry->max_retries);
-
-            if (should_retry) {
-                /* Retry the workflow */
-                mutable_entry->retry_count++;
-                mutable_entry->last_retry_time = time(NULL);
-
-                /* Calculate exponential backoff delay */
-                int delay = RETRY_DELAY_BASE_SECONDS * (1 << (mutable_entry->retry_count - 1));
-
-                LOG_INFO("Workflow %s failed, retry %d/%d in %d seconds",
-                        entry->workflow_id,
-                        mutable_entry->retry_count, mutable_entry->max_retries, delay);
-
-                /* Sleep before retry */
-                sleep(delay);
-
-                /* Re-execute workflow by forking again */
-                pid_t retry_pid = fork();
-                if (retry_pid == 0) {
-                    /* Child process - re-execute the script */
-                    const char* home = getenv("HOME");
-                    if (!home) home = ".";
-
-                    char log_dir[ARGO_PATH_MAX];
-                    snprintf(log_dir, sizeof(log_dir), "%s/.argo/logs", home);
-                    mkdir(log_dir, ARGO_DIR_PERMISSIONS);
-
-                    /* Redirect to same log file (append mode) */
-                    char log_path[ARGO_PATH_MAX];
-                    snprintf(log_path, sizeof(log_path), "%s/%s.log", log_dir,
-                            entry->workflow_id);
-
-                    int log_fd = open(log_path, O_CREAT | O_WRONLY | O_APPEND, ARGO_FILE_PERMISSIONS);
-                    if (log_fd >= 0) {
-                        /* Log retry attempt */
-                        dprintf(log_fd, "\n=== RETRY ATTEMPT %d/%d ===\n\n",
-                               mutable_entry->retry_count, mutable_entry->max_retries);
-                        dup2(log_fd, STDOUT_FILENO);
-                        dup2(log_fd, STDERR_FILENO);
-                        close(log_fd);
-                    }
-
-                    /* Execute script */
-                    char* exec_args[] = {"/bin/bash", (char*)entry->workflow_name, NULL};
-                    execv("/bin/bash", exec_args);
-
-                    /* If execv returns, it failed */
-                    fprintf(stderr, "Failed to execute retry: %s\n", entry->workflow_name);
-                    _exit(E_SYSTEM_PROCESS);
-                } else if (retry_pid > 0) {
-                    /* Parent - update PID and state */
-                    mutable_entry->executor_pid = retry_pid;
-                    workflow_registry_update_state(daemon->workflow_registry,
-                                                  entry->workflow_id,
-                                                  WORKFLOW_STATE_RUNNING);
-                }
-            } else {
-                /* No retry - finalize workflow */
-                workflow_registry_update_state(daemon->workflow_registry,
-                                              entry->workflow_id, new_state);
-                mutable_entry->exit_code = exit_code;
-                mutable_entry->end_time = time(NULL);
-                LOG_INFO("Workflow %s failed after %d attempts", entry->workflow_id,
-                        mutable_entry->retry_count);
-            }
+            handle_workflow_failure(daemon, entry);
         }
     }
 
