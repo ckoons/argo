@@ -40,6 +40,9 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
                                  const char* script_path,
                                  char** args,
                                  int arg_count,
+                                 char** env_keys,
+                                 char** env_values,
+                                 int env_count,
                                  const char* workflow_id);
 
 #endif /* ARGO_DAEMON_H */

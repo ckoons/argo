@@ -253,6 +253,9 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
                                  const char* script_path,
                                  char** args,
                                  int arg_count,
+                                 char** env_keys,
+                                 char** env_values,
+                                 int env_count,
                                  const char* workflow_id) {
     if (!daemon || !script_path || !workflow_id) {
         return E_INPUT_NULL;
@@ -307,6 +310,13 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
             dup2(log_fd, STDOUT_FILENO);
             dup2(log_fd, STDERR_FILENO);
             close(log_fd);
+        }
+
+        /* Apply environment variables if provided */
+        for (int i = 0; i < env_count; i++) {
+            if (env_keys[i] && env_values[i]) {
+                setenv(env_keys[i], env_values[i], 1);  /* Overwrite if exists */
+            }
         }
 
         /* Build argv for bash execution */

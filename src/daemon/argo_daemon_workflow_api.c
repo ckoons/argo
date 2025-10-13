@@ -44,13 +44,170 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
         return E_INPUT_FORMAT;
     }
 
+    /* Extract args array from JSON (optional) */
+    char** args = NULL;
+    int arg_count = 0;
+
+    /* Check if args field exists */
+    const char* args_start = strstr(req->body, "\"args\"");
+    if (args_start) {
+        /* Find array bounds */
+        const char* array_start = strchr(args_start, '[');
+        const char* array_end = strchr(args_start, ']');
+
+        if (array_start && array_end && array_end > array_start) {
+            /* Count args by counting quotes */
+            const char* p = array_start;
+            while (p < array_end) {
+                if (*p == '"') arg_count++;
+                p++;
+            }
+            arg_count /= 2;  /* Each arg has open and close quote */
+
+            if (arg_count > 0) {
+                args = malloc(sizeof(char*) * arg_count);
+                if (!args) {
+                    free(script_path);
+                    http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
+                    return E_SYSTEM_MEMORY;
+                }
+
+                /* Extract each arg */
+                int idx = 0;
+                p = array_start + 1;
+                while (p < array_end && idx < arg_count) {
+                    /* Skip whitespace and commas */
+                    while (*p == ' ' || *p == ',') p++;
+
+                    if (*p == '"') {
+                        p++;  /* Skip opening quote */
+                        const char* arg_start = p;
+                        const char* arg_end = strchr(p, '"');
+                        if (arg_end) {
+                            size_t len = arg_end - arg_start;
+                            args[idx] = malloc(len + 1);
+                            if (args[idx]) {
+                                memcpy(args[idx], arg_start, len);
+                                args[idx][len] = '\0';
+                                idx++;
+                            }
+                            p = arg_end + 1;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                arg_count = idx;  /* Actual number extracted */
+            }
+        }
+    }
+
+    /* Extract env object from JSON (optional) */
+    char** env_keys = NULL;
+    char** env_values = NULL;
+    int env_count = 0;
+
+    const char* env_start = strstr(req->body, "\"env\"");
+    if (env_start) {
+        /* Find object bounds */
+        const char* obj_start = strchr(env_start, '{');
+        const char* obj_end = strchr(env_start, '}');
+
+        if (obj_start && obj_end && obj_end > obj_start) {
+            /* Count env vars by counting colons */
+            const char* p = obj_start;
+            while (p < obj_end) {
+                if (*p == ':') env_count++;
+                p++;
+            }
+
+            if (env_count > 0) {
+                env_keys = malloc(sizeof(char*) * env_count);
+                env_values = malloc(sizeof(char*) * env_count);
+                if (!env_keys || !env_values) {
+                    free(script_path);
+                    for (int i = 0; i < arg_count; i++) {
+                        free(args[i]);
+                    }
+                    free(args);
+                    free(env_keys);
+                    free(env_values);
+                    http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Memory allocation failed");
+                    return E_SYSTEM_MEMORY;
+                }
+
+                /* Extract each env var (KEY":"VALUE" format) */
+                int idx = 0;
+                p = obj_start + 1;
+                while (p < obj_end && idx < env_count) {
+                    /* Skip whitespace and commas */
+                    while (*p == ' ' || *p == ',') p++;
+
+                    if (*p == '"') {
+                        /* Extract key */
+                        p++;  /* Skip opening quote */
+                        const char* key_start = p;
+                        const char* key_end = strchr(p, '"');
+                        if (key_end) {
+                            size_t key_len = key_end - key_start;
+                            env_keys[idx] = malloc(key_len + 1);
+                            if (env_keys[idx]) {
+                                memcpy(env_keys[idx], key_start, key_len);
+                                env_keys[idx][key_len] = '\0';
+                            }
+                            p = key_end + 1;
+
+                            /* Skip to value (past ":") */
+                            p = strchr(p, ':');
+                            if (p) {
+                                p++;  /* Skip colon */
+                                while (*p == ' ') p++;  /* Skip whitespace */
+                                if (*p == '"') {
+                                    p++;  /* Skip opening quote */
+                                    const char* val_start = p;
+                                    const char* val_end = strchr(p, '"');
+                                    if (val_end) {
+                                        size_t val_len = val_end - val_start;
+                                        env_values[idx] = malloc(val_len + 1);
+                                        if (env_values[idx]) {
+                                            memcpy(env_values[idx], val_start, val_len);
+                                            env_values[idx][val_len] = '\0';
+                                            idx++;
+                                        }
+                                        p = val_end + 1;
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                env_count = idx;  /* Actual number extracted */
+            }
+        }
+    }
+
     /* Generate workflow ID */
     char workflow_id[64];
     snprintf(workflow_id, sizeof(workflow_id), "wf_%ld", (long)time(NULL));
 
     /* Execute bash workflow */
-    result = daemon_execute_bash_workflow(g_api_daemon, script_path, NULL, 0, workflow_id);
+    result = daemon_execute_bash_workflow(g_api_daemon, script_path, args, arg_count,
+                                         env_keys, env_values, env_count, workflow_id);
+
+    /* Free allocated memory */
     free(script_path);
+    for (int i = 0; i < arg_count; i++) {
+        free(args[i]);
+    }
+    free(args);
+    for (int i = 0; i < env_count; i++) {
+        free(env_keys[i]);
+        free(env_values[i]);
+    }
+    free(env_keys);
+    free(env_values);
 
     if (result != ARGO_SUCCESS) {
         if (result == E_DUPLICATE) {

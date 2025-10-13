@@ -16,15 +16,81 @@ int arc_workflow_start(int argc, char** argv) {
     if (argc < 1) {
         LOG_USER_ERROR("script path required\n");
         LOG_USER_INFO("Usage: arc workflow start <script.sh> [args...]\n");
-        LOG_USER_INFO("Example: arc workflow start workflows/examples/hello.sh\n");
+        LOG_USER_INFO("Example: arc workflow start workflows/examples/hello.sh arg1 arg2\n");
         return ARC_EXIT_ERROR;
     }
 
-    const char* script_path = argv[0];
+     const char* script_path = argv[0];
 
-    /* Build JSON request */
-    char json_body[1024];
-    snprintf(json_body, sizeof(json_body), "{\"script\":\"%s\"}", script_path);
+    /* Build JSON request with args and env if provided */
+    char json_body[4096];  /* Larger buffer for args + env */
+    size_t offset = 0;
+
+    offset += snprintf(json_body + offset, sizeof(json_body) - offset,
+                      "{\"script\":\"%s\"", script_path);
+
+    /* Parse arguments - separate regular args from KEY=VALUE env vars */
+    int env_count = 0;
+    char* env_keys[32];
+    char* env_values[32];
+
+    /* First pass: identify and extract env vars */
+    for (int i = 1; i < argc && env_count < 32; i++) {
+        char* eq = strchr(argv[i], '=');
+        if (eq && eq != argv[i]) {
+            /* This is KEY=VALUE format */
+            size_t key_len = eq - argv[i];
+            env_keys[env_count] = malloc(key_len + 1);
+            env_values[env_count] = strdup(eq + 1);
+            if (env_keys[env_count] && env_values[env_count]) {
+                memcpy(env_keys[env_count], argv[i], key_len);
+                env_keys[env_count][key_len] = '\0';
+                env_count++;
+            }
+        }
+    }
+
+    /* Add args array (non-env arguments) */
+    int args_added = 0;
+    if (argc > 1) {
+        offset += snprintf(json_body + offset, sizeof(json_body) - offset, ",\"args\":[");
+        for (int i = 1; i < argc; i++) {
+            if (!strchr(argv[i], '=') || strchr(argv[i], '=') == argv[i]) {
+                /* Not an env var */
+                offset += snprintf(json_body + offset, sizeof(json_body) - offset,
+                                 "%s\"%s\"", (args_added > 0 ? "," : ""), argv[i]);
+                args_added++;
+                if (offset >= sizeof(json_body) - 10) {
+                    LOG_USER_ERROR("Too many arguments (buffer overflow)\n");
+                    for (int j = 0; j < env_count; j++) {
+                        free(env_keys[j]);
+                        free(env_values[j]);
+                    }
+                    return ARC_EXIT_ERROR;
+                }
+            }
+        }
+        offset += snprintf(json_body + offset, sizeof(json_body) - offset, "]");
+    }
+
+    /* Add env object if any env vars found */
+    if (env_count > 0) {
+        offset += snprintf(json_body + offset, sizeof(json_body) - offset, ",\"env\":{");
+        for (int i = 0; i < env_count; i++) {
+            offset += snprintf(json_body + offset, sizeof(json_body) - offset,
+                             "%s\"%s\":\"%s\"", (i > 0 ? "," : ""),
+                             env_keys[i], env_values[i]);
+        }
+        offset += snprintf(json_body + offset, sizeof(json_body) - offset, "}");
+
+        /* Free allocated memory */
+        for (int i = 0; i < env_count; i++) {
+            free(env_keys[i]);
+            free(env_values[i]);
+        }
+    }
+
+    snprintf(json_body + offset, sizeof(json_body) - offset, "}");
 
     /* Send POST request to daemon */
     arc_http_response_t* response = NULL;
