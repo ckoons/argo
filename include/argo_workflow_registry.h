@@ -52,6 +52,7 @@ typedef struct {
     time_t start_time;         /* When started (epoch) */
     time_t end_time;           /* When finished (0 if running) */
     int exit_code;             /* Exit code (for completed/failed) */
+    bool abandon_requested;    /* User requested abandon (kill + ABANDONED state) */
     int current_step;          /* Current step number */
     int total_steps;           /* Total steps in workflow */
     int timeout_seconds;       /* Workflow timeout (0 = no timeout) */
@@ -89,6 +90,22 @@ workflow_registry_t* workflow_registry_create(void);
  *   E_SYSTEM_MEMORY on allocation failure
  */
 int workflow_registry_add(workflow_registry_t* reg, const workflow_entry_t* entry);
+
+/* Remove workflow from registry
+ *
+ * Removes workflow entry by ID. Typically used for terminal states
+ * when immediate cleanup is desired.
+ *
+ * Parameters:
+ *   reg - Registry handle
+ *   id  - Workflow ID to remove
+ *
+ * Returns:
+ *   ARGO_SUCCESS on success
+ *   E_INPUT_NULL if reg or id is NULL
+ *   E_NOT_FOUND if workflow doesn't exist
+ */
+int workflow_registry_remove(workflow_registry_t* reg, const char* id);
 
 /* Update workflow state
  *

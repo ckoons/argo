@@ -136,6 +136,38 @@ int workflow_registry_update_progress(workflow_registry_t* reg, const char* id,
     return ARGO_SUCCESS;
 }
 
+/* Remove workflow from registry */
+int workflow_registry_remove(workflow_registry_t* reg, const char* id) {
+    if (!reg || !id) {
+        return E_INPUT_NULL;
+    }
+
+    registry_node_t* prev = NULL;
+    registry_node_t* node = reg->head;
+
+    while (node) {
+        if (strcmp(node->entry.workflow_id, id) == 0) {
+            /* Found - remove from list */
+            if (prev) {
+                prev->next = node->next;
+            } else {
+                reg->head = node->next;
+            }
+
+            LOG_DEBUG("Removed workflow: %s", id);
+            free(node);
+            reg->count--;
+            return ARGO_SUCCESS;
+        }
+
+        prev = node;
+        node = node->next;
+    }
+
+    argo_report_error(E_NOT_FOUND, "workflow_registry_remove", id);
+    return E_NOT_FOUND;
+}
+
 /* Find workflow by ID */
 const workflow_entry_t* workflow_registry_find(const workflow_registry_t* reg,
                                                  const char* id) {

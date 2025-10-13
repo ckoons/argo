@@ -58,10 +58,13 @@ void workflow_timeout_task(void* context) {
                 kill(entry->executor_pid, SIGTERM);
             }
 
-            /* Update state to abandoned */
-            workflow_registry_update_state(daemon->workflow_registry,
-                                          entry->workflow_id,
-                                          WORKFLOW_STATE_ABANDONED);
+            /* Set abandon flag - completion task will remove it */
+            const workflow_entry_t* found = workflow_registry_find(
+                daemon->workflow_registry, entry->workflow_id);
+            if (found) {
+                workflow_entry_t* mutable = (workflow_entry_t*)found;
+                mutable->abandon_requested = true;
+            }
         }
     }
 
@@ -233,16 +236,10 @@ static void handle_workflow_failure(argo_daemon_t* daemon, workflow_entry_t* ent
                                           WORKFLOW_STATE_RUNNING);
         }
     } else {
-        /* No retry - finalize workflow */
-        workflow_state_t new_state = WORKFLOW_STATE_FAILED;
-        int exit_code = 1;  /* Assume non-zero exit */
-
-        workflow_registry_update_state(daemon->workflow_registry,
-                                      entry->workflow_id, new_state);
-        mutable_entry->exit_code = exit_code;
-        mutable_entry->end_time = time(NULL);
+        /* No retry - remove workflow from registry */
         LOG_INFO("Workflow %s failed after %d attempts", entry->workflow_id,
                 mutable_entry->retry_count);
+        workflow_registry_remove(daemon->workflow_registry, entry->workflow_id);
     }
 }
 
@@ -288,13 +285,16 @@ void workflow_completion_task(void* context) {
                 workflow_entry_t* mutable_entry = (workflow_entry_t*)found_entry;
                 mutable_entry->exit_code = exit_entry.exit_code;
 
-                if (exit_entry.exit_code == 0) {
-                    /* Success - mark as completed */
-                    workflow_registry_update_state(daemon->workflow_registry,
-                                                  entry->workflow_id,
-                                                  WORKFLOW_STATE_COMPLETED);
-                    mutable_entry->end_time = time(NULL);
+                /* Check if abandon was requested */
+                if (mutable_entry->abandon_requested) {
+                    /* User requested abandon - remove from registry */
+                    LOG_INFO("Workflow %s abandoned by user request (exit code %d)",
+                            entry->workflow_id, exit_entry.exit_code);
+                    workflow_registry_remove(daemon->workflow_registry, entry->workflow_id);
+                } else if (exit_entry.exit_code == 0) {
+                    /* Success - remove from registry */
                     LOG_INFO("Workflow %s completed successfully (exit code 0)", entry->workflow_id);
+                    workflow_registry_remove(daemon->workflow_registry, entry->workflow_id);
                 } else {
                     /* Failure - handle retry logic */
                     LOG_INFO("Workflow %s failed (exit code %d)", entry->workflow_id, exit_entry.exit_code);

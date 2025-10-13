@@ -311,14 +311,17 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
     offset += snprintf(json_response, json_size, "{\"workflows\":[");
 
     /* Append each workflow entry safely */
+    int first = 1;
     for (int i = 0; i < count; i++) {
         offset += snprintf(json_response + offset, json_size - offset,
                 "%s{\"workflow_id\":\"%s\",\"script\":\"%s\",\"state\":\"%s\",\"pid\":%d}",
-                (i > 0 ? "," : ""),
+                (first ? "" : ","),
                 entries[i].workflow_id,
                 entries[i].workflow_name,
                 workflow_state_to_string(entries[i].state),
                 entries[i].executor_pid);
+
+        first = 0;
 
         /* Safety check: prevent buffer overflow */
         if (offset >= json_size - 10) {
@@ -399,6 +402,10 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
         return E_NOT_FOUND;
     }
 
+    /* Set abandon flag - completion task will handle state transition */
+    workflow_entry_t* mutable_entry = (workflow_entry_t*)entry;
+    mutable_entry->abandon_requested = true;
+
     /* Kill process if running */
     if (entry->executor_pid > 0 && entry->state == WORKFLOW_STATE_RUNNING) {
         if (kill(entry->executor_pid, SIGTERM) < 0) {
@@ -408,10 +415,6 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
         }
         LOG_INFO("Sent SIGTERM to workflow %s (PID: %d)", workflow_id, entry->executor_pid);
     }
-
-    /* Update state to abandoned */
-    workflow_registry_update_state(g_api_daemon->workflow_registry, workflow_id,
-                                  WORKFLOW_STATE_ABANDONED);
 
     /* Build success response */
     char response_json[256];

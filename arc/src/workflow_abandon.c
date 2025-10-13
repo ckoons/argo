@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "arc_http_client.h"
@@ -13,6 +14,11 @@
 
 /* Get confirmation from user */
 static int get_confirmation(const char* workflow_name) {
+    /* Skip confirmation if not interactive (for automation/testing) */
+    if (!isatty(STDIN_FILENO)) {
+        return 1;  /* Auto-confirm in non-interactive mode */
+    }
+
     char response[10];
     LOG_USER_INFO("Abandon workflow '%s'? (y/N): ", workflow_name);
     if (fgets(response, sizeof(response), stdin) == NULL) {
@@ -44,9 +50,9 @@ int arc_workflow_abandon(int argc, char** argv) {
         return ARC_EXIT_SUCCESS;
     }
 
-    /* Build request URL with query parameter */
+    /* Build request URL with workflow ID in path */
     char endpoint[ARGO_PATH_MAX];
-    snprintf(endpoint, sizeof(endpoint), "/api/workflow/abandon?workflow_name=%s", workflow_name);
+    snprintf(endpoint, sizeof(endpoint), "/api/workflow/abandon/%s", workflow_name);
 
     /* Send DELETE request to daemon */
     arc_http_response_t* response = NULL;
