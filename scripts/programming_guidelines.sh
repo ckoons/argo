@@ -352,6 +352,111 @@ else
 fi
 echo ""
 
+# 18. Return value checking
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "18. RETURN VALUE CHECKING (MISRA SUBSET)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for unchecked return values of critical functions
+# Critical functions that should always be checked:
+# - malloc/calloc/realloc/strdup (memory allocation)
+# - fopen/open (file operations)
+# - pthread_mutex_lock/pthread_create (threading)
+# - fork (process creation)
+
+# Look for patterns where these functions are called without assignment or if-check
+# This is a heuristic check - may have false positives/negatives
+UNCHECKED_CALLS=0
+
+# Check for standalone malloc/calloc calls (not assigned or checked)
+UNCHECKED_MALLOC=$(grep -rn "^\s*malloc\|^\s*calloc\|^\s*realloc\|^\s*strdup" src/ --include="*.c" | \
+  grep -v "=" | grep -v "if\s*(" | grep -v "//" | grep -v "/\*" | wc -l | tr -d ' ')
+UNCHECKED_CALLS=$((UNCHECKED_CALLS + UNCHECKED_MALLOC))
+
+# Check for standalone pthread calls
+UNCHECKED_PTHREAD=$(grep -rn "^\s*pthread_mutex_lock\|^\s*pthread_create" src/ --include="*.c" | \
+  grep -v "=" | grep -v "if\s*(" | grep -v "//" | grep -v "/\*" | wc -l | tr -d ' ')
+UNCHECKED_CALLS=$((UNCHECKED_CALLS + UNCHECKED_PTHREAD))
+
+if [ "$UNCHECKED_CALLS" -gt 5 ]; then
+  echo "⚠ WARN: Found $UNCHECKED_CALLS potentially unchecked critical function calls"
+  echo ""
+  echo "Sample violations:"
+  grep -rn "^\s*malloc\|^\s*calloc\|^\s*realloc\|^\s*strdup\|^\s*pthread_mutex_lock" src/ --include="*.c" | \
+    grep -v "=" | grep -v "if\s*(" | grep -v "//" | grep -v "/\*" | head -5
+  echo ""
+  echo "Action: Check return values of malloc, pthread_mutex_lock, fopen, etc."
+  echo "Note: Some false positives possible (e.g., void casts)"
+  WARNINGS=$((WARNINGS + 1))
+else
+  echo "✓ PASS: Most critical function return values appear to be checked"
+  echo "ℹ INFO: Found $UNCHECKED_CALLS potentially unchecked calls (threshold: 5)"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 19. File descriptor leak detection
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "19. FILE DESCRIPTOR LEAK DETECTION"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that functions with fopen/open also have corresponding fclose/close
+# This is a heuristic - looks for functions that open files but might not close them
+
+# Count open operations
+FOPEN_COUNT=$(grep -rn "\bfopen\b\|\bopen\b" src/ --include="*.c" | wc -l | tr -d ' ')
+FCLOSE_COUNT=$(grep -rn "\bfclose\b\|\bclose\b" src/ --include="*.c" | wc -l | tr -d ' ')
+
+if [ "$FOPEN_COUNT" -gt 0 ]; then
+  # Check ratio - should be roughly equal
+  RATIO=$((FCLOSE_COUNT * 100 / FOPEN_COUNT))
+
+  if [ "$RATIO" -lt 80 ]; then
+    echo "⚠ WARN: Potential file descriptor leaks detected"
+    echo "  Open operations: $FOPEN_COUNT"
+    echo "  Close operations: $FCLOSE_COUNT"
+    echo "  Ratio: ${RATIO}%"
+    echo ""
+    echo "Action: Verify all fopen/open calls have corresponding fclose/close"
+    echo "Recommendation: Run 'make valgrind' to detect actual leaks"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✓ PASS: File descriptor open/close ratio looks healthy"
+    echo "ℹ INFO: Open: $FOPEN_COUNT, Close: $FCLOSE_COUNT (${RATIO}%)"
+    INFOS=$((INFOS + 1))
+  fi
+else
+  echo "ℹ INFO: No file operations found"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 20. Workflow state transition validation
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "20. WORKFLOW STATE TRANSITION VALIDATION"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that workflow state updates go through workflow_registry_update_state
+# This ensures state transitions are validated and logged
+
+# Count direct state assignments vs update_state calls
+DIRECT_STATE_WRITES=$(grep -rn "\.state\s*=" src/daemon/ --include="*.c" | \
+  grep -v "entry\.state\s*=\s*WORKFLOW_STATE_PENDING" | \
+  grep -v "//" | grep -v "/\*" | wc -l | tr -d ' ')
+
+UPDATE_STATE_CALLS=$(grep -rn "workflow_registry_update_state" src/daemon/ --include="*.c" | wc -l | tr -d ' ')
+
+if [ "$DIRECT_STATE_WRITES" -gt 5 ]; then
+  echo "⚠ WARN: Found $DIRECT_STATE_WRITES direct workflow state assignments"
+  echo "  workflow_registry_update_state calls: $UPDATE_STATE_CALLS"
+  echo ""
+  echo "Action: Use workflow_registry_update_state() for all state changes"
+  echo "Note: Initial state in workflow_entry_t is acceptable"
+  WARNINGS=$((WARNINGS + 1))
+else
+  echo "✓ PASS: Workflow state transitions properly use registry API"
+  echo "ℹ INFO: Direct writes: $DIRECT_STATE_WRITES, API calls: $UPDATE_STATE_CALLS"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
 # Summary
 echo "=========================================="
 echo "SUMMARY"
