@@ -457,6 +457,139 @@ else
 fi
 echo ""
 
+# 21. NULL pointer dereference check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "21. NULL POINTER DEREFERENCE CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for potential NULL pointer dereferences (functions that don't check parameters)
+# Look for functions that dereference pointers without NULL checks
+NULL_CHECK_MACROS=$(grep -rn "ARGO_CHECK_NULL\|if\s*(!.*)" src/ --include="*.c" | wc -l | tr -d ' ')
+POINTER_DEREFS=$(grep -rn '\->.*=' src/ --include="*.c" | wc -l | tr -d ' ')
+
+if [ "$POINTER_DEREFS" -gt 0 ]; then
+  # Rough heuristic: should have at least some NULL checks
+  RATIO=$((NULL_CHECK_MACROS * 100 / POINTER_DEREFS))
+  if [ "$RATIO" -lt 10 ]; then
+    echo "⚠ WARN: Low NULL check coverage detected"
+    echo "  Pointer dereferences: $POINTER_DEREFS"
+    echo "  NULL checks: $NULL_CHECK_MACROS"
+    echo "  Coverage: ${RATIO}%"
+    echo ""
+    echo "Action: Add NULL checks using ARGO_CHECK_NULL() or if (!ptr) checks"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✓ PASS: NULL pointer check coverage appears reasonable"
+    echo "ℹ INFO: $NULL_CHECK_MACROS NULL checks for $POINTER_DEREFS pointer operations (${RATIO}%)"
+    INFOS=$((INFOS + 1))
+  fi
+else
+  echo "ℹ INFO: No pointer dereferences found"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 22. Function complexity check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "22. FUNCTION COMPLEXITY CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for functions with high cyclomatic complexity (many branches)
+# Look for functions with excessive if/for/while statements
+# Threshold: more than 15 branches suggests function is too complex
+
+COMPLEX_FUNCTIONS=0
+for file in $(find src/ -name "*.c"); do
+  # Extract function bodies and count control flow statements
+  # This is a simplified check - counts if/for/while/switch per function
+  FUNC_LINES=$(grep -n "^[a-zA-Z_].*{$\|^static.*{$" "$file" 2>/dev/null)
+  if [ -n "$FUNC_LINES" ]; then
+    # For each function, count control flow between function start and next function
+    # This is approximate - counts all if/while/for/switch in file
+    BRANCHES=$(grep -c "\bif\s*(\|\bwhile\s*(\|\bfor\s*(\|\bswitch\s*(" "$file" 2>/dev/null || echo "0")
+    BRANCHES=$(echo "$BRANCHES" | tr -d '\n' | tr -d ' ')
+    FILE_LINES=$(wc -l < "$file" | tr -d ' ')
+
+    # If file has more than 30 branches per 100 lines, it's complex
+    if [ -n "$BRANCHES" ] && [ -n "$FILE_LINES" ] && [ "$FILE_LINES" -gt 0 ] && [ "$BRANCHES" -gt 0 ]; then
+      BRANCH_DENSITY=$((BRANCHES * 100 / FILE_LINES))
+      if [ "$BRANCH_DENSITY" -gt 30 ]; then
+        COMPLEX_FUNCTIONS=$((COMPLEX_FUNCTIONS + 1))
+        if [ "$COMPLEX_FUNCTIONS" -le 3 ]; then
+          echo "  $file: $BRANCHES branches in $FILE_LINES lines (${BRANCH_DENSITY}%)"
+        fi
+      fi
+    fi
+  fi
+done
+
+if [ "$COMPLEX_FUNCTIONS" -gt 5 ]; then
+  echo ""
+  echo "⚠ WARN: Found $COMPLEX_FUNCTIONS files with high control flow density"
+  echo "Action: Consider refactoring complex functions into smaller helpers"
+  echo "Recommendation: Extract nested logic into separate functions"
+  WARNINGS=$((WARNINGS + 1))
+elif [ "$COMPLEX_FUNCTIONS" -gt 0 ]; then
+  echo "ℹ INFO: Found $COMPLEX_FUNCTIONS files with elevated complexity (acceptable)"
+  INFOS=$((INFOS + 1))
+else
+  echo "✓ PASS: Function complexity appears manageable"
+fi
+echo ""
+
+# 23. Constant string externalization check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "23. CONSTANT STRING EXTERNALIZATION CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for string literals in .c files that should be in headers
+# Exclude: format strings (contain %), log messages, test strings
+EMBEDDED_STRINGS=$(grep -rn '"[^"]*"' src/ --include="*.c" | \
+  grep -v "^\s*//" | grep -v "^\s*\*" | \
+  grep -v "%" | grep -v "LOG_\|printf\|fprintf\|snprintf" | \
+  grep -v "#include" | grep -v "static const char" | \
+  wc -l | tr -d ' ')
+
+echo "Found $EMBEDDED_STRINGS non-format string literals in .c files"
+if [ "$EMBEDDED_STRINGS" -gt 500 ]; then
+  echo "⚠ WARN: Very high count of embedded strings"
+  echo "Action: Consider externalizing constant strings to headers for i18n"
+  echo "Note: Format strings and log messages are acceptable"
+  WARNINGS=$((WARNINGS + 1))
+else
+  echo "ℹ INFO: String literal usage appears reasonable for current codebase size"
+  echo "Note: Format strings (%), log messages, and test strings excluded"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 24. Resource cleanup verification
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "24. RESOURCE CLEANUP VERIFICATION"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Verify that functions with cleanup labels actually free resources
+CLEANUP_LABELS=$(grep -rn "^cleanup:" src/ --include="*.c" | wc -l | tr -d ' ')
+FREE_IN_CLEANUP=$(grep -rn "^cleanup:" src/ --include="*.c" -A 20 | \
+  grep -c "free\|fclose\|pthread_mutex_unlock\|close" || echo "0")
+
+if [ "$CLEANUP_LABELS" -gt 0 ]; then
+  RATIO=$((FREE_IN_CLEANUP * 100 / CLEANUP_LABELS))
+
+  echo "Functions with cleanup labels: $CLEANUP_LABELS"
+  echo "Cleanup blocks with resource frees: $FREE_IN_CLEANUP"
+
+  if [ "$RATIO" -lt 80 ]; then
+    echo "⚠ WARN: Some cleanup blocks may not free resources"
+    echo "  Coverage: ${RATIO}%"
+    echo ""
+    echo "Action: Verify all cleanup: labels properly free allocated resources"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✓ PASS: Cleanup blocks appear to free resources (${RATIO}%)"
+  fi
+else
+  echo "ℹ INFO: No goto cleanup pattern found (acceptable for simple functions)"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
 # Summary
 echo "=========================================="
 echo "SUMMARY"
