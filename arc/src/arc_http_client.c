@@ -39,9 +39,13 @@ const char* arc_get_daemon_url(void) {
         int port = ARC_DAEMON_DEFAULT_PORT;
         const char* port_env = getenv(ARC_DAEMON_PORT_ENV);
         if (port_env) {
-            port = atoi(port_env);
+            char* endptr = NULL;
+            long port_num = strtol(port_env, &endptr, 10);
+            if (endptr != port_env && port_num > 0 && port_num < 65536) {
+                port = (int)port_num;
+            }
         }
-        snprintf(url_buffer, sizeof(url_buffer), "http://%s:%d", 
+        snprintf(url_buffer, sizeof(url_buffer), "http://%s:%d",
                  ARC_DAEMON_DEFAULT_HOST, port);
         initialized = 1;
     }

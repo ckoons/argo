@@ -306,6 +306,13 @@ int workflow_registry_load(workflow_registry_t* reg, const char* path) {
     }
 
     size_t read = fread(json, 1, size, fp);
+    if (read != (size_t)size && ferror(fp)) {
+        argo_report_error(E_SYSTEM_IO, "workflow_registry_load",
+                         "Failed to read %ld bytes from %s (read %zu)", size, path, read);
+        free(json);
+        fclose(fp);
+        return E_SYSTEM_IO;
+    }
     json[read] = '\0';
     fclose(fp);
 

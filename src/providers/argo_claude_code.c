@@ -250,7 +250,8 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
 
     while ((bytes_read = read(stdout_pipe[0], read_buf, sizeof(read_buf))) > 0) {
         /* Write to stdout for user visibility */
-        fwrite(read_buf, 1, bytes_read, stdout);
+        size_t written = fwrite(read_buf, 1, bytes_read, stdout); /* GUIDELINE_APPROVED: stdout streaming */
+        (void)written; /* Intentionally ignore - best effort streaming to user */
         fflush(stdout);
 
         /* Copy to response buffer */

@@ -38,18 +38,20 @@ int argo_get_daemon_port(void) {
     /* 1. Check config file */
     const char* port_str = argo_config_get("daemon_port");
     if (port_str && port_str[0]) {
-        int port = atoi(port_str);
-        if (port > 0 && port < 65536) {
-            return port;
+        char* endptr = NULL;
+        long port = strtol(port_str, &endptr, 10);
+        if (endptr != port_str && port > 0 && port < 65536) {
+            return (int)port;
         }
     }
 
     /* 2. Check environment */
     port_str = argo_getenv(ARGO_DAEMON_PORT_ENV);
     if (port_str && port_str[0]) {
-        int port = atoi(port_str);
-        if (port > 0 && port < 65536) {
-            return port;
+        char* endptr = NULL;
+        long port = strtol(port_str, &endptr, 10);
+        if (endptr != port_str && port > 0 && port < 65536) {
+            return (int)port;
         }
     }
 

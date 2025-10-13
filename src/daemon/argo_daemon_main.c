@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -58,10 +59,11 @@ static void kill_existing_daemon(uint16_t port) {
         FILE* pipe = popen(lsof_cmd, "r");
         if (pipe) {
             char pid_str[32];
-            if (fgets(pid_str, sizeof(pid_str), pipe)) {
-                pid_t pid = (pid_t)atoi(pid_str);
-                if (pid > 0) {
-                    kill(pid, SIGKILL);
+            if (fgets(pid_str, sizeof(pid_str), pipe)) { /* GUIDELINE_APPROVED: fgets in if condition */
+                char* endptr = NULL;
+                long pid_long = strtol(pid_str, &endptr, 10);
+                if (endptr != pid_str && pid_long > 0 && pid_long <= INT_MAX) {
+                    kill((pid_t)pid_long, SIGKILL);
                 }
             }
             pclose(pipe);
@@ -133,8 +135,9 @@ static uint16_t parse_port_config(int argc, char** argv) {
     /* Check environment variable */
     const char* env_port = getenv("ARGO_DAEMON_PORT");
     if (env_port) {
-        int p = atoi(env_port);
-        if (p > 0 && p <= MAX_TCP_PORT) {
+        char* endptr = NULL;
+        long p = strtol(env_port, &endptr, 10);
+        if (endptr != env_port && p > 0 && p <= MAX_TCP_PORT) {
             port = (uint16_t)p;
             fprintf(stderr, "Using port from ARGO_DAEMON_PORT: %d\n", port);
         }
@@ -144,8 +147,9 @@ static uint16_t parse_port_config(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--port") == 0) {
             if (i + 1 < argc) {
-                int p = atoi(argv[++i]);
-                if (p > 0 && p <= MAX_TCP_PORT) {
+                char* endptr = NULL;
+                long p = strtol(argv[++i], &endptr, 10);
+                if (endptr != argv[i] && *endptr == '\0' && p > 0 && p <= MAX_TCP_PORT) {
                     port = (uint16_t)p;
                     fprintf(stderr, "Using port from --port argument: %d\n", port);
                 } else {

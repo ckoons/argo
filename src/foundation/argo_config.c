@@ -221,7 +221,7 @@ static int load_config_file(const char* file_path) {
     char line[ARGO_BUFFER_STANDARD];
     int loaded = 0;
 
-    while (fgets(line, sizeof(line), fp)) {
+    while (fgets(line, sizeof(line), fp)) { /* GUIDELINE_APPROVED: fgets in while condition */
         /* Remove newline */
         size_t len = strlen(line);
         if (len > 0 && line[len-1] == '\n') {
@@ -239,6 +239,11 @@ static int load_config_file(const char* file_path) {
 
         free(key);
         free(value);
+    }
+
+    /* Check for read errors */
+    if (ferror(fp)) {
+        LOG_WARN("Error reading config file: %s", file_path);
     }
 
     fclose(fp);

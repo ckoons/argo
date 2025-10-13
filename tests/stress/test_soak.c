@@ -100,13 +100,15 @@ int main(int argc, char** argv) {
 
     /* Parse command line */
     if (argc > 1) {
-        duration_seconds = atoi(argv[1]);
-        if (duration_seconds <= 0) {
+        char* endptr = NULL;
+        long duration = strtol(argv[1], &endptr, 10);
+        if (endptr == argv[1] || *endptr != '\0' || duration <= 0 || duration > INT_MAX) {
             fprintf(stderr, "Usage: %s [duration_seconds]\n", argv[0]);
             fprintf(stderr, "Example: %s 3600  # Run for 1 hour\n", argv[0]);
             fprintf(stderr, "         %s 86400 # Run for 24 hours\n", argv[0]);
             return 1;
         }
+        duration_seconds = (int)duration;
     }
 
     printf("\n");

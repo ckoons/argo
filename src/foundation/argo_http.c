@@ -138,6 +138,12 @@ static int read_http_response(FILE* fp, http_response_t** resp) {
 
         size_t bytes = fread(response_buf + response_size, 1,
                            response_capacity - response_size - 1, fp);
+        if (bytes == 0 && ferror(fp)) {
+            argo_report_error(E_SYSTEM_IO, "read_http_response",
+                             "Error reading HTTP response from pipe");
+            result = E_SYSTEM_IO;
+            goto cleanup;
+        }
         response_size += bytes;
     }
     response_buf[response_size] = '\0';
@@ -146,7 +152,11 @@ static int read_http_response(FILE* fp, http_response_t** resp) {
     int status_code = HTTP_STATUS_OK;
     char* last_newline = strrchr(response_buf, '\n');
     if (last_newline && last_newline > response_buf) {
-        status_code = atoi(last_newline + 1);
+        char* endptr = NULL;
+        long code = strtol(last_newline + 1, &endptr, 10);
+        if (endptr != last_newline + 1 && code >= 100 && code < 600) {
+            status_code = (int)code;
+        }
         *last_newline = '\0';
         response_size = last_newline - response_buf;
     }
@@ -317,7 +327,11 @@ int http_parse_url(const char* url, char** host, int* port, char** path) {
     size_t host_len;
     if (colon && (!slash || colon < slash)) {
         host_len = colon - p;
-        *port = atoi(colon + 1);
+        char* endptr = NULL;
+        long port_num = strtol(colon + 1, &endptr, 10);
+        if (endptr != colon + 1 && port_num > 0 && port_num <= 65535) {
+            *port = (int)port_num;
+        }
     } else if (slash) {
         host_len = slash - p;
     } else {

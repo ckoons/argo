@@ -216,7 +216,7 @@ static int load_env_file(const char* filepath, bool required) {
     char line[ARGO_ENV_LINE_MAX];
     int line_num = 0;
 
-    while (fgets(line, sizeof(line), fp)) {
+    while (fgets(line, sizeof(line), fp)) { /* GUIDELINE_APPROVED: fgets in while condition */
         line_num++;
 
         size_t len = strlen(line);
@@ -237,6 +237,14 @@ static int load_env_file(const char* filepath, bool required) {
             free(key);
             free(value);
         }
+    }
+
+    /* Check for read errors */
+    if (ferror(fp)) {
+        argo_report_error(E_SYSTEM_IO, "load_env_file",
+                         "Error reading %s after line %d", filepath, line_num);
+        result = E_SYSTEM_IO;
+        goto cleanup;
     }
 
     LOG_INFO("Loaded %d variables from %s", vars_loaded, filepath);

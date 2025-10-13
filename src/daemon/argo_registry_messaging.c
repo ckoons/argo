@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
 
 /* Project includes */
 #include "argo_registry.h"
@@ -293,7 +294,11 @@ ci_message_t* message_from_json(const char* json) {
     /* Extract timeout_ms */
     char* timeout_start = strstr(json, REGISTRY_JSON_TIMEOUT);
     if (timeout_start) {
-        msg->metadata.timeout_ms = atoi(timeout_start + strlen(REGISTRY_JSON_TIMEOUT));
+        char* endptr = NULL;
+        long timeout = strtol(timeout_start + strlen(REGISTRY_JSON_TIMEOUT), &endptr, 10);
+        if (endptr != timeout_start + strlen(REGISTRY_JSON_TIMEOUT) && timeout >= 0 && timeout <= INT_MAX) {
+            msg->metadata.timeout_ms = (int)timeout;
+        }
     }
 
     return msg;
