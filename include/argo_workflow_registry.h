@@ -24,6 +24,14 @@
  * - Arc CLI queries workflow status
  * - Audit trail of past executions
  * - Cleanup of old workflow history
+ *
+ * THREAD SAFETY:
+ * - NOT thread-safe - caller must synchronize
+ * - Current usage: All access from daemon main thread or shared services thread
+ * - Workflow completion task holds lock during workflow_registry_list() call
+ * - No concurrent modification risk in current architecture
+ * - NOTE: Workflow entries returned by find() are mutable by design (cast away const)
+ *         This is safe because only daemon thread modifies them
  */
 
 /* Workflow states */

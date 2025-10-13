@@ -278,6 +278,80 @@ else
 fi
 echo ""
 
+# 14. Input validation check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "14. INPUT VALIDATION CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that workflow script paths are validated
+VALIDATE_SCRIPT_PATH=$(grep -rn "validate_script_path" src/daemon/ --include="*.c" | wc -l | tr -d ' ')
+if [ "$VALIDATE_SCRIPT_PATH" -gt 0 ]; then
+  echo "✓ PASS: Workflow script path validation implemented"
+  echo "ℹ INFO: Found $VALIDATE_SCRIPT_PATH uses of validate_script_path()"
+  INFOS=$((INFOS + 1))
+else
+  echo "⚠ WARN: No workflow script path validation found"
+  echo "Action: Implement validate_script_path() to prevent command injection"
+  WARNINGS=$((WARNINGS + 1))
+fi
+echo ""
+
+# 15. Environment variable sanitization check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "15. ENVIRONMENT VARIABLE SANITIZATION CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that environment variables are validated
+IS_SAFE_ENV_VAR=$(grep -rn "is_safe_env_var" src/daemon/ --include="*.c" | wc -l | tr -d ' ')
+if [ "$IS_SAFE_ENV_VAR" -gt 0 ]; then
+  echo "✓ PASS: Environment variable sanitization implemented"
+  echo "ℹ INFO: Found $IS_SAFE_ENV_VAR uses of is_safe_env_var()"
+  INFOS=$((INFOS + 1))
+else
+  echo "⚠ WARN: No environment variable sanitization found"
+  echo "Action: Implement is_safe_env_var() to block dangerous env vars (LD_PRELOAD, PATH, etc.)"
+  WARNINGS=$((WARNINGS + 1))
+fi
+echo ""
+
+# 16. AI provider timeout enforcement check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "16. AI PROVIDER TIMEOUT ENFORCEMENT CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that curl commands have --max-time flag
+CURL_TIMEOUT=$(grep -rn "curl.*--max-time" src/foundation/argo_http.c 2>/dev/null | wc -l | tr -d ' ')
+if [ "$CURL_TIMEOUT" -gt 0 ]; then
+  echo "✓ PASS: AI provider timeout enforcement implemented"
+  echo "ℹ INFO: Found $CURL_TIMEOUT curl commands with --max-time"
+  INFOS=$((INFOS + 1))
+else
+  echo "⚠ WARN: No timeout enforcement in HTTP client"
+  echo "Action: Add --max-time flag to curl commands to prevent indefinite hangs"
+  WARNINGS=$((WARNINGS + 1))
+fi
+echo ""
+
+# 17. Thread safety annotations check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "17. THREAD SAFETY ANNOTATIONS CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that structs with pthread_mutex_t have THREAD SAFETY documentation
+STRUCTS_WITH_MUTEX=$(grep -rn "pthread_mutex_t" include/ --include="*.h" | grep -v "^[^:]*:.*extern" | wc -l | tr -d ' ')
+THREAD_SAFETY_DOCS=$(grep -rn "THREAD SAFETY:" include/ --include="*.h" | wc -l | tr -d ' ')
+if [ "$STRUCTS_WITH_MUTEX" -gt 0 ]; then
+  if [ "$THREAD_SAFETY_DOCS" -ge "$STRUCTS_WITH_MUTEX" ]; then
+    echo "✓ PASS: Thread safety documented for critical data structures"
+    echo "ℹ INFO: Found $THREAD_SAFETY_DOCS thread safety annotations for $STRUCTS_WITH_MUTEX structs with mutexes"
+    INFOS=$((INFOS + 1))
+  else
+    echo "⚠ WARN: $STRUCTS_WITH_MUTEX structs with mutexes, but only $THREAD_SAFETY_DOCS thread safety docs"
+    echo "Action: Add THREAD SAFETY comments to document mutex protection"
+    WARNINGS=$((WARNINGS + 1))
+  fi
+else
+  echo "ℹ INFO: No structs with pthread_mutex_t found (single-threaded)"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
 # Summary
 echo "=========================================="
 echo "SUMMARY"

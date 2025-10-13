@@ -151,6 +151,18 @@ static int read_http_response(FILE* fp, http_response_t** resp) {
         response_size = last_newline - response_buf;
     }
 
+    /* Validate HTTP status code - catch non-200 responses */
+    if (status_code < HTTP_STATUS_OK || status_code >= HTTP_STATUS_SERVER_ERROR) {
+        LOG_WARN("HTTP request returned non-2xx status: %d", status_code);
+        /* Still return the response so caller can handle it */
+    }
+
+    /* Validate response body is not empty for successful requests */
+    if (status_code == HTTP_STATUS_OK && response_size == 0) {
+        LOG_WARN("HTTP request returned 200 but empty body");
+        /* This might be valid for some APIs, so don't fail */
+    }
+
     /* Create response */
     new_resp = calloc(1, sizeof(http_response_t));
     if (!new_resp) {
@@ -179,9 +191,11 @@ cleanup:
 int http_execute(const http_request_t* req, http_response_t** resp) {
     if (!req || !resp) return E_INPUT_NULL;
 
-    /* Build curl command with status code output */
+    /* Build curl command with status code output and timeout */
     char cmd[HTTP_CMD_BUFFER_SIZE];
-    int cmd_len = snprintf(cmd, sizeof(cmd), "curl -s -w '\\n%%{http_code}' -X %s",
+    int cmd_len = snprintf(cmd, sizeof(cmd),
+                          "curl -s --max-time %d -w '\\n%%{http_code}' -X %s",
+                          req->timeout_seconds > 0 ? req->timeout_seconds : HTTP_DEFAULT_TIMEOUT_SECONDS,
                           req->method == HTTP_POST ? "POST" : "GET");
 
     /* Add headers */

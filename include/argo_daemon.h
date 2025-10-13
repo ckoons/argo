@@ -14,7 +14,7 @@ typedef struct workflow_registry workflow_registry_t;
 typedef struct shared_services shared_services_t;
 
 /* Daemon structure */
-typedef struct {
+typedef struct argo_daemon_struct {
     http_server_t* http_server;
     ci_registry_t* registry;
     lifecycle_manager_t* lifecycle;

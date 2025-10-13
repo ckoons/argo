@@ -40,7 +40,7 @@
  *   E_SYSTEM_FILE if .env.argo not found
  *   E_SYSTEM_MEMORY if allocation fails
  */
-int argo_loadenv(void);
+int argo_loadenv(void);  /* LOCKS: argo_env_mutex */
 
 /* Get environment variable from Argo environment
  *
@@ -52,7 +52,7 @@ int argo_loadenv(void);
  * Returns:
  *   Value string or NULL if not found
  */
-const char* argo_getenv(const char* name);
+const char* argo_getenv(const char* name);  /* LOCKS: argo_env_mutex */
 
 /* Set environment variable in Argo environment
  *
@@ -67,7 +67,7 @@ const char* argo_getenv(const char* name);
  *   E_INPUT_NULL if name or value is NULL
  *   E_SYSTEM_MEMORY if allocation fails
  */
-int argo_setenv(const char* name, const char* value);
+int argo_setenv(const char* name, const char* value);  /* LOCKS: argo_env_mutex */
 
 /* Unset environment variable in Argo environment
  *
@@ -80,7 +80,7 @@ int argo_setenv(const char* name, const char* value);
  *   ARGO_SUCCESS on success
  *   E_INPUT_NULL if name is NULL
  */
-int argo_unsetenv(const char* name);
+int argo_unsetenv(const char* name);  /* LOCKS: argo_env_mutex */
 
 /* Clear all variables from Argo environment
  *
@@ -89,14 +89,14 @@ int argo_unsetenv(const char* name);
  * Returns:
  *   ARGO_SUCCESS on success
  */
-int argo_clearenv(void);
+int argo_clearenv(void);  /* LOCKS: argo_env_mutex */
 
 /* Free Argo environment and release resources
  *
  * Thread-safe. Frees all allocations and resets to empty state.
  * Safe to call multiple times.
  */
-void argo_freeenv(void);
+void argo_freeenv(void);  /* LOCKS: argo_env_mutex */
 
 /* Get integer value from environment
  *
@@ -111,14 +111,14 @@ void argo_freeenv(void);
  *   E_INPUT_NULL if name or value pointer is NULL
  *   E_PROTOCOL_FORMAT if variable not found or not valid integer
  */
-int argo_getenvint(const char* name, int* value);
+int argo_getenvint(const char* name, int* value);  /* LOCKS: argo_env_mutex */
 
 /* Print Argo environment to stdout
  *
  * Thread-safe. Prints all variables in NAME=VALUE format, one per line.
  * Similar to 'env' command output.
  */
-void argo_env_print(void);
+void argo_env_print(void);  /* LOCKS: argo_env_mutex */
 
 /* Dump Argo environment to file
  *
@@ -133,6 +133,6 @@ void argo_env_print(void);
  *   E_INPUT_NULL if filepath is NULL
  *   E_SYSTEM_FILE if file cannot be opened
  */
-int argo_env_dump(const char* filepath);
+int argo_env_dump(const char* filepath);  /* LOCKS: argo_env_mutex */
 
 #endif /* ARGO_ENV_UTILS_H */

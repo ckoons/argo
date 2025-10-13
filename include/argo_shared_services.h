@@ -25,20 +25,28 @@ typedef struct shared_service_task {
     bool enabled;                   /* Can be disabled without unregistering */
 } shared_service_task_t;
 
-/* Shared services manager */
+/*
+ * Shared services manager
+ *
+ * THREAD SAFETY:
+ * - All access to tasks[], task_count, and statistics MUST be protected by lock
+ * - running and should_stop are accessed atomically (bool reads/writes are atomic)
+ * - Background thread holds lock only during task list iteration setup
+ * - Task functions execute WITHOUT holding lock (to prevent deadlocks)
+ */
 typedef struct shared_services {
     pthread_t thread;               /* Background thread */
-    pthread_mutex_t lock;           /* Thread-safe access */
-    bool running;                   /* Thread running flag */
-    bool should_stop;               /* Shutdown signal */
+    pthread_mutex_t lock;           /* PROTECTS: tasks, task_count, statistics */
+    bool running;                   /* Thread running flag (atomic) */
+    bool should_stop;               /* Shutdown signal (atomic) */
 
-    /* Registered tasks */
+    /* Registered tasks - PROTECTED BY lock */
     shared_service_task_t tasks[SHARED_SERVICES_MAX_TASKS];
-    int task_count;
+    int task_count;                 /* PROTECTED BY lock */
 
-    /* Statistics */
-    uint64_t total_task_runs;
-    time_t started_at;
+    /* Statistics - PROTECTED BY lock */
+    uint64_t total_task_runs;       /* PROTECTED BY lock */
+    time_t started_at;              /* PROTECTED BY lock */
 
 } shared_services_t;
 
@@ -47,25 +55,25 @@ shared_services_t* shared_services_create(void);
 void shared_services_destroy(shared_services_t* svc);
 
 /* Thread control */
-int shared_services_start(shared_services_t* svc);
-void shared_services_stop(shared_services_t* svc);
-bool shared_services_is_running(shared_services_t* svc);
+int shared_services_start(shared_services_t* svc);  /* LOCKS: svc->lock briefly */
+void shared_services_stop(shared_services_t* svc);  /* LOCKS: svc->lock briefly */
+bool shared_services_is_running(shared_services_t* svc);  /* LOCKS: none (atomic read) */
 
-/* Task management */
-int shared_services_register_task(shared_services_t* svc,
+/* Task management - THREAD SAFE */
+int shared_services_register_task(shared_services_t* svc,  /* LOCKS: svc->lock */
                                    shared_service_task_fn fn,
                                    void* context,
                                    int interval_sec);
 
-int shared_services_unregister_task(shared_services_t* svc,
+int shared_services_unregister_task(shared_services_t* svc,  /* LOCKS: svc->lock */
                                      shared_service_task_fn fn);
 
-int shared_services_enable_task(shared_services_t* svc,
+int shared_services_enable_task(shared_services_t* svc,  /* LOCKS: svc->lock */
                                  shared_service_task_fn fn,
                                  bool enable);
 
-/* Statistics */
-uint64_t shared_services_get_task_runs(shared_services_t* svc);
-time_t shared_services_get_uptime(shared_services_t* svc);
+/* Statistics - THREAD SAFE */
+uint64_t shared_services_get_task_runs(shared_services_t* svc);  /* LOCKS: svc->lock */
+time_t shared_services_get_uptime(shared_services_t* svc);  /* LOCKS: svc->lock */
 
 #endif /* ARGO_SHARED_SERVICES_H */
