@@ -117,12 +117,18 @@ static int claude_code_init(ci_provider_t* provider) {
 static int claude_code_connect(ci_provider_t* provider) {
     ARGO_CHECK_NULL(provider);
 
-    /* Check if 'claude' command exists */
+    /* Check if 'claude' command exists in common locations */
     if (access("/usr/local/bin/claude", X_OK) != 0 &&
-        system("which claude > /dev/null 2>&1") != 0) {
-        argo_report_error(E_CI_NO_PROVIDER, "claude_code_connect",
-                         "claude command not found in PATH");
-        return E_CI_NO_PROVIDER;
+        access("/usr/bin/claude", X_OK) != 0 &&
+        access("/opt/homebrew/bin/claude", X_OK) != 0) {
+        /* Last resort: try to execute 'claude --version' */
+        FILE* pipe = popen("claude --version 2>&1", "r");
+        if (!pipe) {
+            argo_report_error(E_CI_NO_PROVIDER, "claude_code_connect",
+                             "claude command not found in PATH");
+            return E_CI_NO_PROVIDER;
+        }
+        pclose(pipe);
     }
 
     LOG_DEBUG("Claude Code provider connected");

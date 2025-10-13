@@ -51,12 +51,21 @@ static void kill_existing_daemon(uint16_t port) {
 
         fprintf(stderr, "Port %d is in use, killing existing daemon...\n", port);
 
-        /* Use lsof to find the PID listening on this port and kill it */
-        char kill_cmd[ARGO_BUFFER_MEDIUM];
-        snprintf(kill_cmd, sizeof(kill_cmd),
-                "lsof -ti tcp:%d | xargs kill -9 2>/dev/null",
-                port);
-        system(kill_cmd);
+        /* Use lsof to find the PID listening on this port */
+        char lsof_cmd[ARGO_BUFFER_SMALL];
+        snprintf(lsof_cmd, sizeof(lsof_cmd), "lsof -ti tcp:%d", port);
+
+        FILE* pipe = popen(lsof_cmd, "r");
+        if (pipe) {
+            char pid_str[32];
+            if (fgets(pid_str, sizeof(pid_str), pipe)) {
+                pid_t pid = (pid_t)atoi(pid_str);
+                if (pid > 0) {
+                    kill(pid, SIGKILL);
+                }
+            }
+            pclose(pipe);
+        }
 
         /* Wait for port to become free */
         sleep(1);

@@ -48,6 +48,12 @@ int file_read_all(const char* path, char** buffer, size_t* size) {
 
     /* Read file */
     size_t read_size = fread(file_buffer, 1, (size_t)file_size, fp);
+    if (read_size != (size_t)file_size && ferror(fp)) {
+        argo_report_error(E_SYSTEM_IO, "file_read_all",
+                         "Failed to read %ld bytes from %s (read %zu)", file_size, path, read_size);
+        result = E_SYSTEM_IO;
+        goto cleanup;
+    }
 
     /* Null-terminate */
     file_buffer[read_size] = '\0';
