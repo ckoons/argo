@@ -462,7 +462,11 @@ int argo_loadenv(void) {
     char* local_env = NULL;
     char* root_dir = NULL;
 
-    pthread_mutex_lock(&argo_env_mutex);
+    int lock_result = pthread_mutex_lock(&argo_env_mutex);
+    if (lock_result != 0) {
+        argo_report_error(E_SYSTEM_PROCESS, "argo_loadenv", "Failed to acquire mutex");
+        return E_SYSTEM_PROCESS;
+    }
 
     if (argo_env_initialized) {
         for (int i = 0; i < argo_env_count; i++) {
@@ -503,7 +507,11 @@ cleanup:
 
 /* Clear environment */
 int argo_clearenv(void) {
-    pthread_mutex_lock(&argo_env_mutex);
+    int lock_result = pthread_mutex_lock(&argo_env_mutex);
+    if (lock_result != 0) {
+        argo_report_error(E_SYSTEM_PROCESS, "argo_clearenv", "Failed to acquire mutex");
+        return E_SYSTEM_PROCESS;
+    }
 
     for (int i = 0; i < argo_env_count; i++) {
         free(argo_env[i]);
@@ -518,7 +526,12 @@ int argo_clearenv(void) {
 
 /* Free environment */
 void argo_freeenv(void) {
-    pthread_mutex_lock(&argo_env_mutex);
+    int lock_result = pthread_mutex_lock(&argo_env_mutex);
+    if (lock_result != 0) {
+        /* Can't return error from void function, log and proceed */
+        LOG_ERROR("Failed to acquire mutex in argo_freeenv: %d", lock_result);
+        return;
+    }
 
     for (int i = 0; i < argo_env_count; i++) {
         free(argo_env[i]);

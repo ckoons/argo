@@ -12,12 +12,17 @@
 #include "argo_env_utils.h"
 #include "argo_env_internal.h"
 #include "argo_error.h"
+#include "argo_log.h"
 
 /* Get environment variable */
 const char* argo_getenv(const char* name) {
     if (!name) return NULL;
 
-    pthread_mutex_lock(&argo_env_mutex);
+    int lock_result = pthread_mutex_lock(&argo_env_mutex);
+    if (lock_result != 0) {
+        LOG_ERROR("Failed to acquire mutex in argo_getenv: %d", lock_result);
+        return NULL;
+    }
 
     int idx = find_env_index(name);
     const char* result = NULL;
@@ -36,7 +41,11 @@ int argo_setenv(const char* name, const char* value) {
     ARGO_CHECK_NULL(name);
     ARGO_CHECK_NULL(value);
 
-    pthread_mutex_lock(&argo_env_mutex);
+    int lock_result = pthread_mutex_lock(&argo_env_mutex);
+    if (lock_result != 0) {
+        argo_report_error(E_SYSTEM_PROCESS, "argo_setenv", "Failed to acquire mutex");
+        return E_SYSTEM_PROCESS;
+    }
     int result = set_env_internal(name, value);
     pthread_mutex_unlock(&argo_env_mutex);
 
@@ -47,7 +56,11 @@ int argo_setenv(const char* name, const char* value) {
 int argo_unsetenv(const char* name) {
     ARGO_CHECK_NULL(name);
 
-    pthread_mutex_lock(&argo_env_mutex);
+    int lock_result = pthread_mutex_lock(&argo_env_mutex);
+    if (lock_result != 0) {
+        argo_report_error(E_SYSTEM_PROCESS, "argo_unsetenv", "Failed to acquire mutex");
+        return E_SYSTEM_PROCESS;
+    }
 
     int idx = find_env_index(name);
     if (idx >= 0) {
@@ -91,7 +104,11 @@ int argo_getenvint(const char* name, int* value) {
 
 /* Print environment */
 void argo_env_print(void) {
-    pthread_mutex_lock(&argo_env_mutex);
+    int lock_result = pthread_mutex_lock(&argo_env_mutex);
+    if (lock_result != 0) {
+        LOG_ERROR("Failed to acquire mutex in argo_env_print: %d", lock_result);
+        return;
+    }
 
     for (int i = 0; i < argo_env_count; i++) {
         if (argo_env[i]) {
@@ -106,7 +123,11 @@ void argo_env_print(void) {
 int argo_env_dump(const char* filepath) {
     ARGO_CHECK_NULL(filepath);
 
-    pthread_mutex_lock(&argo_env_mutex);
+    int lock_result = pthread_mutex_lock(&argo_env_mutex);
+    if (lock_result != 0) {
+        argo_report_error(E_SYSTEM_PROCESS, "argo_env_dump", "Failed to acquire mutex");
+        return E_SYSTEM_PROCESS;
+    }
 
     FILE* fp = fopen(filepath, "w");
     if (!fp) {

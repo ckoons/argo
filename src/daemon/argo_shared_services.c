@@ -14,7 +14,12 @@ static void* shared_services_thread_main(void* arg) {
     while (!svc->should_stop) {
         time_t now = time(NULL);
 
-        pthread_mutex_lock(&svc->lock);
+        int lock_result = pthread_mutex_lock(&svc->lock);
+        if (lock_result != 0) {
+            /* Mutex failure in background thread - log and continue */
+            usleep(SHARED_SERVICES_CHECK_INTERVAL_MS * MICROSECONDS_PER_MILLISECOND);
+            continue;
+        }
 
         /* Check each task to see if it should run */
         for (int i = 0; i < svc->task_count; i++) {
@@ -32,7 +37,12 @@ static void* shared_services_thread_main(void* arg) {
 
                 task->fn(task->context);
 
-                pthread_mutex_lock(&svc->lock);
+                lock_result = pthread_mutex_lock(&svc->lock);
+                if (lock_result != 0) {
+                    /* Can't continue without lock, sleep and retry */
+                    usleep(SHARED_SERVICES_CHECK_INTERVAL_MS * MICROSECONDS_PER_MILLISECOND);
+                    break;
+                }
 
                 /* Update last run time and statistics */
                 task->last_run = time(NULL);
@@ -91,7 +101,10 @@ int shared_services_start(shared_services_t* svc) {
         return E_INVALID_PARAMS;
     }
 
-    pthread_mutex_lock(&svc->lock);
+    int lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        return E_SYSTEM_PROCESS;
+    }
 
     if (svc->running) {
         pthread_mutex_unlock(&svc->lock);
@@ -119,7 +132,11 @@ void shared_services_stop(shared_services_t* svc) {
         return;
     }
 
-    pthread_mutex_lock(&svc->lock);
+    int lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        /* Can't safely stop without lock */
+        return;
+    }
 
     if (!svc->running) {
         pthread_mutex_unlock(&svc->lock);
@@ -134,7 +151,11 @@ void shared_services_stop(shared_services_t* svc) {
     /* Wait for thread to complete all pending tasks */
     pthread_join(svc->thread, NULL);
 
-    pthread_mutex_lock(&svc->lock);
+    lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        /* Thread is stopped, just can't update state cleanly */
+        return;
+    }
     svc->running = false;
     pthread_mutex_unlock(&svc->lock);
 }
@@ -145,7 +166,10 @@ bool shared_services_is_running(shared_services_t* svc) {
         return false;
     }
 
-    pthread_mutex_lock(&svc->lock);
+    int lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        return false;
+    }
     bool running = svc->running;
     pthread_mutex_unlock(&svc->lock);
 
@@ -161,7 +185,10 @@ int shared_services_register_task(shared_services_t* svc,
         return E_INVALID_PARAMS;
     }
 
-    pthread_mutex_lock(&svc->lock);
+    int lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        return E_SYSTEM_PROCESS;
+    }
 
     /* Check if task limit reached */
     if (svc->task_count >= SHARED_SERVICES_MAX_TASKS) {
@@ -199,7 +226,10 @@ int shared_services_unregister_task(shared_services_t* svc,
         return E_INVALID_PARAMS;
     }
 
-    pthread_mutex_lock(&svc->lock);
+    int lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        return E_SYSTEM_PROCESS;
+    }
 
     /* Find and remove task */
     int found = -1;
@@ -235,7 +265,10 @@ int shared_services_enable_task(shared_services_t* svc,
         return E_INVALID_PARAMS;
     }
 
-    pthread_mutex_lock(&svc->lock);
+    int lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        return E_SYSTEM_PROCESS;
+    }
 
     /* Find task */
     int found = -1;
@@ -264,7 +297,10 @@ uint64_t shared_services_get_task_runs(shared_services_t* svc) {
         return 0;
     }
 
-    pthread_mutex_lock(&svc->lock);
+    int lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        return 0;
+    }
     uint64_t runs = svc->total_task_runs;
     pthread_mutex_unlock(&svc->lock);
 
@@ -277,7 +313,10 @@ time_t shared_services_get_uptime(shared_services_t* svc) {
         return 0;
     }
 
-    pthread_mutex_lock(&svc->lock);
+    int lock_result = pthread_mutex_lock(&svc->lock);
+    if (lock_result != 0) {
+        return 0;
+    }
     time_t uptime = 0;
     if (svc->running) {
         uptime = time(NULL) - svc->started_at;

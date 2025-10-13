@@ -18,7 +18,12 @@ static void generate_session_id(char* id_out, size_t len) {
     static int session_counter = 0;
     static pthread_mutex_t counter_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    pthread_mutex_lock(&counter_mutex);
+    int lock_result = pthread_mutex_lock(&counter_mutex);
+    if (lock_result != 0) {
+        /* Can't return error from void function, use fallback */
+        snprintf(id_out, len, "merge-%ld-fallback", (long)time(NULL));
+        return;
+    }
     int counter = session_counter++;
     pthread_mutex_unlock(&counter_mutex);
 
