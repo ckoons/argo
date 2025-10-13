@@ -836,7 +836,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "34. PROCESS EXECUTION SAFETY CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check process execution functions for proper usage
-SYSTEM_CALLS=$(grep -rn "\bsystem\b" src/ --include="*.c" | grep -v "//" | grep -v "/\*" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+SYSTEM_CALLS=$(grep -rn "system(" src/ --include="*.c" | grep -v "//" | grep -v "/\*" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 EXEC_CALLS=$(grep -rn "\bexecl\b\|\bexeclp\b\|\bexecv\b\|\bexecvp\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 POPEN_CALLS=$(grep -rn "\bpopen\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
@@ -901,10 +901,10 @@ FREAD_COUNT=$(grep -rn "\bfread\b" src/ --include="*.c" | grep -v "GUIDELINE_APP
 FWRITE_COUNT=$(grep -rn "\bfwrite\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 FGETS_COUNT=$(grep -rn "\bfgets\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
-# Check how many are actually checked (appear on same or next line with if/==/>/<)
-FREAD_CHECKED=$(grep -rn "\bfread\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | grep -A 1 "" | grep -E "if\s*\(|==|!=|<|>" | wc -l | tr -d ' ')
-FWRITE_CHECKED=$(grep -rn "\bfwrite\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | grep -A 1 "" | grep -E "if\s*\(|==|!=|<|>" | wc -l | tr -d ' ')
-FGETS_CHECKED=$(grep -rn "\bfgets\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | grep -A 1 "" | grep -E "if\s*\(|==|!=|NULL" | wc -l | tr -d ' ')
+# Check how many are actually checked (look for ferror or return value checks within next few lines)
+FREAD_CHECKED=$(grep -rn "\bfread\b" src/ --include="*.c" -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
+FWRITE_CHECKED=$(grep -rn "\bfwrite\b" src/ --include="*.c" -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
+FGETS_CHECKED=$(grep -rn "\bfgets\b" src/ --include="*.c" -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|==|!=|NULL" | wc -l | tr -d ' ')
 
 TOTAL_FILE_IO=$((FREAD_COUNT + FWRITE_COUNT + FGETS_COUNT))
 TOTAL_CHECKED=$((FREAD_CHECKED + FWRITE_CHECKED + FGETS_CHECKED))
