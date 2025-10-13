@@ -37,7 +37,11 @@ typedef struct claude_code_context {
     char* response_content;
     size_t response_capacity;
 
-    /* Memory digest for sundown/sunrise - TODO: Restore after Unix pivot */
+    /* Memory digest for sundown/sunrise - disabled for CLI provider.
+     * Tested and validated in Tekton - Claude reported sunset/sunrise approach
+     * felt "more natural than --continue". Infrastructure exists in
+     * argo_claude_memory.c and can be integrated when CLI supports it.
+     * For now, Claude Code CLI uses --continue flag for session continuity. */
     /* ci_memory_digest_t* memory_digest; */
 
     /* Statistics */
@@ -79,7 +83,7 @@ ci_provider_t* claude_code_create_provider(const char* model) {
     strncpy(ctx->provider.name, "claude_code", sizeof(ctx->provider.name) - 1);
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = true;   /* Streaming visible to user */
-    ctx->provider.supports_memory = false;     /* TODO: Restore memory after Unix pivot */
+    ctx->provider.supports_memory = false;     /* Memory via --continue flag */
     ctx->provider.max_context = CLAUDE_CONTEXT_WINDOW;
 
     /* Allocate response buffer */
@@ -91,7 +95,7 @@ ci_provider_t* claude_code_create_provider(const char* model) {
         return NULL;
     }
 
-    /* TODO: Restore memory digest after Unix pivot */
+    /* Memory digest initialization disabled - using --continue for CLI sessions */
     /* ctx->memory_digest = memory_digest_create(ctx->provider.max_context); */
     /* if (!ctx->memory_digest) { */
     /*     LOG_WARN("Failed to create memory digest, continuing without memory"); */
@@ -142,8 +146,7 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
     ARGO_CHECK_NULL(callback);
     ARGO_GET_CONTEXT(provider, claude_code_context_t, ctx);
 
-    /* TODO: Memory augmentation disabled during Unix pivot - will restore after */
-    /* Execute with streaming (no memory augmentation) */
+    /* Execute with streaming - memory via --continue flag, not augmentation */
     int result = claude_code_execute_with_streaming(ctx, prompt, prompt);
 
     if (result != ARGO_SUCCESS) {
@@ -332,7 +335,7 @@ static void claude_code_cleanup(ci_provider_t* provider) {
     claude_code_context_t* ctx = (claude_code_context_t*)provider->context;
     if (!ctx) return;
 
-    /* TODO: Memory digest cleanup disabled during Unix pivot */
+    /* Memory digest cleanup not needed - using --continue for sessions */
     /* if (ctx->memory_digest) { */
     /*     memory_digest_destroy(ctx->memory_digest); */
     /* } */
@@ -343,7 +346,11 @@ static void claude_code_cleanup(ci_provider_t* provider) {
     LOG_DEBUG("Claude Code provider cleaned up");
 }
 
-/* TODO: Public API for memory management - disabled during Unix pivot, will restore after */
+/* Memory management API disabled for CLI provider.
+ * Claude Code uses --continue flag for session continuity.
+ * Memory digest approach (sunset/sunrise) tested in Tekton and works well,
+ * but CLI integration requires changes to claude command itself.
+ * Infrastructure exists in argo_claude_memory.c for future use. */
 /* int claude_code_set_sunrise(ci_provider_t* provider, const char* brief); */
 /* int claude_code_set_sunset(ci_provider_t* provider, const char* notes); */
 /* ci_memory_digest_t* claude_code_get_memory(ci_provider_t* provider); */
