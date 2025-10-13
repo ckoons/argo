@@ -590,6 +590,124 @@ else
 fi
 echo ""
 
+# 25. Memory initialization check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "25. MEMORY INITIALIZATION CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that allocated memory is initialized (prefer calloc or explicit memset)
+CALLOC_COUNT=$(grep -rn "\bcalloc\b" src/ --include="*.c" | wc -l | tr -d ' ')
+MALLOC_COUNT=$(grep -rn "\bmalloc\b" src/ --include="*.c" | wc -l | tr -d ' ')
+MEMSET_COUNT=$(grep -rn "\bmemset\b.*0" src/ --include="*.c" | wc -l | tr -d ' ')
+
+TOTAL_ALLOC=$((CALLOC_COUNT + MALLOC_COUNT))
+INITIALIZED=$((CALLOC_COUNT + MEMSET_COUNT))
+
+if [ "$TOTAL_ALLOC" -gt 0 ]; then
+  INIT_RATIO=$((INITIALIZED * 100 / TOTAL_ALLOC))
+
+  echo "Memory allocations: $TOTAL_ALLOC (calloc: $CALLOC_COUNT, malloc: $MALLOC_COUNT)"
+  echo "Initialized allocations: $INITIALIZED (calloc + memset)"
+  echo "Initialization coverage: ${INIT_RATIO}%"
+
+  if [ "$INIT_RATIO" -lt 50 ]; then
+    echo "⚠ WARN: Low memory initialization coverage"
+    echo "Action: Prefer calloc() or add memset() after malloc()"
+    echo "Reason: Prevents use of uninitialized memory"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✓ PASS: Memory initialization coverage appears adequate"
+  fi
+else
+  echo "ℹ INFO: No memory allocations found"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 26. Buffer size validation check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "26. BUFFER SIZE VALIDATION CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that buffer operations use sizeof() for size calculation
+STRING_OPS=$(grep -rn "strncpy\|snprintf\|strncat" src/ --include="*.c" | wc -l | tr -d ' ')
+STRING_OPS_WITH_SIZEOF=$(grep -rn "strncpy\|snprintf\|strncat" src/ --include="*.c" | grep -c "sizeof" || echo "0")
+
+if [ "$STRING_OPS" -gt 0 ]; then
+  SIZEOF_RATIO=$((STRING_OPS_WITH_SIZEOF * 100 / STRING_OPS))
+
+  echo "String operations: $STRING_OPS"
+  echo "Operations using sizeof(): $STRING_OPS_WITH_SIZEOF"
+  echo "sizeof() usage: ${SIZEOF_RATIO}%"
+
+  if [ "$SIZEOF_RATIO" -lt 70 ]; then
+    echo "⚠ WARN: Low sizeof() usage in string operations"
+    echo "Action: Use sizeof(buffer) instead of hard-coded sizes"
+    echo "Reason: Prevents buffer overflows when buffer size changes"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✓ PASS: Buffer size validation appears adequate (${SIZEOF_RATIO}%)"
+  fi
+else
+  echo "ℹ INFO: No string operations found"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 27. Defensive programming check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "27. DEFENSIVE PROGRAMMING CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for early return pattern (fail-fast principle)
+# Count functions with parameter validation at the top
+ARGO_CHECK_NULL_COUNT=$(grep -rn "ARGO_CHECK_NULL" src/ --include="*.c" | wc -l | tr -d ' ')
+EARLY_RETURNS=$(grep -rn "if\s*(!.*)\s*return" src/ --include="*.c" | wc -l | tr -d ' ')
+PUBLIC_FUNCTIONS=$(grep -rn "^[a-zA-Z_].*{$\|^int\s\|^void\s\|^const\s\|^static" src/ --include="*.c" | \
+  grep -v "^\s*//" | grep -v "^\s*\*" | wc -l | tr -d ' ')
+
+DEFENSIVE_CHECKS=$((ARGO_CHECK_NULL_COUNT + EARLY_RETURNS))
+
+echo "Defensive checks found: $DEFENSIVE_CHECKS"
+echo "  ARGO_CHECK_NULL uses: $ARGO_CHECK_NULL_COUNT"
+echo "  Early return patterns: $EARLY_RETURNS"
+
+if [ "$DEFENSIVE_CHECKS" -gt 80 ]; then
+  echo "✓ PASS: Strong defensive programming practices"
+  echo "ℹ INFO: Fail-fast pattern widely adopted"
+  INFOS=$((INFOS + 1))
+else
+  echo "ℹ INFO: Defensive programming present but could be enhanced"
+  echo "Recommendation: Add parameter validation to public functions"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 28. Error path coverage check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "28. ERROR PATH COVERAGE CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that functions have error handling paths
+# Look for functions with goto cleanup and error returns
+FUNCTIONS_WITH_GOTO=$(grep -rn "goto cleanup\|goto error" src/ --include="*.c" | \
+  cut -d: -f1 | sort -u | wc -l | tr -d ' ')
+FUNCTIONS_WITH_ERROR_RETURNS=$(grep -rn "return E_\|return ARGO_\|return -1" src/ --include="*.c" | \
+  cut -d: -f1 | sort -u | wc -l | tr -d ' ')
+
+TOTAL_ERROR_HANDLING=$((FUNCTIONS_WITH_GOTO + FUNCTIONS_WITH_ERROR_RETURNS))
+
+echo "Files with error handling: $TOTAL_ERROR_HANDLING"
+echo "  Files using goto cleanup/error: $FUNCTIONS_WITH_GOTO"
+echo "  Files with error returns: $FUNCTIONS_WITH_ERROR_RETURNS"
+
+if [ "$TOTAL_ERROR_HANDLING" -ge 30 ]; then
+  echo "✓ PASS: Comprehensive error handling coverage"
+  echo "ℹ INFO: Error paths well-defined across codebase"
+  INFOS=$((INFOS + 1))
+else
+  echo "ℹ INFO: Error handling present in $TOTAL_ERROR_HANDLING files"
+  echo "Recommendation: Ensure all non-trivial functions handle errors"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
 # Summary
 echo "=========================================="
 echo "SUMMARY"
