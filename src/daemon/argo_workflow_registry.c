@@ -260,7 +260,11 @@ int workflow_registry_save(const workflow_registry_t* reg, const char* path) {
         fprintf(fp, "      \"end_time\": %ld,\n", (long)node->entry.end_time);
         fprintf(fp, "      \"exit_code\": %d,\n", node->entry.exit_code);
         fprintf(fp, "      \"current_step\": %d,\n", node->entry.current_step);
-        fprintf(fp, "      \"total_steps\": %d\n", node->entry.total_steps);
+        fprintf(fp, "      \"total_steps\": %d,\n", node->entry.total_steps);
+        fprintf(fp, "      \"timeout_seconds\": %d,\n", node->entry.timeout_seconds);
+        fprintf(fp, "      \"retry_count\": %d,\n", node->entry.retry_count);
+        fprintf(fp, "      \"max_retries\": %d,\n", node->entry.max_retries);
+        fprintf(fp, "      \"last_retry_time\": %ld\n", (long)node->entry.last_retry_time);
         fprintf(fp, "    }");
 
         node = node->next;

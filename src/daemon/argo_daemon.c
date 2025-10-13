@@ -14,6 +14,7 @@
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
 #include "argo_workflow_registry.h"
+#include "argo_shared_services.h"
 #include "argo_limits.h"
 #include "argo_log.h"
 
@@ -25,9 +26,139 @@
 #include <fcntl.h>
 #include <time.h>
 #include <signal.h>
+#include <dirent.h>
 
 /* Global daemon pointer for signal handler */
 static argo_daemon_t* g_daemon_for_sigchld = NULL;
+
+/* Workflow timeout monitoring task */
+static void workflow_timeout_task(void* context) {
+    argo_daemon_t* daemon = (argo_daemon_t*)context;
+    if (!daemon || !daemon->workflow_registry) {
+        return;
+    }
+
+    time_t now = time(NULL);
+    workflow_entry_t* entries = NULL;
+    int count = 0;
+
+    int result = workflow_registry_list(daemon->workflow_registry, &entries, &count);
+    if (result != ARGO_SUCCESS || !entries) {
+        return;
+    }
+
+    for (int i = 0; i < count; i++) {
+        workflow_entry_t* entry = &entries[i];
+
+        /* Only check running workflows with timeout set */
+        if (entry->state != WORKFLOW_STATE_RUNNING || entry->timeout_seconds == 0) {
+            continue;
+        }
+
+        /* Check if workflow has exceeded timeout */
+        time_t elapsed = now - entry->start_time;
+        if (elapsed > entry->timeout_seconds) {
+            LOG_WARN("Workflow %s exceeded timeout (%d seconds), terminating",
+                    entry->workflow_id, entry->timeout_seconds);
+
+            /* Kill the workflow process */
+            if (entry->executor_pid > 0) {
+                kill(entry->executor_pid, SIGTERM);
+            }
+
+            /* Update state to abandoned */
+            workflow_registry_update_state(daemon->workflow_registry,
+                                          entry->workflow_id,
+                                          WORKFLOW_STATE_ABANDONED);
+        }
+    }
+
+    free(entries);
+}
+
+/* Log rotation task */
+static void log_rotation_task(void* context) {
+    argo_daemon_t* daemon = (argo_daemon_t*)context;
+    (void)daemon;  /* Currently unused, may be needed for stats */
+
+    const char* home = getenv("HOME");
+    if (!home) home = ".";
+
+    char log_dir[ARGO_PATH_MAX];
+    snprintf(log_dir, sizeof(log_dir), "%s/.argo/logs", home);
+
+    /* Open log directory */
+    DIR* dir = opendir(log_dir);
+    if (!dir) {
+        return;  /* No logs directory, nothing to rotate */
+    }
+
+    time_t now = time(NULL);
+    struct dirent* entry;
+
+    while ((entry = readdir(dir)) != NULL) {
+        /* Skip non-log files */
+        if (strstr(entry->d_name, ".log") == NULL) {
+            continue;
+        }
+
+        char log_path[ARGO_PATH_MAX];
+        snprintf(log_path, sizeof(log_path), "%s/%s", log_dir, entry->d_name);
+
+        struct stat st;
+        if (stat(log_path, &st) != 0) {
+            continue;
+        }
+
+        /* Check if log needs rotation (by age or size) */
+        bool needs_rotation = false;
+        time_t age = now - st.st_mtime;
+
+        if (age > LOG_MAX_AGE_SECONDS) {
+            LOG_DEBUG("Log %s exceeds max age (%ld days), rotating",
+                     entry->d_name, age / (24 * 60 * 60));
+            needs_rotation = true;
+        } else if (st.st_size > LOG_MAX_SIZE_BYTES) {
+            LOG_DEBUG("Log %s exceeds max size (%ld MB), rotating",
+                     entry->d_name, st.st_size / (1024 * 1024));
+            needs_rotation = true;
+        }
+
+        if (!needs_rotation) {
+            continue;
+        }
+
+        /* Rotate log files: file.log -> file.log.1 -> file.log.2 -> ... */
+        /* First, remove oldest if it exists */
+        char oldest_path[ARGO_PATH_MAX];
+        snprintf(oldest_path, sizeof(oldest_path), "%s.%d",
+                log_path, LOG_ROTATION_KEEP_COUNT);
+        unlink(oldest_path);  /* Ignore errors */
+
+        /* Rotate existing backups */
+        for (int i = LOG_ROTATION_KEEP_COUNT - 1; i >= 1; i--) {
+            char old_path[ARGO_PATH_MAX];
+            char new_path[ARGO_PATH_MAX];
+
+            if (i == 1) {
+                snprintf(old_path, sizeof(old_path), "%s", log_path);
+            } else {
+                snprintf(old_path, sizeof(old_path), "%s.%d", log_path, i - 1);
+            }
+            snprintf(new_path, sizeof(new_path), "%s.%d", log_path, i);
+
+            rename(old_path, new_path);  /* Ignore errors */
+        }
+
+        /* Create new empty log file */
+        FILE* new_log = fopen(log_path, "w");
+        if (new_log) {
+            fclose(new_log);
+        }
+    }
+
+    closedir(dir);
+}
 
 /* SIGCHLD handler - reap completed workflow processes */
 static void sigchld_handler(int sig) {
@@ -57,10 +188,16 @@ static void sigchld_handler(int sig) {
                 /* Update workflow state based on exit status */
                 workflow_state_t new_state;
                 int exit_code = 0;
+                bool should_retry = false;
 
                 if (WIFEXITED(status)) {
                     exit_code = WEXITSTATUS(status);
                     new_state = (exit_code == 0) ? WORKFLOW_STATE_COMPLETED : WORKFLOW_STATE_FAILED;
+
+                    /* Check if we should retry on failure */
+                    if (exit_code != 0 && entries[i].retry_count < entries[i].max_retries) {
+                        should_retry = true;
+                    }
                 } else if (WIFSIGNALED(status)) {
                     new_state = WORKFLOW_STATE_ABANDONED;
                     exit_code = WTERMSIG(status);
@@ -68,15 +205,73 @@ static void sigchld_handler(int sig) {
                     new_state = WORKFLOW_STATE_FAILED;
                 }
 
-                /* Update workflow registry */
-                workflow_registry_update_state(g_daemon_for_sigchld->workflow_registry,
-                                              entries[i].workflow_id, new_state);
-
-                /* Update exit code and end time */
+                /* Get mutable entry for updates */
                 const workflow_entry_t* entry = workflow_registry_find(
                     g_daemon_for_sigchld->workflow_registry, entries[i].workflow_id);
-                if (entry) {
-                    workflow_entry_t* mutable_entry = (workflow_entry_t*)entry;
+                if (!entry) {
+                    break;
+                }
+                workflow_entry_t* mutable_entry = (workflow_entry_t*)entry;
+
+                if (should_retry) {
+                    /* Retry the workflow */
+                    mutable_entry->retry_count++;
+                    mutable_entry->last_retry_time = time(NULL);
+
+                    /* Calculate exponential backoff delay */
+                    int delay = RETRY_DELAY_BASE_SECONDS * (1 << (mutable_entry->retry_count - 1));
+
+                    LOG_INFO("Workflow %s failed (exit %d), retry %d/%d in %d seconds",
+                            entries[i].workflow_id, exit_code,
+                            mutable_entry->retry_count, mutable_entry->max_retries, delay);
+
+                    /* Sleep before retry */
+                    sleep(delay);
+
+                    /* Re-execute workflow by forking again */
+                    pid_t retry_pid = fork();
+                    if (retry_pid == 0) {
+                        /* Child process - re-execute the script */
+                        const char* home = getenv("HOME");
+                        if (!home) home = ".";
+
+                        char log_dir[ARGO_PATH_MAX];
+                        snprintf(log_dir, sizeof(log_dir), "%s/.argo/logs", home);
+                        mkdir(log_dir, ARGO_DIR_PERMISSIONS);
+
+                        /* Redirect to same log file (append mode) */
+                        char log_path[ARGO_PATH_MAX];
+                        snprintf(log_path, sizeof(log_path), "%s/%s.log", log_dir,
+                                entries[i].workflow_id);
+
+                        int log_fd = open(log_path, O_CREAT | O_WRONLY | O_APPEND, ARGO_FILE_PERMISSIONS);
+                        if (log_fd >= 0) {
+                            /* Log retry attempt */
+                            dprintf(log_fd, "\n=== RETRY ATTEMPT %d/%d ===\n\n",
+                                   mutable_entry->retry_count, mutable_entry->max_retries);
+                            dup2(log_fd, STDOUT_FILENO);
+                            dup2(log_fd, STDERR_FILENO);
+                            close(log_fd);
+                        }
+
+                        /* Execute script (args/env preserved in original fork) */
+                        char* exec_args[] = {"/bin/bash", (char*)entries[i].workflow_name, NULL};
+                        execv("/bin/bash", exec_args);
+
+                        /* If execv returns, it failed */
+                        fprintf(stderr, "Failed to execute retry: %s\n", entries[i].workflow_name);
+                        exit(E_SYSTEM_PROCESS);
+                    } else if (retry_pid > 0) {
+                        /* Parent - update PID and state */
+                        mutable_entry->executor_pid = retry_pid;
+                        workflow_registry_update_state(g_daemon_for_sigchld->workflow_registry,
+                                                      entries[i].workflow_id,
+                                                      WORKFLOW_STATE_RUNNING);
+                    }
+                } else {
+                    /* No retry - finalize workflow */
+                    workflow_registry_update_state(g_daemon_for_sigchld->workflow_registry,
+                                                  entries[i].workflow_id, new_state);
                     mutable_entry->exit_code = exit_code;
                     mutable_entry->end_time = time(NULL);
                 }
@@ -138,13 +333,31 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
         return NULL;
     }
 
-    LOG_INFO("Daemon created with workflow registry");
+    /* Create shared services */
+    daemon->shared_services = shared_services_create();
+    if (!daemon->shared_services) {
+        argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "shared services creation failed");
+        lifecycle_manager_destroy(daemon->lifecycle);
+        registry_destroy(daemon->registry);
+        http_server_destroy(daemon->http_server);
+        workflow_registry_destroy(daemon->workflow_registry);
+        free(daemon);
+        return NULL;
+    }
+
+    LOG_INFO("Daemon created with workflow registry and shared services");
     return daemon;
 }
 
 /* Destroy daemon */
 void argo_daemon_destroy(argo_daemon_t* daemon) {
     if (!daemon) return;
+
+    /* Stop shared services first */
+    if (daemon->shared_services) {
+        shared_services_stop(daemon->shared_services);
+        shared_services_destroy(daemon->shared_services);
+    }
 
     if (daemon->lifecycle) {
         lifecycle_manager_destroy(daemon->lifecycle);
@@ -234,6 +447,30 @@ int argo_daemon_start(argo_daemon_t* daemon) {
     /* Register API routes */
     argo_daemon_register_api_routes(daemon);
 
+    /* Start shared services and register background tasks */
+    if (daemon->shared_services) {
+        /* Register workflow timeout monitoring task */
+        shared_services_register_task(daemon->shared_services,
+                                     workflow_timeout_task,
+                                     daemon,
+                                     WORKFLOW_TIMEOUT_CHECK_INTERVAL_SECONDS);
+
+        /* Register log rotation task */
+        shared_services_register_task(daemon->shared_services,
+                                     log_rotation_task,
+                                     daemon,
+                                     LOG_ROTATION_CHECK_INTERVAL_SECONDS);
+
+        /* Start shared services thread */
+        int svc_result = shared_services_start(daemon->shared_services);
+        if (svc_result != ARGO_SUCCESS) {
+            argo_report_error(svc_result, "argo_daemon_start", "failed to start shared services");
+            return svc_result;
+        }
+
+        LOG_INFO("Shared services started (timeout monitoring, log rotation)");
+    }
+
     LOG_INFO("Argo Daemon starting on port %d", daemon->port);
 
     /* Start HTTP server (blocking) */
@@ -271,6 +508,10 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
     entry.exit_code = 0;
     entry.current_step = 0;
     entry.total_steps = 1;  /* Bash scripts don't have steps */
+    entry.timeout_seconds = DEFAULT_WORKFLOW_TIMEOUT_SECONDS;
+    entry.retry_count = 0;
+    entry.max_retries = DEFAULT_MAX_RETRY_ATTEMPTS;
+    entry.last_retry_time = 0;
 
     /* Add to registry before forking */
     int result = workflow_registry_add(daemon->workflow_registry, &entry);

@@ -73,6 +73,33 @@
 /* Maximum queued input lines per workflow */
 #define MAX_WORKFLOW_INPUT_QUEUE 10
 
+/* Default workflow timeout (1 hour) */
+#define DEFAULT_WORKFLOW_TIMEOUT_SECONDS 3600
+
+/* Maximum workflow timeout (24 hours) */
+#define MAX_WORKFLOW_TIMEOUT_SECONDS 86400
+
+/* Default maximum retry attempts */
+#define DEFAULT_MAX_RETRY_ATTEMPTS 3
+
+/* Retry delay base (exponential backoff base in seconds) */
+#define RETRY_DELAY_BASE_SECONDS 5
+
+/* Workflow timeout check interval (every 10 seconds) */
+#define WORKFLOW_TIMEOUT_CHECK_INTERVAL_SECONDS 10
+
+/* Log rotation check interval (every hour) */
+#define LOG_ROTATION_CHECK_INTERVAL_SECONDS 3600
+
+/* Maximum log file age before rotation (7 days) */
+#define LOG_MAX_AGE_SECONDS (7 * 24 * 60 * 60)
+
+/* Maximum log file size before rotation (50MB) */
+#define LOG_MAX_SIZE_BYTES (50 * 1024 * 1024)
+
+/* Number of rotated log files to keep */
+#define LOG_ROTATION_KEEP_COUNT 5
+
 /* ===== Provider Defaults ===== */
 
 /* Ollama default port */

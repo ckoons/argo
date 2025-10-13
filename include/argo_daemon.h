@@ -9,8 +9,9 @@
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
 
-/* Forward declaration */
+/* Forward declarations */
 typedef struct workflow_registry workflow_registry_t;
+typedef struct shared_services shared_services_t;
 
 /* Daemon structure */
 typedef struct {
@@ -18,6 +19,7 @@ typedef struct {
     ci_registry_t* registry;
     lifecycle_manager_t* lifecycle;
     workflow_registry_t* workflow_registry;  /* Bash workflow tracking (Phase 3) */
+    shared_services_t* shared_services;      /* Background tasks (timeout, log rotation) */
     uint16_t port;
     bool should_shutdown;  /* Graceful shutdown flag */
 } argo_daemon_t;

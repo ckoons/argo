@@ -46,6 +46,10 @@ typedef struct {
     int exit_code;             /* Exit code (for completed/failed) */
     int current_step;          /* Current step number */
     int total_steps;           /* Total steps in workflow */
+    int timeout_seconds;       /* Workflow timeout (0 = no timeout) */
+    int retry_count;           /* Number of retries attempted */
+    int max_retries;           /* Maximum retry attempts (0 = no retry) */
+    time_t last_retry_time;    /* Timestamp of last retry attempt */
 } workflow_entry_t;
 
 /* Opaque registry structure */
