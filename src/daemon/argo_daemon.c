@@ -11,6 +11,7 @@
 #include "argo_daemon_api.h"
 #include "argo_daemon_tasks.h"
 #include "argo_daemon_workflow.h"
+#include "argo_daemon_exit_queue.h"
 #include "argo_error.h"
 #include "argo_http_server.h"
 #include "argo_registry.h"
@@ -29,13 +30,26 @@
 /* Global daemon pointer for signal handler */
 static argo_daemon_t* g_daemon_for_sigchld = NULL;
 
-/* SIGCHLD handler - POSIX async-signal-safe - DO NOT reap here */
+/* SIGCHLD handler - POSIX async-signal-safe - reap and queue exit codes */
 static void sigchld_handler(int sig) {
     (void)sig;  /* Unused */
 
-    /* Do NOT reap children here - let workflow_completion_task() handle it */
-    /* This allows completion task to capture exit codes via waitpid() */
-    /* The SA_NOCLDSTOP flag prevents zombies from accumulating */
+    if (!g_daemon_for_sigchld || !g_daemon_for_sigchld->exit_queue) {
+        return;  /* Should never happen, but be defensive */
+    }
+
+    /* Reap all terminated children and store exit codes in queue */
+    /* ONLY async-signal-safe operations allowed here */
+    int status;
+    pid_t pid;
+
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        /* Extract exit code */
+        int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+
+        /* Push to exit code queue for completion task to process */
+        exit_queue_push(g_daemon_for_sigchld->exit_queue, pid, exit_code);
+    }
 }
 
 /* Create daemon */
@@ -49,10 +63,20 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
     daemon->port = port;
     daemon->should_shutdown = false;
 
+    /* Create exit code queue for signal handler communication */
+    daemon->exit_queue = calloc(1, sizeof(exit_code_queue_t));
+    if (!daemon->exit_queue) {
+        argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "exit queue allocation failed");
+        free(daemon);
+        return NULL;
+    }
+    exit_queue_init(daemon->exit_queue);
+
     /* Create workflow registry (Phase 3) */
     daemon->workflow_registry = workflow_registry_create();
     if (!daemon->workflow_registry) {
         argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "workflow registry creation failed");
+        free(daemon->exit_queue);
         free(daemon);
         return NULL;
     }
@@ -62,6 +86,7 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
     if (!daemon->http_server) {
         argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "HTTP server creation failed");
         workflow_registry_destroy(daemon->workflow_registry);
+        free(daemon->exit_queue);
         free(daemon);
         return NULL;
     }
@@ -72,6 +97,7 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
         argo_report_error(E_SYSTEM_MEMORY, "argo_daemon_create", "registry creation failed");
         http_server_destroy(daemon->http_server);
         workflow_registry_destroy(daemon->workflow_registry);
+        free(daemon->exit_queue);
         free(daemon);
         return NULL;
     }
@@ -83,6 +109,7 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
         registry_destroy(daemon->registry);
         http_server_destroy(daemon->http_server);
         workflow_registry_destroy(daemon->workflow_registry);
+        free(daemon->exit_queue);
         free(daemon);
         return NULL;
     }
@@ -95,6 +122,7 @@ argo_daemon_t* argo_daemon_create(uint16_t port) {
         registry_destroy(daemon->registry);
         http_server_destroy(daemon->http_server);
         workflow_registry_destroy(daemon->workflow_registry);
+        free(daemon->exit_queue);
         free(daemon);
         return NULL;
     }
@@ -127,6 +155,10 @@ void argo_daemon_destroy(argo_daemon_t* daemon) {
 
     if (daemon->workflow_registry) {
         workflow_registry_destroy(daemon->workflow_registry);
+    }
+
+    if (daemon->exit_queue) {
+        free(daemon->exit_queue);
     }
 
     free(daemon);

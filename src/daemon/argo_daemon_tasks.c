@@ -17,6 +17,7 @@
 /* Project includes */
 #include "argo_daemon_tasks.h"
 #include "argo_daemon.h"
+#include "argo_daemon_exit_queue.h"
 #include "argo_workflow_registry.h"
 #include "argo_limits.h"
 #include "argo_log.h"
@@ -248,58 +249,66 @@ static void handle_workflow_failure(argo_daemon_t* daemon, workflow_entry_t* ent
 /* Workflow completion detection and retry task */
 void workflow_completion_task(void* context) {
     argo_daemon_t* daemon = (argo_daemon_t*)context;
-    if (!daemon || !daemon->workflow_registry) {
+    if (!daemon || !daemon->workflow_registry || !daemon->exit_queue) {
         return;
     }
 
-    workflow_entry_t* entries = NULL;
-    int count = 0;
-
-    int result = workflow_registry_list(daemon->workflow_registry, &entries, &count);
-    if (result != ARGO_SUCCESS || !entries) {
-        return;
+    /* Check for dropped exit codes (queue overflow) */
+    int dropped = exit_queue_get_dropped(daemon->exit_queue);
+    if (dropped > 0) {
+        LOG_WARN("Exit code queue dropped %d entries (queue full)", dropped);
     }
 
-    /* Check all RUNNING workflows to see if process has completed */
-    for (int i = 0; i < count; i++) {
-        workflow_entry_t* entry = &entries[i];
+    /* Drain exit code queue from SIGCHLD handler */
+    exit_code_entry_t exit_entry;
+    while (exit_queue_pop(daemon->exit_queue, &exit_entry)) {
+        /* Find workflow by PID */
+        workflow_entry_t* entries = NULL;
+        int count = 0;
 
-        if (entry->state != WORKFLOW_STATE_RUNNING) {
+        int result = workflow_registry_list(daemon->workflow_registry, &entries, &count);
+        if (result != ARGO_SUCCESS || !entries) {
             continue;
         }
 
-        /* Use waitpid with WNOHANG to check if process completed and get exit code */
-        if (entry->executor_pid > 0) {
-            int status = 0;
-            pid_t wait_result = waitpid(entry->executor_pid, &status, WNOHANG);
+        /* Match PID to workflow */
+        bool found = false;
+        for (int i = 0; i < count; i++) {
+            workflow_entry_t* entry = &entries[i];
 
-            if (wait_result > 0) {
-                /* Process has exited - check exit code */
-                int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+            if (entry->executor_pid == exit_entry.pid && entry->state == WORKFLOW_STATE_RUNNING) {
+                found = true;
 
                 /* Get mutable entry for updates */
                 const workflow_entry_t* found_entry = workflow_registry_find(
                     daemon->workflow_registry, entry->workflow_id);
                 if (!found_entry) {
-                    continue;
+                    break;
                 }
                 workflow_entry_t* mutable_entry = (workflow_entry_t*)found_entry;
-                mutable_entry->exit_code = exit_code;
+                mutable_entry->exit_code = exit_entry.exit_code;
 
-                if (exit_code == 0) {
+                if (exit_entry.exit_code == 0) {
                     /* Success - mark as completed */
                     workflow_registry_update_state(daemon->workflow_registry,
                                                   entry->workflow_id,
                                                   WORKFLOW_STATE_COMPLETED);
                     mutable_entry->end_time = time(NULL);
-                    LOG_INFO("Workflow %s completed successfully", entry->workflow_id);
+                    LOG_INFO("Workflow %s completed successfully (exit code 0)", entry->workflow_id);
                 } else {
                     /* Failure - handle retry logic */
+                    LOG_INFO("Workflow %s failed (exit code %d)", entry->workflow_id, exit_entry.exit_code);
                     handle_workflow_failure(daemon, entry);
                 }
+
+                break;
             }
         }
-    }
 
-    free(entries);
+        if (!found) {
+            LOG_DEBUG("Exit code for PID %d not matched to any workflow (already cleaned up?)", exit_entry.pid);
+        }
+
+        free(entries);
+    }
 }

@@ -8,6 +8,7 @@
 #include "argo_http_server.h"
 #include "argo_registry.h"
 #include "argo_lifecycle.h"
+#include "argo_daemon_exit_queue.h"
 
 /* Forward declarations */
 typedef struct workflow_registry workflow_registry_t;
@@ -20,6 +21,7 @@ typedef struct argo_daemon_struct {
     lifecycle_manager_t* lifecycle;
     workflow_registry_t* workflow_registry;  /* Bash workflow tracking (Phase 3) */
     shared_services_t* shared_services;      /* Background tasks (timeout, log rotation) */
+    exit_code_queue_t* exit_queue;           /* Signal-safe exit code queue (SIGCHLD → completion task) */
     uint16_t port;
     bool should_shutdown;  /* Graceful shutdown flag */
 } argo_daemon_t;
