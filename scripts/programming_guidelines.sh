@@ -708,6 +708,128 @@ else
 fi
 echo ""
 
+# 29. Mutex lock/unlock balance check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "29. MUTEX LOCK/UNLOCK BALANCE CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Verify pthread_mutex_lock and pthread_mutex_unlock are balanced
+MUTEX_LOCK=$(grep -rn "pthread_mutex_lock" src/ --include="*.c" | wc -l | tr -d ' ')
+MUTEX_UNLOCK=$(grep -rn "pthread_mutex_unlock" src/ --include="*.c" | wc -l | tr -d ' ')
+
+echo "Mutex operations:"
+echo "  pthread_mutex_lock calls: $MUTEX_LOCK"
+echo "  pthread_mutex_unlock calls: $MUTEX_UNLOCK"
+
+if [ "$MUTEX_LOCK" -gt 0 ]; then
+  if [ "$MUTEX_UNLOCK" -lt "$MUTEX_LOCK" ]; then
+    echo "⚠ WARN: More locks than unlocks detected"
+    echo "Action: Verify all mutexes are unlocked in error paths"
+    echo "Recommendation: Use goto cleanup pattern for mutex cleanup"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    BALANCE_RATIO=$((MUTEX_UNLOCK * 100 / MUTEX_LOCK))
+    echo "✓ PASS: Mutex lock/unlock balance appears healthy (${BALANCE_RATIO}%)"
+    echo "ℹ INFO: Unlock >= lock is expected (cleanup paths may have multiple unlocks)"
+    INFOS=$((INFOS + 1))
+  fi
+else
+  echo "ℹ INFO: No mutex operations found (single-threaded or lock-free)"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 30. Include guard coverage check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "30. INCLUDE GUARD COVERAGE CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that all header files have include guards
+TOTAL_HEADERS=$(find include/ -name "*.h" | wc -l | tr -d ' ')
+HEADERS_WITH_GUARDS=$(grep -l "#ifndef.*_H" include/*.h 2>/dev/null | wc -l | tr -d ' ')
+
+echo "Header files: $TOTAL_HEADERS"
+echo "Headers with include guards: $HEADERS_WITH_GUARDS"
+
+if [ "$TOTAL_HEADERS" -gt 0 ]; then
+  GUARD_RATIO=$((HEADERS_WITH_GUARDS * 100 / TOTAL_HEADERS))
+
+  if [ "$GUARD_RATIO" -lt 95 ]; then
+    echo "⚠ WARN: Not all header files have include guards (${GUARD_RATIO}%)"
+    echo "Action: Add #ifndef/#define/#endif guards to all headers"
+    echo ""
+    echo "Headers without guards:"
+    for header in include/*.h; do
+      if ! grep -q "#ifndef.*_H" "$header" 2>/dev/null; then
+        echo "  $header"
+      fi
+    done
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✓ PASS: Include guard coverage is excellent (${GUARD_RATIO}%)"
+  fi
+else
+  echo "ℹ INFO: No header files found"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 31. Error reporting consistency check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "31. ERROR REPORTING CONSISTENCY CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Verify proper use of argo_report_error vs LOG_ERROR
+ARGO_REPORT_ERROR=$(grep -rn "argo_report_error" src/ --include="*.c" | wc -l | tr -d ' ')
+LOG_ERROR_CALLS=$(grep -rn "LOG_ERROR" src/ --include="*.c" | wc -l | tr -d ' ')
+
+echo "Error reporting calls:"
+echo "  argo_report_error: $ARGO_REPORT_ERROR"
+echo "  LOG_ERROR: $LOG_ERROR_CALLS"
+
+if [ "$ARGO_REPORT_ERROR" -gt 0 ]; then
+  echo "✓ PASS: Centralized error reporting in use"
+  echo "ℹ INFO: argo_report_error for errors, LOG_ERROR for informational logging"
+  INFOS=$((INFOS + 1))
+else
+  echo "⚠ WARN: No argo_report_error calls found"
+  echo "Action: Use argo_report_error() for all error conditions"
+  echo "Note: LOG_ERROR is for informational logging, not error reporting"
+  WARNINGS=$((WARNINGS + 1))
+fi
+echo ""
+
+# 32. String allocation safety check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "32. STRING ALLOCATION SAFETY CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that strdup/strndup calls have return value checking
+STRDUP_CALLS=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" | wc -l | tr -d ' ')
+STRDUP_CHECKED=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" | grep -E "if\s*\(|=.*if|ARGO_CHECK_NULL" | wc -l | tr -d ' ')
+
+echo "String allocation calls:"
+echo "  strdup/strndup calls: $STRDUP_CALLS"
+echo "  Checked calls: $STRDUP_CHECKED"
+
+if [ "$STRDUP_CALLS" -gt 0 ]; then
+  CHECK_RATIO=$((STRDUP_CHECKED * 100 / STRDUP_CALLS))
+
+  if [ "$CHECK_RATIO" -lt 70 ]; then
+    echo "⚠ WARN: Many strdup calls lack NULL checking (${CHECK_RATIO}%)"
+    echo "Action: Check strdup return values (can fail and return NULL)"
+    echo ""
+    echo "Sample unchecked strdup calls:"
+    grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" | \
+      grep -v "if\s*(\|=.*if\|ARGO_CHECK_NULL" | head -3
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✓ PASS: Most strdup calls are checked (${CHECK_RATIO}%)"
+    echo "ℹ INFO: strdup can return NULL on allocation failure"
+    INFOS=$((INFOS + 1))
+  fi
+else
+  echo "ℹ INFO: No strdup calls found"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
 # Summary
 echo "=========================================="
 echo "SUMMARY"
