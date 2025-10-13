@@ -100,7 +100,21 @@ stop_daemon() {
     if [ -n "$DAEMON_PID" ]; then
         echo "Stopping daemon (PID: $DAEMON_PID)..."
         kill $DAEMON_PID 2>/dev/null || true
-        wait $DAEMON_PID 2>/dev/null || true
+
+        # Wait up to 5 seconds for graceful shutdown
+        for i in {1..5}; do
+            if ! ps -p $DAEMON_PID > /dev/null 2>&1; then
+                break
+            fi
+            sleep 1
+        done
+
+        # Force kill if still running
+        if ps -p $DAEMON_PID > /dev/null 2>&1; then
+            echo "Daemon didn't stop gracefully, force killing..."
+            kill -9 $DAEMON_PID 2>/dev/null || true
+        fi
+
         DAEMON_PID=""
     fi
 
@@ -178,14 +192,29 @@ fi
 test_start "Start bash workflow"
 output=$("$ARC_BIN" workflow start "$TEST_HELLO" 2>&1 || true)
 if output_contains "$output" "Started workflow" && output_contains "$output" "wf_"; then
-    WORKFLOW_ID=$(echo "$output" | grep -o 'wf_[0-9]*' | head -1)
+    WORKFLOW_ID=$(echo "$output" | grep -o 'wf_[0-9_]*' | head -1)
     test_pass
 else
     test_fail "Failed to start workflow: $output"
 fi
 
-# Wait for workflow to complete
-sleep 4
+# Wait for workflow to complete with polling (max 30 seconds)
+# Accepts both "completed" and "failed" as terminal states
+wait_for_completion() {
+    local workflow_id=$1
+    local max_attempts=30
+    local attempt=0
+
+    while [ $attempt -lt $max_attempts ]; do
+        local status_output=$("$ARC_BIN" workflow status "$workflow_id" 2>&1 || true)
+        if output_contains "$status_output" "completed" || output_contains "$status_output" "failed"; then
+            return 0
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+    return 1
+}
 
 # Test 3: Workflow appears in list
 test_start "Workflow appears in list"
@@ -210,6 +239,7 @@ fi
 
 # Test 5: Workflow completed successfully
 test_start "Workflow completed with exit code 0"
+wait_for_completion "$WORKFLOW_ID" || true
 output=$("$ARC_BIN" workflow status "$WORKFLOW_ID" 2>&1 || true)
 if output_contains "$output" "completed" && output_contains "$output" "Exit code:      0"; then
     test_pass
@@ -222,14 +252,14 @@ test_start "Start failing workflow"
 if [ -f "$TEST_FAILING" ]; then
     output=$("$ARC_BIN" workflow start "$TEST_FAILING" 2>&1 || true)
     if output_contains "$output" "Started workflow"; then
-        FAILING_ID=$(echo "$output" | grep -o 'wf_[0-9]*' | head -1)
+        FAILING_ID=$(echo "$output" | grep -o 'wf_[0-9_]*' | head -1)
         test_pass
     else
         test_fail "Failed to start failing workflow"
     fi
 
-    # Wait for it to fail
-    sleep 2
+    # Wait for it to fail (don't exit script if timeout)
+    wait_for_completion "$FAILING_ID" || true
 
     # Test 7: Failing workflow has non-zero exit code
     test_start "Failing workflow captured exit code"
@@ -251,7 +281,7 @@ test_start "Start long-running workflow"
 if [ -f "$TEST_LONG" ]; then
     output=$("$ARC_BIN" workflow start "$TEST_LONG" 2>&1 || true)
     if output_contains "$output" "Started workflow"; then
-        LONG_ID=$(echo "$output" | grep -o 'wf_[0-9]*' | head -1)
+        LONG_ID=$(echo "$output" | grep -o 'wf_[0-9_]*' | head -1)
         test_pass
     else
         test_fail "Failed to start long workflow"

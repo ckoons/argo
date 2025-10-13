@@ -260,7 +260,7 @@ void workflow_completion_task(void* context) {
         return;
     }
 
-    /* Check all RUNNING workflows to see if process still exists */
+    /* Check all RUNNING workflows to see if process has completed */
     for (int i = 0; i < count; i++) {
         workflow_entry_t* entry = &entries[i];
 
@@ -268,10 +268,36 @@ void workflow_completion_task(void* context) {
             continue;
         }
 
-        /* Check if process still exists using kill(pid, 0) */
-        if (entry->executor_pid > 0 && kill(entry->executor_pid, 0) != 0) {
-            /* Process doesn't exist - workflow completed/failed */
-            handle_workflow_failure(daemon, entry);
+        /* Use waitpid with WNOHANG to check if process completed and get exit code */
+        if (entry->executor_pid > 0) {
+            int status = 0;
+            pid_t wait_result = waitpid(entry->executor_pid, &status, WNOHANG);
+
+            if (wait_result > 0) {
+                /* Process has exited - check exit code */
+                int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+
+                /* Get mutable entry for updates */
+                const workflow_entry_t* found_entry = workflow_registry_find(
+                    daemon->workflow_registry, entry->workflow_id);
+                if (!found_entry) {
+                    continue;
+                }
+                workflow_entry_t* mutable_entry = (workflow_entry_t*)found_entry;
+                mutable_entry->exit_code = exit_code;
+
+                if (exit_code == 0) {
+                    /* Success - mark as completed */
+                    workflow_registry_update_state(daemon->workflow_registry,
+                                                  entry->workflow_id,
+                                                  WORKFLOW_STATE_COMPLETED);
+                    mutable_entry->end_time = time(NULL);
+                    LOG_INFO("Workflow %s completed successfully", entry->workflow_id);
+                } else {
+                    /* Failure - handle retry logic */
+                    handle_workflow_failure(daemon, entry);
+                }
+            }
         }
     }
 

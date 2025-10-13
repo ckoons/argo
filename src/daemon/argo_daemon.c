@@ -29,17 +29,13 @@
 /* Global daemon pointer for signal handler */
 static argo_daemon_t* g_daemon_for_sigchld = NULL;
 
-/* SIGCHLD handler - POSIX async-signal-safe - ONLY reap zombies */
+/* SIGCHLD handler - POSIX async-signal-safe - DO NOT reap here */
 static void sigchld_handler(int sig) {
     (void)sig;  /* Unused */
 
-    /* ONLY call async-signal-safe functions */
-    int status;
-    /* Reap all terminated children without blocking */
-    /* This prevents zombie processes - actual workflow handling done in background task */
-    while (waitpid(-1, &status, WNOHANG) > 0) {
-        /* Just reap - workflow completion handled by workflow_completion_task() */
-    }
+    /* Do NOT reap children here - let workflow_completion_task() handle it */
+    /* This allows completion task to capture exit codes via waitpid() */
+    /* The SA_NOCLDSTOP flag prevents zombies from accumulating */
 }
 
 /* Create daemon */
