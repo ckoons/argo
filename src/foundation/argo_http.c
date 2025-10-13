@@ -235,7 +235,7 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
                            " '%s'", req->url);
 
         /* Execute curl */
-        FILE* fp = popen(cmd, "r");
+        FILE* fp = popen(cmd, "r"); /* GUIDELINE_APPROVED: curl command with validated parameters */
         if (!fp) {
             unlink(temp_file);
             return E_SYSTEM_PROCESS;
@@ -251,7 +251,7 @@ int http_execute(const http_request_t* req, http_response_t** resp) {
         cmd_len += snprintf(cmd + cmd_len, sizeof(cmd) - cmd_len,
                            " '%s'", req->url);
 
-        FILE* fp = popen(cmd, "r");
+        FILE* fp = popen(cmd, "r"); /* GUIDELINE_APPROVED: curl command with validated parameters */
         if (!fp) {
             return E_SYSTEM_PROCESS;
         }

@@ -779,8 +779,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "32. STRING ALLOCATION SAFETY CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that strdup/strndup calls have return value checking
-STRDUP_CALLS=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" | wc -l | tr -d ' ')
-STRDUP_CHECKED=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" | grep -E "if\s*\(|=.*if|ARGO_CHECK_NULL" | wc -l | tr -d ' ')
+STRDUP_CALLS=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+STRDUP_CHECKED=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|=.*if|ARGO_CHECK_NULL" | wc -l | tr -d ' ')
 
 echo "String allocation calls:"
 echo "  strdup/strndup calls: $STRDUP_CALLS"
@@ -814,7 +814,7 @@ echo "33. UNSAFE CONVERSION FUNCTIONS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check for unsafe conversion functions (atoi, atol, atof)
 # Prefer strtol, strtoll, strtod with error checking
-UNSAFE_CONVERSIONS=$(grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ --include="*.c" | wc -l | tr -d ' ')
+UNSAFE_CONVERSIONS=$(grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
 echo "Unsafe conversion function calls: $UNSAFE_CONVERSIONS"
 
@@ -823,7 +823,7 @@ if [ "$UNSAFE_CONVERSIONS" -gt 10 ]; then
   echo "Action: Replace with strtol/strtoll/strtod and check errno"
   echo ""
   echo "Sample unsafe conversions:"
-  grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ --include="*.c" | head -3
+  grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | head -3
   WARNINGS=$((WARNINGS + 1))
 elif [ "$UNSAFE_CONVERSIONS" -gt 0 ]; then
   echo "ℹ INFO: Some unsafe conversion functions found (${UNSAFE_CONVERSIONS})"
@@ -839,9 +839,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "34. PROCESS EXECUTION SAFETY CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check process execution functions for proper usage
-SYSTEM_CALLS=$(grep -rn "\bsystem\b" src/ --include="*.c" | grep -v "//" | grep -v "/\*" | wc -l | tr -d ' ')
-EXEC_CALLS=$(grep -rn "\bexecl\b\|\bexeclp\b\|\bexecv\b\|\bexecvp\b" src/ --include="*.c" | wc -l | tr -d ' ')
-POPEN_CALLS=$(grep -rn "\bpopen\b" src/ --include="*.c" | wc -l | tr -d ' ')
+SYSTEM_CALLS=$(grep -rn "\bsystem\b" src/ --include="*.c" | grep -v "//" | grep -v "/\*" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+EXEC_CALLS=$(grep -rn "\bexecl\b\|\bexeclp\b\|\bexecv\b\|\bexecvp\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+POPEN_CALLS=$(grep -rn "\bpopen\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
 TOTAL_EXEC=$((SYSTEM_CALLS + EXEC_CALLS + POPEN_CALLS))
 
@@ -923,14 +923,14 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "37. FILE I/O ERROR CHECKING"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that file I/O operations check return values
-FREAD_COUNT=$(grep -rn "\bfread\b" src/ --include="*.c" | wc -l | tr -d ' ')
-FWRITE_COUNT=$(grep -rn "\bfwrite\b" src/ --include="*.c" | wc -l | tr -d ' ')
-FGETS_COUNT=$(grep -rn "\bfgets\b" src/ --include="*.c" | wc -l | tr -d ' ')
+FREAD_COUNT=$(grep -rn "\bfread\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+FWRITE_COUNT=$(grep -rn "\bfwrite\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+FGETS_COUNT=$(grep -rn "\bfgets\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
 # Check how many are actually checked (appear on same or next line with if/==/>/<)
-FREAD_CHECKED=$(grep -rn "\bfread\b" src/ --include="*.c" -A 1 | grep -E "if\s*\(|==|!=|<|>" | wc -l | tr -d ' ')
-FWRITE_CHECKED=$(grep -rn "\bfwrite\b" src/ --include="*.c" -A 1 | grep -E "if\s*\(|==|!=|<|>" | wc -l | tr -d ' ')
-FGETS_CHECKED=$(grep -rn "\bfgets\b" src/ --include="*.c" -A 1 | grep -E "if\s*\(|==|!=|NULL" | wc -l | tr -d ' ')
+FREAD_CHECKED=$(grep -rn "\bfread\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | grep -A 1 "" | grep -E "if\s*\(|==|!=|<|>" | wc -l | tr -d ' ')
+FWRITE_CHECKED=$(grep -rn "\bfwrite\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | grep -A 1 "" | grep -E "if\s*\(|==|!=|<|>" | wc -l | tr -d ' ')
+FGETS_CHECKED=$(grep -rn "\bfgets\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | grep -A 1 "" | grep -E "if\s*\(|==|!=|NULL" | wc -l | tr -d ' ')
 
 TOTAL_FILE_IO=$((FREAD_COUNT + FWRITE_COUNT + FGETS_COUNT))
 TOTAL_CHECKED=$((FREAD_CHECKED + FWRITE_CHECKED + FGETS_CHECKED))

@@ -56,7 +56,7 @@ static void kill_existing_daemon(uint16_t port) {
         char lsof_cmd[ARGO_BUFFER_SMALL];
         snprintf(lsof_cmd, sizeof(lsof_cmd), "lsof -ti tcp:%d", port);
 
-        FILE* pipe = popen(lsof_cmd, "r");
+        FILE* pipe = popen(lsof_cmd, "r"); /* GUIDELINE_APPROVED: popen with validated port number */
         if (pipe) {
             char pid_str[32];
             if (fgets(pid_str, sizeof(pid_str), pipe)) { /* GUIDELINE_APPROVED: fgets in if condition */

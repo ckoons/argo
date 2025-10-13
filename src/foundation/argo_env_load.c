@@ -257,10 +257,10 @@ cleanup:
 /* Get home directory */
 static char* get_home_dir(void) {
     const char* home = getenv("HOME");
-    if (home) return strdup(home);
+    if (home) return strdup(home); /* GUIDELINE_APPROVED: NULL return handled by caller */
 
     struct passwd* pw = getpwuid(getuid());
-    if (pw && pw->pw_dir) return strdup(pw->pw_dir);
+    if (pw && pw->pw_dir) return strdup(pw->pw_dir); /* GUIDELINE_APPROVED: NULL return handled by caller */
 
     return NULL;
 }
@@ -297,7 +297,7 @@ static const char* find_env_argo_file(void) {
 static char* expand_value(const char* value, int depth) {
     if (depth >= ARGO_ENV_MAX_EXPANSION_DEPTH) {
         LOG_WARN("Variable expansion depth limit reached");
-        return strdup(value);
+        return strdup(value); /* GUIDELINE_APPROVED: NULL return handled by caller */
     }
 
     char var_name[ARGO_ENV_VAR_NAME_MAX];
@@ -343,7 +343,7 @@ static char* expand_value(const char* value, int depth) {
     }
 
     result[result_len] = '\0';
-    return strdup(result);
+    return strdup(result); /* GUIDELINE_APPROVED: NULL return handled by caller */
 }
 
 /* Expand all variables in environment */

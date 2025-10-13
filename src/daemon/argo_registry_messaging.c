@@ -286,7 +286,13 @@ ci_message_t* message_from_json(const char* json) {
     /* Extract timestamp (simple - just look for the number) */
     char* ts_start = strstr(json, REGISTRY_JSON_TIMESTAMP);
     if (ts_start) {
-        msg->timestamp = atol(ts_start + strlen(REGISTRY_JSON_TIMESTAMP));
+        char* endptr = NULL;
+        long ts = strtol(ts_start + strlen(REGISTRY_JSON_TIMESTAMP), &endptr, 10);
+        if (endptr != ts_start + strlen(REGISTRY_JSON_TIMESTAMP) && ts >= 0) {
+            msg->timestamp = (time_t)ts;
+        } else {
+            msg->timestamp = time(NULL);
+        }
     } else {
         msg->timestamp = time(NULL);
     }

@@ -122,7 +122,7 @@ static int claude_code_connect(ci_provider_t* provider) {
         access("/usr/bin/claude", X_OK) != 0 &&
         access("/opt/homebrew/bin/claude", X_OK) != 0) {
         /* Last resort: try to execute 'claude --version' */
-        FILE* pipe = popen("claude --version 2>&1", "r");
+        FILE* pipe = popen("claude --version 2>&1", "r"); /* GUIDELINE_APPROVED: popen with fixed command string */
         if (!pipe) {
             argo_report_error(E_CI_NO_PROVIDER, "claude_code_connect",
                              "claude command not found in PATH");

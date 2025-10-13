@@ -42,7 +42,13 @@ static off_t get_cursor_position(const char* workflow_id) {
         return 0;  /* Start from beginning */
     }
 
-    return (off_t)atol(cursor_str);
+    char* endptr = NULL;
+    long pos = strtol(cursor_str, &endptr, 10);
+    if (endptr == cursor_str || pos < 0) {
+        return 0;  /* Invalid cursor, start from beginning */
+    }
+
+    return (off_t)pos;
 }
 
 /* Set cursor position for this terminal */

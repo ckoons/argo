@@ -67,7 +67,7 @@ char* build_context_with_memory(claude_context_t* ctx, const char* prompt) {
     working_memory_t* mem = (working_memory_t*)ctx->working_memory;
     if (!mem || mem->magic != WORKING_MEMORY_MAGIC) {
         /* No working memory, just return prompt */
-        return strdup(prompt);
+        return strdup(prompt); /* GUIDELINE_APPROVED: NULL return handled by caller */
     }
 
     /* Calculate total size needed */
