@@ -88,6 +88,9 @@
 /* Workflow timeout check interval (every 10 seconds) */
 #define WORKFLOW_TIMEOUT_CHECK_INTERVAL_SECONDS 10
 
+/* Workflow completion check interval (every 5 seconds) */
+#define WORKFLOW_COMPLETION_CHECK_INTERVAL_SECONDS 5
+
 /* Log rotation check interval (every hour) */
 #define LOG_ROTATION_CHECK_INTERVAL_SECONDS 3600
 

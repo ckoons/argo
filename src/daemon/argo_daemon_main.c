@@ -27,6 +27,9 @@
 /* Global daemon for signal handling */
 static argo_daemon_t* g_daemon = NULL;
 
+/* Volatile flag for signal-safe shutdown */
+static volatile sig_atomic_t g_shutdown_requested = 0;
+
 /* Kill any existing daemon on this port - NOT SELF */
 static void kill_existing_daemon(uint16_t port) {
     /* Try to connect to the port */
@@ -65,13 +68,11 @@ static void kill_existing_daemon(uint16_t port) {
     }
 }
 
-/* Signal handler for shutdown */
+/* Signal handler for shutdown - POSIX async-signal-safe */
 static void signal_handler(int signum) {
     (void)signum;
-    fprintf(stderr, "\nReceived shutdown signal\n");
-    if (g_daemon) {
-        argo_daemon_stop(g_daemon);
-    }
+    /* ONLY set atomic flag - no fprintf, no function calls */
+    g_shutdown_requested = 1;
 }
 
 /* SIGCHLD handler to reap completed workflow executors */

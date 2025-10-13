@@ -221,9 +221,33 @@ else
 fi
 echo ""
 
-# 12. Hard-coded URLs check
+# 12. Signal handler safety check
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "12. HARD-CODED URLS/ENDPOINTS CHECK"
+echo "12. SIGNAL HANDLER SAFETY CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for unsafe functions in signal handlers
+# Unsafe: malloc, printf, fprintf, LOG_*, any complex library functions
+# Safe: write, _exit, waitpid, kill, sigaction, sigprocmask
+SIGNAL_HANDLERS=$(grep -n "signal_handler\|sigchld_handler" src/ --include="*.c" -A 30 | \
+  grep -E "malloc|fprintf|printf|LOG_|snprintf|sleep\(" | wc -l | tr -d ' ')
+if [ "$SIGNAL_HANDLERS" -gt 0 ]; then
+  echo "✗ FAIL: Found $SIGNAL_HANDLERS unsafe function calls in signal handlers"
+  echo ""
+  echo "Details:"
+  grep -n "signal_handler\|sigchld_handler" src/ --include="*.c" -A 30 | \
+    grep -E "malloc|fprintf|printf|LOG_|snprintf|sleep\(" | head -5
+  echo ""
+  echo "Action: Only use async-signal-safe functions (waitpid, write, _exit, etc.)"
+  echo "See: man 7 signal-safety for complete list"
+  ERRORS=$((ERRORS + 1))
+else
+  echo "✓ PASS: Signal handlers use only async-signal-safe functions"
+fi
+echo ""
+
+# 13. Hard-coded URLs check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "13. HARD-CODED URLS/ENDPOINTS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Look for complete URLs in .c files (not just constants)
 # Exclude: comments, defines, daemon_client.c (URL builder itself), providers (external APIs)
