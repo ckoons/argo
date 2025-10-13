@@ -20,6 +20,9 @@
 
 /* Setup working memory with mmap */
 int setup_working_memory(claude_context_t* ctx, const char* ci_name) {
+    if (!ctx || !ci_name) {
+        return E_INVALID_PARAMS;
+    }
     /* Open or create session file */
     ctx->memory_fd = open(ctx->session_path, O_RDWR | O_CREAT, ARGO_FILE_MODE_PRIVATE);
     if (ctx->memory_fd < 0) {
@@ -64,6 +67,9 @@ int setup_working_memory(claude_context_t* ctx, const char* ci_name) {
 
 /* Build context with working memory */
 char* build_context_with_memory(claude_context_t* ctx, const char* prompt) {
+    if (!ctx || !prompt) {
+        return NULL;
+    }
     working_memory_t* mem = (working_memory_t*)ctx->working_memory;
     if (!mem || mem->magic != WORKING_MEMORY_MAGIC) {
         /* No working memory, just return prompt */
@@ -71,7 +77,7 @@ char* build_context_with_memory(claude_context_t* ctx, const char* prompt) {
     }
 
     /* Calculate total size needed */
-    size_t total_size = strlen(prompt) + 1;
+    size_t total_size = strlen(prompt) + MEMORY_NOTES_PADDING;  /* Prompt + "## Current Task\n" header */
 
     if (mem->has_sunset && mem->sunset_offset > 0) {
         total_size += strlen(mem->content + mem->sunset_offset) + MEMORY_NOTES_PADDING;
@@ -112,6 +118,9 @@ char* build_context_with_memory(claude_context_t* ctx, const char* prompt) {
 
 /* Load working memory */
 int load_working_memory(claude_context_t* ctx) {
+    if (!ctx) {
+        return E_INVALID_PARAMS;
+    }
     /* Memory is already mapped, just verify it's valid */
     working_memory_t* mem = (working_memory_t*)ctx->working_memory;
     if (mem->magic == WORKING_MEMORY_MAGIC) {
@@ -122,6 +131,9 @@ int load_working_memory(claude_context_t* ctx) {
 
 /* Save working memory */
 int save_working_memory(claude_context_t* ctx) {
+    if (!ctx) {
+        return E_INVALID_PARAMS;
+    }
     /* Memory is mapped, so changes are automatic */
     /* Just sync to disk */
     if (msync(ctx->working_memory, ctx->memory_size, MS_SYNC) < 0) {
@@ -133,6 +145,9 @@ int save_working_memory(claude_context_t* ctx) {
 
 /* Update turn count in working memory */
 void claude_memory_update_turn(claude_context_t* ctx) {
+    if (!ctx) {
+        return;
+    }
     working_memory_t* mem = (working_memory_t*)ctx->working_memory;
     if (mem && mem->magic == WORKING_MEMORY_MAGIC) {
         mem->turn_count++;
@@ -143,6 +158,9 @@ void claude_memory_update_turn(claude_context_t* ctx) {
 
 /* Cleanup working memory */
 void cleanup_working_memory(claude_context_t* ctx) {
+    if (!ctx) {
+        return;
+    }
     if (ctx->working_memory && ctx->working_memory != MAP_FAILED) {
         munmap(ctx->working_memory, ctx->memory_size);
     }

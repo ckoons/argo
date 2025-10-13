@@ -3,7 +3,7 @@
 # Test target definitions, test harnesses, validation
 
 # Quick tests - fast, no external dependencies
-test-quick: test-registry test-lifecycle test-messaging test-env test-config test-isolated-env test-workflow-registry test-http test-json
+test-quick: test-registry test-lifecycle test-messaging test-env test-config test-isolated-env test-workflow-registry test-http test-json test-http-server test-workflow-api test-daemon-lifecycle test-daemon-tasks test-registry-persistence test-claude-memory
 	@echo ""
 	@echo "=========================================="
 	@echo "Quick Tests Complete"
@@ -31,7 +31,7 @@ test-integration-complete: $(DAEMON_BINARY) arc
 	@echo "=========================================="
 	@./tests/integration/test_complete_e2e.sh
 
-test-integration-all: test-integration-bash test-integration-daemon test-integration-complete
+test-integration-all: test-integration-bash test-integration-daemon test-integration-complete test-workflow-execution test-daemon-restart
 	@echo ""
 	@echo "=========================================="
 	@echo "All Integration Tests Complete"
@@ -213,6 +213,62 @@ test-claude-providers: $(CLAUDE_PROVIDERS_TEST_TARGET)
 	@echo "Claude Provider Tests"
 	@echo "=========================================="
 	@./$(CLAUDE_PROVIDERS_TEST_TARGET)
+
+test-http-server: $(HTTP_SERVER_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "HTTP Server Tests"
+	@echo "=========================================="
+	@./$(HTTP_SERVER_TEST_TARGET)
+
+test-workflow-api: $(WORKFLOW_API_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Workflow API Tests"
+	@echo "=========================================="
+	@./$(WORKFLOW_API_TEST_TARGET)
+
+test-daemon-lifecycle: $(DAEMON_LIFECYCLE_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Daemon Lifecycle Tests"
+	@echo "=========================================="
+	@./$(DAEMON_LIFECYCLE_TEST_TARGET)
+
+test-daemon-tasks: $(DAEMON_TASKS_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Daemon Tasks Tests"
+	@echo "=========================================="
+	@./$(DAEMON_TASKS_TEST_TARGET)
+
+test-registry-persistence: $(REGISTRY_PERSISTENCE_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Registry Persistence Tests"
+	@echo "=========================================="
+	@./$(REGISTRY_PERSISTENCE_TEST_TARGET)
+
+test-claude-memory: $(CLAUDE_MEMORY_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Claude Memory Tests"
+	@echo "=========================================="
+	@./$(CLAUDE_MEMORY_TEST_TARGET)
+
+test-workflow-execution: $(WORKFLOW_EXECUTION_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Workflow Execution Integration Tests"
+	@echo "=========================================="
+	@./$(WORKFLOW_EXECUTION_TEST_TARGET)
+
+test-daemon-restart: $(DAEMON_RESTART_TEST_TARGET)
+	@echo ""
+	@echo "=========================================="
+	@echo "Daemon Restart Integration Tests"
+	@echo "=========================================="
+	@./$(DAEMON_RESTART_TEST_TARGET)
 
 test-memory-stress: $(MEMORY_STRESS_TEST_TARGET)
 	@echo ""
