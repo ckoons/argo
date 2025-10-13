@@ -7,6 +7,7 @@
 #include <string.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 /* Project includes */
 #include "argo_daemon.h"
@@ -188,9 +189,12 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
         }
     }
 
-    /* Generate workflow ID */
+    /* Generate workflow ID with microseconds to avoid collisions */
     char workflow_id[64];
-    snprintf(workflow_id, sizeof(workflow_id), "wf_%ld", (long)time(NULL));
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    snprintf(workflow_id, sizeof(workflow_id), "wf_%ld_%ld",
+             (long)tv.tv_sec, (long)tv.tv_usec);
 
     /* Execute bash workflow */
     result = daemon_execute_bash_workflow(g_api_daemon, script_path, args, arg_count,

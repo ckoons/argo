@@ -31,7 +31,7 @@ int argo_init(void) {
         return result;
     }
 
-    /* TODO: Unix pivot - shared services and workflow registry initialization removed */
+    /* Note: Workflow registry now initialized directly by daemon (Unix pivot complete) */
     /* These will be reintroduced after Unix workflow pivot is complete */
 
     LOG_INFO("Argo initialization complete");

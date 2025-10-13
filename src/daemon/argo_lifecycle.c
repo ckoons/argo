@@ -33,7 +33,7 @@ lifecycle_manager_t* lifecycle_manager_create(ci_registry_t* registry) {
     manager->max_missed_heartbeats = DEFAULT_MAX_MISSED;
     manager->auto_restart_on_error = false;
 
-    /* TODO: Register for graceful shutdown tracking (after Unix pivot) */
+    /* Future work: Optional graceful shutdown tracking (not required for daemon model) */
     /* argo_register_lifecycle(manager); */
 
     LOG_INFO("Lifecycle manager created");
@@ -44,7 +44,7 @@ lifecycle_manager_t* lifecycle_manager_create(ci_registry_t* registry) {
 void lifecycle_manager_destroy(lifecycle_manager_t* manager) {
     if (!manager) return;
 
-    /* TODO: Unregister from shutdown tracking (after Unix pivot) */
+    /* Future work: Optional shutdown tracking cleanup (not required for daemon model) */
     /* argo_unregister_lifecycle(manager); */
 
     for (int i = 0; i < manager->count; i++) {

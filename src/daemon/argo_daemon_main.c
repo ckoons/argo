@@ -82,7 +82,7 @@ static void sigchld_handler(int signum) {
 
     /* Reap all terminated children */
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        /* TODO: Unix pivot - workflow registry cleanup removed, will be replaced with bash-based process tracking */
+        /* Unix pivot complete - workflow registry cleanup handled by daemon_destroy */
         (void)pid;  /* Process reaped, logging could be added here */
     }
 }

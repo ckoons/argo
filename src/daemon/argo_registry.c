@@ -37,7 +37,7 @@ ci_registry_t* registry_create(void) {
     registry->port_config.analysis_offset = REGISTRY_PORT_OFFSET_ANALYSIS;
     registry->port_config.reserved_offset = REGISTRY_PORT_OFFSET_RESERVED;
 
-    /* TODO: Register for graceful shutdown tracking (after Unix pivot) */
+    /* Future work: Optional graceful shutdown tracking (not required for daemon model) */
     /* argo_register_registry(registry); */
 
     LOG_INFO("Registry created with base port %d", REGISTRY_BASE_PORT);
@@ -48,7 +48,7 @@ ci_registry_t* registry_create(void) {
 void registry_destroy(ci_registry_t* registry) {
     if (!registry) return;
 
-    /* TODO: Unregister from shutdown tracking (after Unix pivot) */
+    /* Future work: Optional shutdown tracking cleanup (not required for daemon model) */
     /* argo_unregister_registry(registry); */
 
     ci_registry_entry_t* entry = registry->entries;
