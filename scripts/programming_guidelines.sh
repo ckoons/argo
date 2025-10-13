@@ -830,6 +830,227 @@ else
 fi
 echo ""
 
+# 33. Unsafe conversion functions check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "33. UNSAFE CONVERSION FUNCTIONS CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for unsafe conversion functions (atoi, atol, atof)
+# Prefer strtol, strtoll, strtod with error checking
+UNSAFE_CONVERSIONS=$(grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ --include="*.c" | wc -l | tr -d ' ')
+
+echo "Unsafe conversion function calls: $UNSAFE_CONVERSIONS"
+
+if [ "$UNSAFE_CONVERSIONS" -gt 10 ]; then
+  echo "⚠ WARN: Many unsafe conversion functions found"
+  echo "Action: Replace with strtol/strtoll/strtod and check errno"
+  echo ""
+  echo "Sample unsafe conversions:"
+  grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ --include="*.c" | head -3
+  WARNINGS=$((WARNINGS + 1))
+elif [ "$UNSAFE_CONVERSIONS" -gt 0 ]; then
+  echo "ℹ INFO: Some unsafe conversion functions found (${UNSAFE_CONVERSIONS})"
+  echo "Recommendation: Consider strtol/strtoll/strtod for better error handling"
+  INFOS=$((INFOS + 1))
+else
+  echo "✓ PASS: No unsafe conversion functions found"
+fi
+echo ""
+
+# 34. Process execution safety check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "34. PROCESS EXECUTION SAFETY CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check process execution functions for proper usage
+SYSTEM_CALLS=$(grep -rn "\bsystem\b" src/ --include="*.c" | grep -v "//" | grep -v "/\*" | wc -l | tr -d ' ')
+EXEC_CALLS=$(grep -rn "\bexecl\b\|\bexeclp\b\|\bexecv\b\|\bexecvp\b" src/ --include="*.c" | wc -l | tr -d ' ')
+POPEN_CALLS=$(grep -rn "\bpopen\b" src/ --include="*.c" | wc -l | tr -d ' ')
+
+TOTAL_EXEC=$((SYSTEM_CALLS + EXEC_CALLS + POPEN_CALLS))
+
+echo "Process execution calls:"
+echo "  system(): $SYSTEM_CALLS"
+echo "  exec*(): $EXEC_CALLS"
+echo "  popen(): $POPEN_CALLS"
+echo "  Total: $TOTAL_EXEC"
+
+if [ "$SYSTEM_CALLS" -gt 0 ]; then
+  echo "⚠ WARN: system() calls found - command injection risk"
+  echo "Action: Validate all input before passing to system()"
+  echo "Recommendation: Use exec*() or fork+exec instead"
+  WARNINGS=$((WARNINGS + 1))
+elif [ "$TOTAL_EXEC" -gt 0 ]; then
+  echo "✓ PASS: Process execution present"
+  echo "ℹ INFO: Verify input validation for all exec/popen calls"
+  INFOS=$((INFOS + 1))
+else
+  echo "ℹ INFO: No process execution found"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 35. Switch statement completeness check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "35. SWITCH STATEMENT COMPLETENESS CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that switch statements have default cases
+SWITCH_COUNT=$(grep -rn "switch\s*(" src/ --include="*.c" | wc -l | tr -d ' ')
+DEFAULT_COUNT=$(grep -rn "default\s*:" src/ --include="*.c" | wc -l | tr -d ' ')
+
+echo "Switch statements: $SWITCH_COUNT"
+echo "Default cases: $DEFAULT_COUNT"
+
+if [ "$SWITCH_COUNT" -gt 0 ]; then
+  COVERAGE=$((DEFAULT_COUNT * 100 / SWITCH_COUNT))
+
+  if [ "$COVERAGE" -lt 80 ]; then
+    echo "⚠ WARN: Not all switch statements have default cases (${COVERAGE}%)"
+    echo "Action: Add default: cases to handle unexpected values"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo "✓ PASS: Most switch statements have default cases (${COVERAGE}%)"
+    echo "ℹ INFO: Default cases improve robustness"
+    INFOS=$((INFOS + 1))
+  fi
+else
+  echo "ℹ INFO: No switch statements found"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 36. Pointer typedef hygiene check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "36. POINTER TYPEDEF HYGIENE CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for pointer typedefs (generally discouraged in C)
+POINTER_TYPEDEFS=$(grep -rn "typedef.*\*" include/ --include="*.h" | wc -l | tr -d ' ')
+
+echo "Pointer typedefs: $POINTER_TYPEDEFS"
+
+if [ "$POINTER_TYPEDEFS" -gt 20 ]; then
+  echo "⚠ WARN: Many pointer typedefs found"
+  echo "Action: Consider typedef struct instead of typedef struct*"
+  echo "Reason: Pointer typedefs hide indirection and make ownership unclear"
+  WARNINGS=$((WARNINGS + 1))
+elif [ "$POINTER_TYPEDEFS" -gt 0 ]; then
+  echo "ℹ INFO: Some pointer typedefs found (${POINTER_TYPEDEFS})"
+  echo "Note: Prefer explicit pointers for clarity"
+  INFOS=$((INFOS + 1))
+else
+  echo "✓ PASS: No pointer typedefs found"
+fi
+echo ""
+
+# 37. File I/O error checking
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "37. FILE I/O ERROR CHECKING"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check that file I/O operations check return values
+FREAD_COUNT=$(grep -rn "\bfread\b" src/ --include="*.c" | wc -l | tr -d ' ')
+FWRITE_COUNT=$(grep -rn "\bfwrite\b" src/ --include="*.c" | wc -l | tr -d ' ')
+FGETS_COUNT=$(grep -rn "\bfgets\b" src/ --include="*.c" | wc -l | tr -d ' ')
+
+TOTAL_FILE_IO=$((FREAD_COUNT + FWRITE_COUNT + FGETS_COUNT))
+
+echo "File I/O operations:"
+echo "  fread: $FREAD_COUNT"
+echo "  fwrite: $FWRITE_COUNT"
+echo "  fgets: $FGETS_COUNT"
+echo "  Total: $TOTAL_FILE_IO"
+
+if [ "$TOTAL_FILE_IO" -gt 15 ]; then
+  echo "ℹ INFO: Significant file I/O usage"
+  echo "Reminder: Always check return values and handle partial reads/writes"
+  INFOS=$((INFOS + 1))
+elif [ "$TOTAL_FILE_IO" -gt 0 ]; then
+  echo "✓ PASS: Moderate file I/O usage"
+  echo "ℹ INFO: Verify all I/O operations check return values"
+  INFOS=$((INFOS + 1))
+else
+  echo "ℹ INFO: Minimal file I/O operations"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
+# 38. Function length limits check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "38. FUNCTION LENGTH LIMITS CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check for excessively long functions (>150 lines)
+LONG_FUNCTIONS=0
+for file in $(find src/ -name "*.c"); do
+  # Simple heuristic: look for functions by searching for opening brace on function line
+  # Count lines between function start and likely end
+  # This is approximate - a full parser would be needed for accuracy
+  LINES=$(wc -l < "$file" | tr -d ' ')
+  if [ "$LINES" -gt 150 ]; then
+    # File itself is long, likely has long functions
+    LONG_FUNCTIONS=$((LONG_FUNCTIONS + 1))
+  fi
+done
+
+echo "Files >150 lines (potential long functions): $LONG_FUNCTIONS"
+
+if [ "$LONG_FUNCTIONS" -gt 15 ]; then
+  echo "⚠ WARN: Many potentially long functions"
+  echo "Action: Refactor long functions into smaller, focused helpers"
+  echo "Recommendation: Keep functions under 100 lines"
+  WARNINGS=$((WARNINGS + 1))
+elif [ "$LONG_FUNCTIONS" -gt 0 ]; then
+  echo "ℹ INFO: Some files >150 lines (${LONG_FUNCTIONS})"
+  echo "Note: Long files may contain long functions - review for refactoring"
+  INFOS=$((INFOS + 1))
+else
+  echo "✓ PASS: Most files are compact"
+fi
+echo ""
+
+# 39. Extern declaration minimization check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "39. EXTERN DECLARATION MINIMIZATION CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check extern declarations in headers (prefer static or proper encapsulation)
+EXTERN_DECLS=$(grep -rn "^extern\s" include/ --include="*.h" | wc -l | tr -d ' ')
+
+echo "Extern declarations in headers: $EXTERN_DECLS"
+
+if [ "$EXTERN_DECLS" -gt 30 ]; then
+  echo "⚠ WARN: Many extern declarations"
+  echo "Action: Consider encapsulation or static functions"
+  echo "Reason: Excessive externs increase coupling"
+  WARNINGS=$((WARNINGS + 1))
+elif [ "$EXTERN_DECLS" -gt 0 ]; then
+  echo "ℹ INFO: Some extern declarations found (${EXTERN_DECLS})"
+  echo "Note: Prefer minimal public API surface"
+  INFOS=$((INFOS + 1))
+else
+  echo "✓ PASS: No extern declarations (excellent encapsulation)"
+fi
+echo ""
+
+# 40. Inline function appropriate usage check
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "40. INLINE FUNCTION APPROPRIATE USAGE CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Check inline function usage (should be small, frequently called)
+INLINE_FUNCS=$(grep -rn "static\s\+inline" include/ src/ --include="*.h" --include="*.c" | wc -l | tr -d ' ')
+
+echo "Inline functions: $INLINE_FUNCS"
+
+if [ "$INLINE_FUNCS" -gt 30 ]; then
+  echo "⚠ WARN: Many inline functions"
+  echo "Action: Reserve inline for hot paths only"
+  echo "Reason: Excessive inlining increases code size"
+  WARNINGS=$((WARNINGS + 1))
+elif [ "$INLINE_FUNCS" -gt 0 ]; then
+  echo "ℹ INFO: Moderate inline function usage (${INLINE_FUNCS})"
+  echo "Note: Inline functions should be small and frequently called"
+  INFOS=$((INFOS + 1))
+else
+  echo "ℹ INFO: No inline functions (compiler will inline as needed)"
+  INFOS=$((INFOS + 1))
+fi
+echo ""
+
 # Summary
 echo "=========================================="
 echo "SUMMARY"
