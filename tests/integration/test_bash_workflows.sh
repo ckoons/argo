@@ -308,7 +308,8 @@ if [ -f "$TEST_LONG" ]; then
 
     # Test 10: Abandon running workflow
     test_start "Abandon running workflow"
-    output=$("$ARC_BIN" workflow abandon "$LONG_ID" 2>&1 || true)
+    # Redirect stdin to auto-confirm abandon (non-interactive mode)
+    output=$("$ARC_BIN" workflow abandon "$LONG_ID" </dev/null 2>&1 || true)
     if output_contains "$output" "Abandoned" || output_contains "$output" "killed"; then
         test_pass
     else
