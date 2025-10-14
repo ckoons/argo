@@ -126,8 +126,8 @@ GET    /api/workflow/list          /* List all workflows */
 GET    /api/workflow/status/{id}   /* Get workflow status */
 DELETE /api/workflow/abandon/{id}  /* Terminate workflow */
 POST   /api/workflow/progress/{id} /* Progress update (from executor) */
-POST   /api/workflow/pause/{id}    /* Pause workflow (stub) */
-POST   /api/workflow/resume/{id}   /* Resume workflow (stub) */
+POST   /api/workflow/pause/{id}    /* Pause workflow (SIGSTOP) */
+POST   /api/workflow/resume/{id}   /* Resume workflow (SIGCONT) */
 ```
 
 **Interactive Workflow I/O** (HTTP I/O Channel):
@@ -909,19 +909,16 @@ static int newprovider_query(ci_provider_t* provider, const char* prompt, char**
 
 **Fully Implemented**:
 - HTTP server (custom, 350 lines, zero dependencies)
-- REST API endpoints (start, list, status, abandon, progress)
-- Workflow executor (complete implementation, not stub)
-- Bi-directional messaging (executor → daemon via HTTP POST)
-- Arc CLI integration (workflow_start, workflow_status, workflow_abandon use HTTP)
+- REST API endpoints (start, list, status, abandon, pause, resume, progress)
+- Workflow pause/resume (SIGSTOP/SIGCONT signal handling)
+- Workflow executor (bash script execution with timeout)
+- Arc CLI integration (all workflow commands use HTTP)
 - Process management (fork/exec, signal handling)
 - Error handling (consistent HTTP status codes, JSON responses)
-
-**Partial/Stub Implementations**:
-- `api_workflow_pause()` - Returns success but doesn't actually pause execution
-- `api_workflow_resume()` - Returns success but doesn't actually resume execution
-- `arc workflow list` - Still uses direct registry access (not HTTP yet)
+- State management (6 workflow states: pending, running, paused, completed, failed, abandoned)
 
 **Future Enhancements** (design documented, not implemented):
+- Interactive workflow I/O endpoints (design complete, not yet used)
 - Long-polling for real-time updates
 - WebSocket upgrade for streaming progress
 - Distributed daemon coordination (multi-host)

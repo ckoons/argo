@@ -256,12 +256,9 @@ void test_full_load_cycle(void) {
     printf("Testing: Full load cycle ... ");
     tests_run++;
 
-    /* Create minimal .env.argo for testing */
-    FILE* fp = fopen(".env.argo", "a");  /* Append mode - don't overwrite */
-    if (fp) {
-        fprintf(fp, "# Test marker - can be removed\n");
-        fclose(fp);
-    }
+    /* Note: argo_loadenv() loads .env.argo from project root */
+    /* We don't create test files - just verify it loads successfully */
+    /* The actual .env.argo file should already exist in the project */
 
     int result = argo_loadenv();
 
