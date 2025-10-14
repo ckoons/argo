@@ -105,7 +105,7 @@ test-arc-workflow: $(TARGET)
 	@echo "=========================================="
 	@cd $(TEST_DIR) && ./test_arc_workflows.sh
 
-# Background/attach tests (manual only)
+# Background process tests (manual only)
 test-arc-background: $(TARGET)
 	@echo ""
 	@echo "=========================================="

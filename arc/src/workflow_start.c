@@ -138,11 +138,5 @@ int arc_workflow_start(int argc, char** argv) {
     /* Cleanup HTTP response */
     arc_http_response_free(response);
 
-    /* Auto-attach to workflow only if stdin is a TTY (interactive mode) */
-    if (isatty(STDIN_FILENO)) {
-        char* attach_argv[] = {workflow_id};
-        return arc_workflow_attach(1, attach_argv);
-    }
-
     return ARC_EXIT_SUCCESS;
 }
