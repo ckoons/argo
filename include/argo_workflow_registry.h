@@ -55,6 +55,7 @@ typedef struct {
     char workflow_name[128];   /* Template name (e.g., "ci_build") */
     workflow_state_t state;    /* Current state */
     pid_t executor_pid;        /* Executor PID (0 if not running) */
+    int stdin_pipe;            /* Pipe FD for sending input to workflow (0 if not piped) */
     time_t start_time;         /* When started (epoch) */
     time_t end_time;           /* When finished (0 if running) */
     int exit_code;             /* Exit code (for completed/failed) */

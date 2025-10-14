@@ -21,6 +21,7 @@ int arc_workflow_start(int argc, char** argv);
 int arc_workflow_list(int argc, char** argv);
 int arc_workflow_status(int argc, char** argv);
 int arc_workflow_states(int argc, char** argv);
+int arc_workflow_attach(int argc, char** argv);
 int arc_workflow_pause(int argc, char** argv);
 int arc_workflow_resume(int argc, char** argv);
 int arc_workflow_abandon(int argc, char** argv);

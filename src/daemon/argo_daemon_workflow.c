@@ -151,10 +151,20 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
         return result;
     }
 
+    /* Create pipe for stdin (parent writes, child reads) */
+    int pipe_fds[2];
+    if (pipe(pipe_fds) < 0) {
+        argo_report_error(E_SYSTEM_PROCESS, "daemon_execute_bash_workflow", "pipe creation failed");
+        workflow_registry_remove(daemon->workflow_registry, workflow_id);
+        return E_SYSTEM_PROCESS;
+    }
+
     /* Fork process */
     pid_t pid = fork();
     if (pid < 0) {
         /* Fork failed */
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
         argo_report_error(E_SYSTEM_FORK, "daemon_execute_bash_workflow", "fork failed");
         workflow_registry_update_state(daemon->workflow_registry, workflow_id,
                                       WORKFLOW_STATE_FAILED);
@@ -163,6 +173,11 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
 
     if (pid == 0) {
         /* Child process - execute bash script */
+
+        /* Setup stdin pipe (close write end, redirect read end to stdin) */
+        close(pipe_fds[1]);  /* Close write end */
+        dup2(pipe_fds[0], STDIN_FILENO);
+        close(pipe_fds[0]);
 
         /* Create log directory if needed */
         const char* home = getenv("HOME");
@@ -212,19 +227,22 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
         _exit(E_SYSTEM_PROCESS);
     }
 
-    /* Parent process - update registry with PID */
+    /* Parent process - close read end, keep write end for input */
+    close(pipe_fds[0]);
+
+    /* Update registry with PID and stdin pipe */
     workflow_registry_update_state(daemon->workflow_registry, workflow_id,
                                   WORKFLOW_STATE_RUNNING);
 
-    /* Store PID in registry entry */
-    /* Note: workflow_entry_t has executor_pid field */
+    /* Store PID and stdin pipe in registry entry */
     const workflow_entry_t* wf_entry = workflow_registry_find(daemon->workflow_registry, workflow_id);
     if (wf_entry) {
         /* Need to cast away const to update - this is a limitation of current API */
         workflow_entry_t* mutable_entry = (workflow_entry_t*)wf_entry;
         mutable_entry->executor_pid = pid;
+        mutable_entry->stdin_pipe = pipe_fds[1];  /* Store write end for input */
     }
 
-    LOG_INFO("Started bash workflow: %s (PID: %d)", workflow_id, pid);
+    LOG_INFO("Started bash workflow: %s (PID: %d, stdin_pipe: %d)", workflow_id, pid, pipe_fds[1]);
     return ARGO_SUCCESS;
 }

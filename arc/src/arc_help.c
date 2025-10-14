@@ -18,6 +18,7 @@ static void show_general_help(void) {
     printf("  list [active|template]          List workflows or templates\n");
     printf("  status [workflow_name]          Show workflow status\n");
     printf("  states                          Show all workflow states\n");
+    printf("  attach [workflow_name]          Attach to workflow (tail logs + send input)\n");
     printf("  pause [workflow_name]           Pause workflow at next checkpoint\n");
     printf("  resume [workflow_name]          Resume paused workflow\n");
     printf("  abandon [workflow_name]         Stop and remove workflow\n\n");
@@ -48,6 +49,7 @@ static void show_command_help(const char* command) {
         printf("  list [active|template]          List workflows or templates\n");
         printf("  status [workflow_name]          Show workflow status\n");
         printf("  states                          Show all workflow states\n");
+        printf("  attach [workflow_name]          Attach to workflow (tail logs + send input)\n");
         printf("  pause [workflow_name]           Pause workflow at next checkpoint\n");
         printf("  resume [workflow_name]          Resume paused workflow\n");
         printf("  abandon [workflow_name]         Stop and remove workflow\n\n");

@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <unistd.h>
 #include <errno.h>
 
 /* Project includes */
@@ -536,5 +537,79 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
             workflow_id);
 
     http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+    return ARGO_SUCCESS;
+}
+/* POST /api/workflow/input/{id} - Send user input to workflow */
+int api_workflow_input(http_request_t* req, http_response_t* resp) {
+    if (!req || !resp || !g_api_daemon || !g_api_daemon->workflow_registry) {
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        return E_SYSTEM_MEMORY;
+    }
+
+    /* Extract workflow ID from path */
+    const char* id_start = strrchr(req->path, '/');
+    if (!id_start || !*(id_start + 1)) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        return E_INPUT_NULL;
+    }
+    const char* workflow_id = id_start + 1;
+
+    /* Find workflow in registry */
+    const workflow_entry_t* entry = workflow_registry_find(g_api_daemon->workflow_registry, workflow_id);
+    if (!entry) {
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        return E_NOT_FOUND;
+    }
+
+    /* Check if workflow is running */
+    if (entry->state != WORKFLOW_STATE_RUNNING && entry->state != WORKFLOW_STATE_PAUSED) {
+        char error_msg[128];
+        snprintf(error_msg, sizeof(error_msg),
+                "Workflow is not running (state: %s)",
+                workflow_state_to_string(entry->state));
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, error_msg);
+        return E_INVALID_STATE;
+    }
+
+    /* Check if stdin pipe is available */
+    if (entry->stdin_pipe <= 0) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Workflow has no stdin pipe");
+        return E_INVALID_STATE;
+    }
+
+    /* Parse JSON body to extract input text */
+    if (!req->body) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing request body");
+        return E_INPUT_NULL;
+    }
+
+    const char* field_path[] = {"input"};
+    char* input_text = NULL;
+    size_t input_len = 0;
+    int result = json_extract_nested_string(req->body, field_path, 1, &input_text, &input_len);
+    if (result != ARGO_SUCCESS || !input_text) {
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing 'input' field");
+        free(input_text);
+        return E_INPUT_FORMAT;
+    }
+
+    /* Write input to workflow's stdin pipe */
+    ssize_t written = write(entry->stdin_pipe, input_text, input_len);
+    free(input_text);
+
+    if (written < 0) {
+        LOG_ERROR("Failed to write to workflow stdin: %s", strerror(errno));
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to send input to workflow");
+        return E_SYSTEM_PROCESS;
+    }
+
+    /* Build success response */
+    char response_json[256];
+    snprintf(response_json, sizeof(response_json),
+            "{\"status\":\"success\",\"workflow_id\":\"%s\",\"bytes_written\":%zd}",
+            workflow_id, written);
+
+    http_response_set_json(resp, HTTP_STATUS_OK, response_json);
+    LOG_INFO("Sent input to workflow %s: %zd bytes", workflow_id, written);
     return ARGO_SUCCESS;
 }

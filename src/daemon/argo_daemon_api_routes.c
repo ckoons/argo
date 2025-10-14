@@ -48,6 +48,8 @@ int argo_daemon_register_api_routes(argo_daemon_t* daemon) {
                          "/api/workflow/pause", api_workflow_pause);
     http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
                          "/api/workflow/resume", api_workflow_resume);
+    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
+                         "/api/workflow/input", api_workflow_input);
 
     /* Registry routes */
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,

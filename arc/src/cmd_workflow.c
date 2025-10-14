@@ -29,6 +29,9 @@ int arc_cmd_workflow(int argc, char** argv) {
     else if (strcmp(subcommand, "states") == 0) {
         return arc_workflow_states(argc - 1, argv + 1);
     }
+    else if (strcmp(subcommand, "attach") == 0) {
+        return arc_workflow_attach(argc - 1, argv + 1);
+    }
     else if (strcmp(subcommand, "pause") == 0) {
         return arc_workflow_pause(argc - 1, argv + 1);
     }
