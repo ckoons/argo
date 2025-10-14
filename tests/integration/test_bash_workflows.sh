@@ -139,7 +139,10 @@ cleanup() {
 
     stop_daemon
 
-    # Clean up log files
+    # Clean up log files (preserve test log for debugging)
+    if [ -f /tmp/argo-daemon-test.log ]; then
+        cp /tmp/argo-daemon-test.log /tmp/argo-daemon-test-LAST.log
+    fi
     rm -f /tmp/argo-daemon-test.log
     rm -f ~/.argo/logs/wf_test_*.log 2>/dev/null || true
 }
@@ -306,7 +309,16 @@ if [ -f "$TEST_LONG" ]; then
         test_fail "Workflow not showing running state"
     fi
 
-    # Test 10: Abandon running workflow
+    # Test 10: Workflow appears in list before abandon
+    test_start "Long workflow appears in list"
+    output=$("$ARC_BIN" workflow list 2>&1 || true)
+    if output_contains "$output" "$LONG_ID"; then
+        test_pass
+    else
+        test_fail "Workflow not in list before abandon"
+    fi
+
+    # Test 11: Abandon running workflow
     test_start "Abandon running workflow"
     # Redirect stdin to auto-confirm abandon (non-interactive mode)
     output=$("$ARC_BIN" workflow abandon "$LONG_ID" </dev/null 2>&1 || true)
@@ -316,32 +328,32 @@ if [ -f "$TEST_LONG" ]; then
         test_fail "Failed to abandon workflow"
     fi
 
-    # Test 11: Abandoned workflow removed from list
+    # Test 12: Abandoned workflow removed from list
     test_start "Abandoned workflow removed from list"
-    # Wait for: (1) process to exit after SIGTERM, (2) SIGCHLD fires, (3) completion task processes exit queue
-    # Completion task runs every 5 seconds, worst case: up to 30s for removal to complete
-    max_attempts=30
-    attempt=0
+    # Check list 3 times with 2-second delay between checks
+    # Process exit → SIGCHLD → exit queue → completion task (every 5s) → removal
+    # Should complete within one completion task cycle
     workflow_removed=false
-    while [ $attempt -lt $max_attempts ]; do
+    for attempt in 1 2 3; do
+        sleep 2
         output=$("$ARC_BIN" workflow list 2>&1 || true)
         if ! output_contains "$output" "$LONG_ID"; then
             workflow_removed=true
             break
         fi
-        sleep 1
-        attempt=$((attempt + 1))
     done
 
     if [ "$workflow_removed" = true ]; then
         test_pass
     else
-        test_fail "Abandoned workflow still in list after $max_attempts seconds"
+        test_fail "Abandoned workflow still in list after 6 seconds (3 checks)"
     fi
 else
     test_start "Start long-running workflow"
     test_fail "long_running.sh not found - skipping"
     test_start "Long workflow shows running state"
+    test_fail "skipped"
+    test_start "Long workflow appears in list"
     test_fail "skipped"
     test_start "Abandon running workflow"
     test_fail "skipped"
@@ -349,7 +361,7 @@ else
     test_fail "skipped"
 fi
 
-# Test 12: Log file created
+# Test 13: Log file created
 test_start "Log file created for workflow"
 log_file="$HOME/.argo/logs/${WORKFLOW_ID}.log"
 if [ -f "$log_file" ]; then
@@ -358,7 +370,7 @@ else
     test_fail "Log file not found at $log_file"
 fi
 
-# Test 13: Log file contains output
+# Test 14: Log file contains output
 test_start "Log file contains workflow output"
 if [ -f "$log_file" ]; then
     if grep -q "Workflow" "$log_file"; then
@@ -370,7 +382,7 @@ else
     test_fail "Log file not found"
 fi
 
-# Test 14: Daemon API - direct health check
+# Test 15: Daemon API - direct health check
 test_start "Direct daemon API health check"
 response=$(curl -s "http://localhost:$DAEMON_PORT/api/health")
 if output_contains "$response" "ok"; then
@@ -379,7 +391,7 @@ else
     test_fail "Health API failed"
 fi
 
-# Test 15: Daemon API - workflow list endpoint
+# Test 16: Daemon API - workflow list endpoint
 test_start "Direct daemon API workflow list"
 response=$(curl -s "http://localhost:$DAEMON_PORT/api/workflow/list")
 if output_contains "$response" "workflows"; then
@@ -388,7 +400,7 @@ else
     test_fail "List API failed: $response"
 fi
 
-# Test 16: Daemon API - workflow status endpoint
+# Test 17: Daemon API - workflow status endpoint
 test_start "Direct daemon API workflow status"
 # Use the long-running workflow (still running) or any workflow in list
 # If first workflow was removed, get any workflow from list

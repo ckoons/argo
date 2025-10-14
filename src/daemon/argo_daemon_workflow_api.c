@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <errno.h>
 
 /* Project includes */
 #include "argo_daemon.h"
@@ -409,7 +410,7 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
     /* Kill process if running */
     if (entry->executor_pid > 0 && entry->state == WORKFLOW_STATE_RUNNING) {
         if (kill(entry->executor_pid, SIGTERM) < 0) {
-            LOG_ERROR("Failed to kill workflow PID %d", entry->executor_pid);
+            LOG_ERROR("Failed to kill workflow PID %d: %s", entry->executor_pid, strerror(errno));
             http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Failed to kill workflow process");
             return E_SYSTEM_PROCESS;
         }

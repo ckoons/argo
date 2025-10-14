@@ -86,18 +86,8 @@ static void signal_handler(int signum) {
     g_shutdown_requested = 1;
 }
 
-/* SIGCHLD handler to reap completed workflow executors */
-static void sigchld_handler(int signum) {
-    (void)signum;
-    int status;
-    pid_t pid;
-
-    /* Reap all terminated children */
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        /* Unix pivot complete - workflow registry cleanup handled by daemon_destroy */
-        (void)pid;  /* Process reaped, logging could be added here */
-    }
-}
+/* NOTE: SIGCHLD handler is installed in argo_daemon_start() */
+/* The handler in argo_daemon.c properly reaps children and pushes exit codes to the exit queue */
 
 /* Print usage */
 static void print_usage(const char* prog) {
@@ -231,7 +221,7 @@ int main(int argc, char** argv) {
     /* Setup signal handlers */
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
-    signal(SIGCHLD, sigchld_handler);  /* Auto-remove completed workflows */
+    /* SIGCHLD handler installed by argo_daemon_start() */
 
     /* Start daemon (blocks until stopped) */
     fprintf(stderr, "Starting daemon on port %d...\n", port);

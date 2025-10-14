@@ -178,21 +178,22 @@ static int setup_retry_log(const char* workflow_id, int retry_count, int max_ret
     return log_fd >= 0 ? 0 : -1;
 }
 
-/* Helper: Retry workflow execution */
+/* Helper: Retry workflow execution (forked background process with delay) */
 static pid_t retry_workflow_execution(workflow_entry_t* entry, workflow_entry_t* mutable_entry) {
     /* Calculate exponential backoff delay */
     int delay = RETRY_DELAY_BASE_SECONDS * (1 << (mutable_entry->retry_count - 1));
 
-    LOG_INFO("Workflow %s failed, retry %d/%d in %d seconds",
+    LOG_INFO("Workflow %s failed, scheduling retry %d/%d after %d seconds",
             entry->workflow_id,
             mutable_entry->retry_count, mutable_entry->max_retries, delay);
 
-    sleep(delay);
-
-    /* Re-execute workflow by forking */
+    /* Fork immediately - child will sleep, parent continues processing */
     pid_t retry_pid = fork();
     if (retry_pid == 0) {
-        /* Child process - setup logging and execute */
+        /* Child process - sleep for backoff delay */
+        sleep(delay);
+
+        /* Setup logging for retry */
         setup_retry_log(entry->workflow_id, mutable_entry->retry_count,
                        mutable_entry->max_retries);
 
@@ -205,6 +206,7 @@ static pid_t retry_workflow_execution(workflow_entry_t* entry, workflow_entry_t*
         _exit(E_SYSTEM_PROCESS);
     }
 
+    /* Parent returns immediately - child handles delay + retry */
     return retry_pid;
 }
 
