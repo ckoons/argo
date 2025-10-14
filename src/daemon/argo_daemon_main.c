@@ -69,8 +69,20 @@ static void kill_existing_daemon(uint16_t port) {
             pclose(pipe);
         }
 
-        /* Wait for port to become free */
-        sleep(1);
+        /* Poll for port to become free (max 20 attempts × 100ms = 2 seconds) */
+        for (int attempt = 0; attempt < 20; attempt++) {
+            usleep(100000);  /* 100ms - under 0.5s threshold */
+
+            int test_sock = socket(AF_INET, SOCK_STREAM, 0);
+            if (test_sock >= 0) {
+                if (connect(test_sock, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+                    /* Port is free */
+                    close(test_sock);
+                    break;
+                }
+                close(test_sock);
+            }
+        }
 
         fprintf(stderr, "Previous daemon killed.\n");
     } else {
