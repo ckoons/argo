@@ -80,9 +80,10 @@ test: $(TEST_TARGETS)
 count:
 	@../../scripts/count_component.sh ui/argo-term --budget 3000
 
-# Clean build artifacts
+# Clean build artifacts (only argo-term's local directories)
 clean:
-	rm -rf $(BUILD_DIR) bin
+	rm -rf $(BUILD_DIR)
+	rm -rf bin
 
 # Installation targets
 install:

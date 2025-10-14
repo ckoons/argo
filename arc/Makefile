@@ -133,9 +133,10 @@ test-arc-all: test-arc-full test-arc-background
 count:
 	@../scripts/count_component.sh arc --budget 5000
 
-# Clean build artifacts
+# Clean build artifacts (only arc's local directories)
 clean:
-	rm -rf $(BUILD_DIR) bin
+	rm -rf $(BUILD_DIR)
+	rm -rf bin/tests
 
 # Installation targets
 install:
