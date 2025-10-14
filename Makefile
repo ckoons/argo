@@ -31,7 +31,7 @@ full-build: clean-all all-components install-all
 # .PHONY declarations
 .PHONY: all directories scripts test-quick test-all test-api-live test-providers \
         test-registry test-memory test-lifecycle test-providers test-messaging \
-        test-workflow test-integration test-persistence test-workflow-loader \
+        test-workflow test-persistence test-workflow-loader \
         test-session test-env test-config test-isolated-env test-api test-api-calls test-harnesses test-http \
         test-json test-claude-providers test-arc test-arc-workflow test-arc-background \
         test-arc-full test-arc-all count-core clean distclean check debug \
@@ -41,7 +41,7 @@ full-build: clean-all all-components install-all
         harness-workflow-chain arc ui ui-argo-term all-components test-arc test-ui \
         test-all-components count count-summary count-report count-snapshot count-json \
         clean-arc clean-ui clean-all install install-arc install-term install-completion \
-        install-all uninstall uninstall-arc uninstall-term uninstall-all test-thread-safety \
+        install-all uninstall uninstall-arc uninstall-term uninstall-all \
         test-shutdown-signals test-concurrent-workflows test-env-precedence \
         test-shared-services test-workflow-registry test-valgrind build-asan \
         test-asan test-asan-full help help-test help-count restart-daemon \
