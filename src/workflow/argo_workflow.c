@@ -188,6 +188,7 @@ const char* workflow_state_to_string(workflow_state_t state) {
     switch (state) {
         case WORKFLOW_STATE_PENDING: return "pending";
         case WORKFLOW_STATE_RUNNING: return "running";
+        case WORKFLOW_STATE_PAUSED: return "paused";
         case WORKFLOW_STATE_COMPLETED: return "completed";
         case WORKFLOW_STATE_FAILED: return "failed";
         case WORKFLOW_STATE_ABANDONED: return "abandoned";

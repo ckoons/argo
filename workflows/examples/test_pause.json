@@ -1,0 +1,7 @@
+{
+  "workflow_name": "test_pause",
+  "description": "Test workflow for pause/resume functionality",
+  "script": "workflows/scripts/test_pause.sh",
+  "working_dir": "/Users/cskoons/projects/github/argo",
+  "timeout_seconds": 300
+}

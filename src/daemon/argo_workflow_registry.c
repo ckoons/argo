@@ -242,6 +242,7 @@ workflow_state_t workflow_state_from_string(const char* str) {
 
     if (strcmp(str, "pending") == 0)    return WORKFLOW_STATE_PENDING;
     if (strcmp(str, "running") == 0)    return WORKFLOW_STATE_RUNNING;
+    if (strcmp(str, "paused") == 0)     return WORKFLOW_STATE_PAUSED;
     if (strcmp(str, "completed") == 0)  return WORKFLOW_STATE_COMPLETED;
     if (strcmp(str, "failed") == 0)     return WORKFLOW_STATE_FAILED;
     if (strcmp(str, "abandoned") == 0)  return WORKFLOW_STATE_ABANDONED;

@@ -42,6 +42,7 @@
 typedef enum {
     WORKFLOW_STATE_PENDING,    /* Queued, not started */
     WORKFLOW_STATE_RUNNING,    /* Currently executing */
+    WORKFLOW_STATE_PAUSED,     /* Paused (SIGSTOP) */
     WORKFLOW_STATE_COMPLETED,  /* Finished successfully */
     WORKFLOW_STATE_FAILED,     /* Finished with error */
     WORKFLOW_STATE_ABANDONED   /* User cancelled */

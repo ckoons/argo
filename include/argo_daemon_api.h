@@ -13,6 +13,8 @@ int api_workflow_start(http_request_t* req, http_response_t* resp);
 int api_workflow_list(http_request_t* req, http_response_t* resp);
 int api_workflow_status(http_request_t* req, http_response_t* resp);
 int api_workflow_abandon(http_request_t* req, http_response_t* resp);
+int api_workflow_pause(http_request_t* req, http_response_t* resp);
+int api_workflow_resume(http_request_t* req, http_response_t* resp);
 
 /* Register API routes */
 int argo_daemon_register_api_routes(argo_daemon_t* daemon);
