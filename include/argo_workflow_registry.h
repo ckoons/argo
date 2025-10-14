@@ -35,6 +35,10 @@
  */
 
 /* Workflow states */
+/* NOTE: workflow_state_t is also defined in argo_workflow.h */
+/* We use a guard to prevent duplicate definition when both headers are included */
+#ifndef WORKFLOW_STATE_T_DEFINED
+#define WORKFLOW_STATE_T_DEFINED
 typedef enum {
     WORKFLOW_STATE_PENDING,    /* Queued, not started */
     WORKFLOW_STATE_RUNNING,    /* Currently executing */
@@ -42,6 +46,7 @@ typedef enum {
     WORKFLOW_STATE_FAILED,     /* Finished with error */
     WORKFLOW_STATE_ABANDONED   /* User cancelled */
 } workflow_state_t;
+#endif
 
 /* Workflow entry */
 typedef struct {

@@ -13,7 +13,7 @@ include Makefile.clean
 include Makefile.help
 
 # Default target
-all: directories $(CORE_LIB) $(DAEMON_LIB) $(DAEMON_BINARY)
+all: directories $(CORE_LIB) $(DAEMON_LIB) $(WORKFLOW_LIB) $(DAEMON_BINARY) $(WORKFLOW_EXECUTOR_BINARY)
 
 # Full build - clean, build all components, install
 full-build: clean-all all-components install-all

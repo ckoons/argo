@@ -1,0 +1,7 @@
+{
+  "workflow_name": "simple_test",
+  "description": "Simple test workflow with bash script",
+  "script": "workflows/scripts/simple_test.sh",
+  "working_dir": "/Users/cskoons/projects/github/argo",
+  "timeout_seconds": 300
+}

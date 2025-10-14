@@ -15,6 +15,7 @@
 #define ERR_INPUT    0x03
 #define ERR_PROTOCOL 0x04
 #define ERR_INTERNAL 0x05
+#define ERR_WORKFLOW 0x06
 
 /* Macro to create error codes: TYPE:NUMBER format */
 #define ARGO_ERROR(type, num) (((type) << 16) | (num))
@@ -84,6 +85,13 @@
 #define E_INTERNAL_CORRUPT  ARGO_ERROR(ERR_INTERNAL, 5003)
 #define E_INTERNAL_NOTIMPL  ARGO_ERROR(ERR_INTERNAL, 5004)
 
+/* Workflow errors (WORKFLOW:6xxx) */
+#define E_WORKFLOW_FAILED   ARGO_ERROR(ERR_WORKFLOW, 6001)  /* Workflow execution failed */
+#define E_WORKFLOW_NOT_FOUND ARGO_ERROR(ERR_WORKFLOW, 6002) /* Workflow not found */
+#define E_WORKFLOW_EXISTS   ARGO_ERROR(ERR_WORKFLOW, 6003)  /* Workflow already exists */
+#define E_WORKFLOW_INVALID  ARGO_ERROR(ERR_WORKFLOW, 6004)  /* Invalid workflow definition */
+#define E_TIMEOUT           ARGO_ERROR(ERR_WORKFLOW, 6005)  /* Workflow timeout */
+
 /* Error detail structure */
 typedef struct argo_error_detail {
     int code;                   /* Error code */
@@ -140,6 +148,7 @@ static inline const char* argo_error_type_string(int type) {
         case ERR_INPUT:    return "INPUT";
         case ERR_PROTOCOL: return "PROTOCOL";
         case ERR_INTERNAL: return "INTERNAL";
+        case ERR_WORKFLOW: return "WORKFLOW";
         default:           return "UNKNOWN";
     }
 }

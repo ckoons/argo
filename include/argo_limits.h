@@ -85,11 +85,61 @@
 /* Retry delay base (exponential backoff base in seconds) */
 #define RETRY_DELAY_BASE_SECONDS 5
 
+/* Standard timeout exit code (matches GNU timeout command) */
+#define WORKFLOW_TIMEOUT_EXIT_CODE 124
+
+/* Poll interval for child process status (microseconds, 100ms) */
+#define WORKFLOW_POLL_INTERVAL_USEC 100000
+
+/* strtol base for decimal number parsing */
+#define DECIMAL_BASE 10
+
 /* Workflow timeout check interval (every 10 seconds) */
 #define WORKFLOW_TIMEOUT_CHECK_INTERVAL_SECONDS 10
 
 /* Workflow completion check interval (every 5 seconds) */
 #define WORKFLOW_COMPLETION_CHECK_INTERVAL_SECONDS 5
+
+/* ===== JSON Workflow Limits ===== */
+
+/* Maximum workflow JSON file size (1MB) */
+#define WORKFLOW_MAX_JSON_SIZE (1024 * 1024)
+
+/* Maximum steps per workflow */
+#define WORKFLOW_MAX_STEPS 1000
+
+/* Maximum step name length */
+#define WORKFLOW_MAX_STEP_NAME 256
+
+/* Maximum workflow name length */
+#define WORKFLOW_MAX_NAME 128
+
+/* Maximum workflow description length */
+#define WORKFLOW_MAX_DESCRIPTION 512
+
+/* Maximum variable name length */
+#define WORKFLOW_MAX_VAR_NAME 64
+
+/* Maximum variable value length (64KB) */
+#define WORKFLOW_MAX_VAR_VALUE (64 * 1024)
+
+/* Maximum loop iterations (safety limit) */
+#define WORKFLOW_MAX_LOOP_ITERATIONS 1000
+
+/* Maximum nesting depth for loops/conditionals */
+#define WORKFLOW_MAX_NESTING_DEPTH 10
+
+/* Maximum number of variables per workflow */
+#define WORKFLOW_MAX_VARIABLES 256
+
+/* Default provider name */
+#define WORKFLOW_DEFAULT_PROVIDER "claude_code"
+
+/* Default model name */
+#define WORKFLOW_DEFAULT_MODEL "claude-sonnet-4-5"
+
+/* Workflow version string */
+#define WORKFLOW_SCHEMA_VERSION "1.0"
 
 /* Log rotation check interval (every hour) */
 #define LOG_ROTATION_CHECK_INTERVAL_SECONDS 3600

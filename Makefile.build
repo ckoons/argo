@@ -97,10 +97,21 @@ $(DAEMON_LIB): $(DAEMON_OBJECTS)
 	ar rcs $@ $^
 	@echo "Created daemon library: $@"
 
-# Build daemon binary (needs core + daemon)
-$(DAEMON_BINARY): $(DAEMON_SOURCE) $(CORE_LIB) $(DAEMON_LIB)
-	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+# Build workflow library
+$(WORKFLOW_LIB): $(WORKFLOW_OBJECTS)
+	ar rcs $@ $^
+	@echo "Created workflow library: $@"
+
+# Build daemon binary (needs workflow + core + daemon)
+$(DAEMON_BINARY): $(DAEMON_SOURCE) $(WORKFLOW_LIB) $(CORE_LIB) $(DAEMON_LIB)
+	$(CC) $(CFLAGS) $< $(DAEMON_LIB) $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 	@echo "Built daemon: $@"
+
+# Build workflow executor binary (needs workflow + core)
+$(WORKFLOW_EXECUTOR_BINARY): $(WORKFLOW_EXECUTOR_SOURCE) $(WORKFLOW_LIB) $(CORE_LIB)
+	@mkdir -p bin
+	$(CC) $(CFLAGS) $< $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
+	@echo "Built workflow executor: $@"
 
 # Build script executables into bin/utils/ (need core + daemon)
 bin/utils/%: $(SCRIPT_DIR)/utils/%.c $(CORE_LIB) $(DAEMON_LIB)
@@ -119,6 +130,12 @@ bin/tests/harness_%: $(TEST_INTEGRATION_DIR)/harness_%.c $(CORE_LIB)
 	@mkdir -p bin/tests
 	@echo "Building harness_$*..."
 	@$(CC) $(CFLAGS) $< $(CORE_LIB) -o $@ $(LDFLAGS)
+
+# Build workflow loader test (needs workflow library)
+$(WORKFLOW_LOADER_TEST_TARGET): $(TEST_UNIT_DIR)/test_workflow_loader.c $(WORKFLOW_LIB) $(CORE_LIB)
+	@mkdir -p bin/tests
+	@echo "Building test_workflow_loader..."
+	@$(CC) $(CFLAGS) $< $(WORKFLOW_LIB) $(CORE_LIB) -o $@ $(LDFLAGS)
 
 # Component builds
 arc: $(CORE_LIB) $(DAEMON_LIB)

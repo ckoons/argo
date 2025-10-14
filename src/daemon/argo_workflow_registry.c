@@ -233,17 +233,8 @@ int workflow_registry_count(const workflow_registry_t* reg, workflow_state_t sta
     return count;
 }
 
-/* Convert state to string */
-const char* workflow_state_to_string(workflow_state_t state) {
-    switch (state) {
-        case WORKFLOW_STATE_PENDING:    return "pending";
-        case WORKFLOW_STATE_RUNNING:    return "running";
-        case WORKFLOW_STATE_COMPLETED:  return "completed";
-        case WORKFLOW_STATE_FAILED:     return "failed";
-        case WORKFLOW_STATE_ABANDONED:  return "abandoned";
-        default:                        return "unknown";
-    }
-}
+/* NOTE: workflow_state_to_string() is now implemented in argo_workflow.c */
+/* to avoid duplicate symbols when linking with workflow library */
 
 /* Convert string to state */
 workflow_state_t workflow_state_from_string(const char* str) {
