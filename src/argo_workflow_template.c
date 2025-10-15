@@ -10,6 +10,7 @@
 #include "argo_error.h"
 #include "argo_limits.h"
 #include "argo_file_utils.h"
+#include "argo_yaml.h"
 
 /* Check if path is a directory */
 static bool is_directory(const char* path) {
@@ -25,57 +26,28 @@ static bool file_exists(const char* path) {
     return access(path, F_OK) == 0;
 }
 
-/* Parse YAML metadata file (simple key: value parser) */
+/* YAML callback for metadata parsing */
+static void metadata_yaml_callback(const char* key, const char* value, void* userdata) {
+    workflow_template_t* template = (workflow_template_t*)userdata;
+
+    if (strcmp(key, "name") == 0) {
+        strncpy(template->name, value, sizeof(template->name) - 1);
+    } else if (strcmp(key, "description") == 0) {
+        strncpy(template->description, value, sizeof(template->description) - 1);
+    } else if (strcmp(key, "version") == 0) {
+        strncpy(template->version, value, sizeof(template->version) - 1);
+    } else if (strcmp(key, "author") == 0) {
+        strncpy(template->author, value, sizeof(template->author) - 1);
+    }
+}
+
+/* Parse YAML metadata file using shared YAML parser */
 static int parse_metadata_yaml(const char* content, workflow_template_t* template) {
     if (!content || !template) {
         return E_INVALID_PARAMS;
     }
 
-    char line[ARGO_BUFFER_STANDARD];
-    const char* ptr = content;
-
-    while (*ptr) {
-        /* Read line */
-        size_t i = 0;
-        while (*ptr && *ptr != '\n' && i < sizeof(line) - 1) {
-            line[i++] = *ptr++;
-        }
-        line[i] = '\0';
-        if (*ptr == '\n') ptr++;
-
-        /* Skip empty lines and comments */
-        char* trimmed = line;
-        while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
-        if (*trimmed == '\0' || *trimmed == '#') continue;
-
-        /* Parse key: value */
-        char* colon = strchr(trimmed, ':');
-        if (!colon) continue;
-
-        *colon = '\0';
-        char* key = trimmed;
-        char* value = colon + 1;
-
-        /* Trim value */
-        while (*value == ' ' || *value == '\t') value++;
-        size_t len = strlen(value);
-        while (len > 0 && (value[len-1] == ' ' || value[len-1] == '\t' || value[len-1] == '\r')) {
-            value[--len] = '\0';
-        }
-
-        /* Store values */
-        if (strcmp(key, "name") == 0) {
-            strncpy(template->name, value, sizeof(template->name) - 1);
-        } else if (strcmp(key, "description") == 0) {
-            strncpy(template->description, value, sizeof(template->description) - 1);
-        } else if (strcmp(key, "version") == 0) {
-            strncpy(template->version, value, sizeof(template->version) - 1);
-        } else if (strcmp(key, "author") == 0) {
-            strncpy(template->author, value, sizeof(template->author) - 1);
-        }
-    }
-
-    return ARGO_SUCCESS;
+    return yaml_parse_simple(content, metadata_yaml_callback, template);
 }
 
 /* Load directory-based template */

@@ -1,0 +1,9 @@
+Phase 1: Requirements Gathering
+
+1. What do you want this workflow to do?
+
+2. How will you test if this workflow works correctly?
+
+3. What does success look like? (What should the workflow produce?)
+
+4. Any additional context or requirements? (Press Enter to skip)

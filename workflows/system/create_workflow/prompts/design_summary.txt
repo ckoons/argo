@@ -1,0 +1,10 @@
+Phase 2: Design Dialog
+
+Now I'll analyze your requirements and propose an implementation approach.
+
+Summary of your workflow:
+  Purpose: {WORKFLOW_PURPOSE}
+  Testing: {TEST_METHOD}
+  Success: {SUCCESS_CRITERIA}
+
+Does this look correct? (yes/no)

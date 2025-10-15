@@ -1,0 +1,12 @@
+Welcome to the Argo Workflow Creator!
+
+I'll help you create a new workflow template by asking a few questions.
+We'll work together to define what you want, how to test it, and
+what success looks like.
+
+This process has three phases:
+  1. Requirements gathering - Tell me what you want
+  2. Design dialog - We'll refine the approach together
+  3. Build phase - I'll create the template
+
+Press Enter to continue...

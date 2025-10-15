@@ -1,0 +1,23 @@
+name: create_workflow
+description: Meta-workflow that creates new workflow templates through interactive dialog
+version: 1.0.0
+author: Casey Koons
+created: 2025-10-15T00:00:00Z
+
+parameters: []
+
+requirements:
+  - bash
+  - read (built-in)
+  - mkdir
+
+environments:
+  - dev
+  - test
+  - prod
+
+prompts:
+  - user_onboarding.txt
+  - requirements_questions.txt
+  - design_summary.txt
+  - ci_onboarding.txt
