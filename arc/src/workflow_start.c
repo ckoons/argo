@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "arc_commands.h"
 #include "arc_context.h"
 #include "arc_error.h"
@@ -12,16 +13,69 @@
 #include "argo_error.h"
 #include "argo_output.h"
 
-/* arc workflow start command handler - bash script execution */
-int arc_workflow_start(int argc, char** argv) {
-    if (argc < 1) {
-        LOG_USER_ERROR("script path required\n");
-        LOG_USER_INFO("Usage: arc workflow start <script.sh> [args...]\n");
-        LOG_USER_INFO("Example: arc workflow start workflows/examples/hello.sh arg1 arg2\n");
+/* Resolve template name to script path */
+static int resolve_template_path(const char* template_name, char* script_path, size_t path_size) {
+    const char* home = getenv("HOME");
+    if (!home) {
+        LOG_USER_ERROR("HOME environment variable not set\n");
         return ARC_EXIT_ERROR;
     }
 
-     const char* script_path = argv[0];
+    /* Check if it's already a valid file path */
+    struct stat st;
+    if (stat(template_name, &st) == 0 && S_ISREG(st.st_mode)) {
+        strncpy(script_path, template_name, path_size - 1);
+        script_path[path_size - 1] = '\0';
+        return ARC_EXIT_SUCCESS;
+    }
+
+    /* Try directory-based template */
+    char dir_path[512];
+    snprintf(dir_path, sizeof(dir_path), "%s/.argo/workflows/templates/%s/workflow.sh",
+            home, template_name);
+
+    if (stat(dir_path, &st) == 0 && S_ISREG(st.st_mode)) {
+        strncpy(script_path, dir_path, path_size - 1);
+        script_path[path_size - 1] = '\0';
+        return ARC_EXIT_SUCCESS;
+    }
+
+    /* Try single-file template */
+    char file_path[512];
+    snprintf(file_path, sizeof(file_path), "%s/.argo/workflows/templates/%s.sh",
+            home, template_name);
+
+    if (stat(file_path, &st) == 0 && S_ISREG(st.st_mode)) {
+        strncpy(script_path, file_path, path_size - 1);
+        script_path[path_size - 1] = '\0';
+        return ARC_EXIT_SUCCESS;
+    }
+
+    /* Not found */
+    LOG_USER_ERROR("Template or script not found: %s\n", template_name);
+    LOG_USER_INFO("  Tried:\n");
+    LOG_USER_INFO("    - %s\n", template_name);
+    LOG_USER_INFO("    - %s\n", dir_path);
+    LOG_USER_INFO("    - %s\n", file_path);
+    return ARC_EXIT_ERROR;
+}
+
+/* arc workflow start command handler - bash script execution */
+int arc_workflow_start(int argc, char** argv) {
+    if (argc < 1) {
+        LOG_USER_ERROR("template or script path required\n");
+        LOG_USER_INFO("Usage: arc workflow start <template_or_script> [args...]\n");
+        LOG_USER_INFO("Examples:\n");
+        LOG_USER_INFO("  arc workflow start build_and_test arg1 arg2\n");
+        LOG_USER_INFO("  arc workflow start workflows/examples/hello.sh\n");
+        return ARC_EXIT_ERROR;
+    }
+
+    /* Resolve template name to script path */
+    char script_path[512];
+    if (resolve_template_path(argv[0], script_path, sizeof(script_path)) != ARC_EXIT_SUCCESS) {
+        return ARC_EXIT_ERROR;
+    }
 
     /* Build JSON request with args and env if provided */
     char json_body[4096];  /* Larger buffer for args + env */

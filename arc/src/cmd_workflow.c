@@ -41,6 +41,12 @@ int arc_cmd_workflow(int argc, char** argv) {
     else if (strcmp(subcommand, "abandon") == 0) {
         return arc_workflow_abandon(argc - 1, argv + 1);
     }
+    else if (strcmp(subcommand, "test") == 0) {
+        return arc_workflow_test(argc - 1, argv + 1);
+    }
+    else if (strcmp(subcommand, "docs") == 0) {
+        return arc_workflow_docs(argc - 1, argv + 1);
+    }
     else {
         LOG_USER_ERROR("Unknown workflow subcommand: %s\n", subcommand);
         LOG_USER_INFO("Use 'arc help workflow' to see available subcommands.\n");

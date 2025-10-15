@@ -25,5 +25,7 @@ int arc_workflow_attach(int argc, char** argv);
 int arc_workflow_pause(int argc, char** argv);
 int arc_workflow_resume(int argc, char** argv);
 int arc_workflow_abandon(int argc, char** argv);
+int arc_workflow_test(int argc, char** argv);
+int arc_workflow_docs(int argc, char** argv);
 
 #endif /* ARC_COMMANDS_H */

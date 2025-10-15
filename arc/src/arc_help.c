@@ -21,7 +21,9 @@ static void show_general_help(void) {
     printf("  attach [workflow_name]          Attach to workflow (tail logs + send input)\n");
     printf("  pause [workflow_name]           Pause workflow at next checkpoint\n");
     printf("  resume [workflow_name]          Resume paused workflow\n");
-    printf("  abandon [workflow_name]         Stop and remove workflow\n\n");
+    printf("  abandon [workflow_name]         Stop and remove workflow\n");
+    printf("  test [template]                 Run tests for workflow template\n");
+    printf("  docs [template]                 Show documentation for template\n\n");
     printf("Environment Filtering:\n");
     printf("  --env <env>                     Filter/create in specific environment\n");
     printf("  ARC_ENV=<env>                   Set default environment for terminal\n");
@@ -52,7 +54,9 @@ static void show_command_help(const char* command) {
         printf("  attach [workflow_name]          Attach to workflow (tail logs + send input)\n");
         printf("  pause [workflow_name]           Pause workflow at next checkpoint\n");
         printf("  resume [workflow_name]          Resume paused workflow\n");
-        printf("  abandon [workflow_name]         Stop and remove workflow\n\n");
+        printf("  abandon [workflow_name]         Stop and remove workflow\n");
+        printf("  test [template]                 Run tests for workflow template\n");
+        printf("  docs [template]                 Show documentation for template\n\n");
         printf("Environment Filtering:\n");
         printf("  Most commands support --env <env> to filter by environment\n");
         printf("  or set ARC_ENV environment variable for terminal-wide filtering\n\n");
