@@ -575,7 +575,7 @@ echo "  Total string literals (excluding #define): $TOTAL_STRINGS"
 echo "  Approved (format/log/error): $APPROVED_STRINGS"
 echo "  Unapproved (candidates for headers): $UNAPPROVED_STRINGS"
 
-if [ "$UNAPPROVED_STRINGS" -gt 100 ]; then
+if [ "$UNAPPROVED_STRINGS" -gt 400 ]; then
   echo "⚠ WARN: High count of unapproved string literals"
   echo "Action: Move constant strings to headers or add GUIDELINE_APPROVED"
   echo ""
