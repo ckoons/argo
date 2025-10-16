@@ -8,6 +8,7 @@
 /* Mock provider for testing workflows without real AI */
 
 /* Mock provider constants */
+#define MOCK_PROVIDER_NAME "mock"
 #define MOCK_MODEL_SIZE 256
 #define MOCK_CONTEXT_WINDOW 100000  /* Arbitrary large number for testing */
 

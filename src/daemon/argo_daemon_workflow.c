@@ -208,6 +208,7 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
         /* Build argv for bash execution */
         char** exec_args = malloc(sizeof(char*) * (arg_count + 3));
         if (!exec_args) {
+            /* GUIDELINE_APPROVED: Child process error before _exit */
             fprintf(stderr, "Failed to allocate exec args\n");
             _exit(E_SYSTEM_MEMORY);
         }
@@ -223,6 +224,7 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
         execv("/bin/bash", exec_args);
 
         /* If execv returns, it failed */
+        /* GUIDELINE_APPROVED: Child process error before _exit */
         fprintf(stderr, "Failed to execute script: %s\n", script_path);
         _exit(E_SYSTEM_PROCESS);
     }

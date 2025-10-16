@@ -81,14 +81,47 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "4. ERROR REPORTING CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-STDERR_ERRORS=$(grep -rn 'fprintf(stderr.*[Ee]rror\|fprintf(stderr.*[Ff]ail' src/ --include="*.c" | \
-  wc -l | tr -d ' ')
-echo "Found $STDERR_ERRORS fprintf(stderr) error messages"
-if [ "$STDERR_ERRORS" -gt 15 ]; then
-  echo "⚠ WARN: Prefer argo_report_error() for error reporting"
+# Count ALL fprintf(stderr) uses
+TOTAL_STDERR=$(grep -rn 'fprintf(stderr' src/ --include="*.c" | wc -l | tr -d ' ')
+
+# Count approved uses
+# 1. In legitimate files (argo_error.c, argo_daemon_main.c, argo_print_utils.c)
+LEGITIMATE_FILES=$(grep -rn 'fprintf(stderr' src/ --include="*.c" | \
+  grep -E "argo_error.c|argo_daemon_main.c|argo_print_utils.c" | wc -l | tr -d ' ')
+
+# 2. With GUIDELINE_APPROVED marker in previous line (search for GUIDELINE_APPROVED, then check next line for fprintf)
+GUIDELINE_APPROVED=$(grep -rn 'GUIDELINE_APPROVED' src/ --include="*.c" -A 1 | \
+  grep "fprintf(stderr" | wc -l | tr -d ' ')
+
+APPROVED_STDERR=$((LEGITIMATE_FILES + GUIDELINE_APPROVED))
+
+# Calculate unapproved
+UNAPPROVED_STDERR=$((TOTAL_STDERR - APPROVED_STDERR))
+
+echo "fprintf(stderr) usage:"
+echo "  Total: $TOTAL_STDERR"
+echo "  Legitimate files: $LEGITIMATE_FILES"
+echo "  GUIDELINE_APPROVED: $GUIDELINE_APPROVED"
+echo "  Total approved: $APPROVED_STDERR"
+echo "  Unapproved: $UNAPPROVED_STDERR"
+
+if [ "$UNAPPROVED_STDERR" -gt 0 ]; then
+  echo "⚠ WARN: $UNAPPROVED_STDERR unapproved fprintf(stderr) calls"
+  echo "Action: Add GUIDELINE_APPROVED comment or use argo_report_error()"
+  echo ""
+  echo "Unapproved locations:"
+  grep -rn 'fprintf(stderr' src/ --include="*.c" -B 1 | \
+    grep -B 1 -v "GUIDELINE_APPROVED" | \
+    grep "fprintf(stderr" | \
+    grep -v "argo_error.c\|argo_daemon_main.c\|argo_print_utils.c" | head -5
+  echo ""
+  echo "Note: Add /* GUIDELINE_APPROVED: reason */ comment above fprintf(stderr)"
   WARNINGS=$((WARNINGS + 1))
 else
-  echo "✓ PASS: Error reporting usage acceptable"
+  echo "✓ PASS: All fprintf(stderr) uses are approved"
+  echo "Note: Approved contexts include:"
+  echo "  - Legitimate files (error.c, daemon_main.c, print_utils.c)"
+  echo "  - GUIDELINE_APPROVED markers"
 fi
 echo ""
 
@@ -518,23 +551,58 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "23. CONSTANT STRING EXTERNALIZATION CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check for string literals in .c files that should be in headers
-# Exclude: format strings (contain %), log messages, test strings
-EMBEDDED_STRINGS=$(grep -rn '"[^"]*"' src/ --include="*.c" | \
+# Exclude: #define (already in headers), format strings, log messages, GUIDELINE_APPROVED
+TOTAL_STRINGS=$(grep -rn '"[^"]*"' src/ --include="*.c" | \
   grep -v "^\s*//" | grep -v "^\s*\*" | \
-  grep -v "%" | grep -v "LOG_\|printf\|fprintf\|snprintf" | \
-  grep -v "#include" | grep -v "static const char" | \
+  grep -v "#include" | grep -v "#define" | \
   wc -l | tr -d ' ')
 
-echo "Found $EMBEDDED_STRINGS non-format string literals in .c files"
-if [ "$EMBEDDED_STRINGS" -gt 500 ]; then
-  echo "⚠ WARN: Very high count of embedded strings"
-  echo "Action: Consider externalizing constant strings to headers for i18n"
-  echo "Note: Format strings and log messages are acceptable"
+# Count strings that ARE acceptable (approved or format/log strings + legitimate patterns)
+APPROVED_STRINGS=$(grep -rn '"[^"]*"' src/ --include="*.c" | \
+  grep -v "#define" | \
+  grep -E "GUIDELINE_APPROVED|%|LOG_|printf\|fprintf\|snprintf\|dprintf|argo_report_error|static const char|\
+strstr\(|strcmp\(|strncmp\(|strchr\(|strrchr\(|strpbrk\(|strspn\(|strcspn\(|\
+execlp\(|execv\(|execvp\(|execve\(|execl\(|\
+write\([^,]+,[[:space:]]*\"|\
+\\..*=[[:space:]]*\"" | \
+  wc -l | tr -d ' ')
+
+# Unapproved strings (candidates for externalization)
+UNAPPROVED_STRINGS=$((TOTAL_STRINGS - APPROVED_STRINGS))
+
+echo "String literal usage:"
+echo "  Total string literals (excluding #define): $TOTAL_STRINGS"
+echo "  Approved (format/log/error): $APPROVED_STRINGS"
+echo "  Unapproved (candidates for headers): $UNAPPROVED_STRINGS"
+
+if [ "$UNAPPROVED_STRINGS" -gt 100 ]; then
+  echo "⚠ WARN: High count of unapproved string literals"
+  echo "Action: Move constant strings to headers or add GUIDELINE_APPROVED"
+  echo ""
+  echo "Common unapproved patterns (first 10):"
+  grep -rn '"[^"]*"' src/ --include="*.c" | \
+    grep -v "^\s*//" | grep -v "^\s*\*" | \
+    grep -v "#include" | grep -v "#define" | \
+    grep -v "GUIDELINE_APPROVED" | \
+    grep -v "%" | grep -v "LOG_\|printf\|fprintf\|snprintf\|dprintf" | \
+    grep -v "argo_report_error" | grep -v "static const char" | \
+    grep -vE "strstr\(|strcmp\(|strncmp\(|strchr\(|strrchr\(" | \
+    grep -vE "execlp\(|execv\(|execvp\(|execve\(|execl\(" | \
+    grep -vE "write\([^,]+,[[:space:]]*\"|\\..*=[[:space:]]*\"" | head -10
+  echo ""
+  echo "Note: Add GUIDELINE_APPROVED comment for legitimate constants (JSON, API paths, etc.)"
   WARNINGS=$((WARNINGS + 1))
 else
-  echo "ℹ INFO: String literal usage appears reasonable for current codebase size"
-  echo "Note: Format strings (%), log messages, and test strings excluded"
-  INFOS=$((INFOS + 1))
+  echo "✓ PASS: String literal usage reasonable for current codebase size"
+  echo "Note: Auto-approved string patterns:"
+  echo "  - #define constants (already in headers)"
+  echo "  - Format strings (containing %)"
+  echo "  - Log/print messages (LOG_*, printf, fprintf, etc.)"
+  echo "  - Error contexts (argo_report_error)"
+  echo "  - Pattern matching (strstr, strcmp, strchr, etc.)"
+  echo "  - Process execution (execlp, execv, etc.)"
+  echo "  - Struct initialization (.field = \"value\")"
+  echo "  - GUIDELINE_APPROVED markers"
 fi
 echo ""
 

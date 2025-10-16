@@ -146,6 +146,7 @@ int workflow_execute(workflow_t* workflow, const char* log_path) {
         /* Change working directory if specified */
         if (workflow->working_dir[0] != '\0') {
             if (chdir(workflow->working_dir) != 0) {
+                /* GUIDELINE_APPROVED: Child process error before _exit */
                 fprintf(stderr, "Failed to change directory to: %s\n",
                        workflow->working_dir);
                 _exit(1);
@@ -157,6 +158,7 @@ int workflow_execute(workflow_t* workflow, const char* log_path) {
         execv("/bin/bash", exec_args);
 
         /* If execv returns, it failed */
+        /* GUIDELINE_APPROVED: Child process error before _exit */
         fprintf(stderr, "Failed to execute script: %s\n", workflow->script_path);
         _exit(E_SYSTEM_PROCESS);
     }

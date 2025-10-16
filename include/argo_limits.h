@@ -161,7 +161,8 @@
 /* Claude context window size */
 #define CLAUDE_CONTEXT_WINDOW 200000
 
-/* Claude Code provider buffers */
+/* Claude Code provider configuration */
+#define CLAUDE_CODE_PROVIDER_NAME "claude_code"
 #define CLAUDE_CODE_RESPONSE_BUFFER_SIZE (1024 * 1024)  /* 1MB for response */
 #define CLAUDE_CODE_READ_CHUNK_SIZE 4096
 #define CLAUDE_CODE_MODEL_SIZE 128

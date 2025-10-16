@@ -9,6 +9,7 @@
 #define OLLAMA_DEFAULT_CONTEXT_SIZE 128000
 
 /* Ollama configuration */
+#define OLLAMA_PROVIDER_NAME "ollama"
 #define OLLAMA_DEFAULT_ENDPOINT "http://localhost"
 #define OLLAMA_DEFAULT_PORT 11434
 #define OLLAMA_DEFAULT_MODEL "llama3.3:70b"

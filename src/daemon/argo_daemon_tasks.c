@@ -202,6 +202,7 @@ static pid_t retry_workflow_execution(workflow_entry_t* entry, workflow_entry_t*
         execv("/bin/bash", exec_args);
 
         /* If execv returns, it failed */
+        /* GUIDELINE_APPROVED: Child process error before _exit */
         fprintf(stderr, "Failed to execute retry: %s\n", entry->workflow_name);
         _exit(E_SYSTEM_PROCESS);
     }

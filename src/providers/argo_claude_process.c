@@ -51,12 +51,8 @@ int spawn_claude_process(claude_context_t* ctx) {
         /* Execute Claude */
         execlp("claude", "claude", NULL);
 
-        /* If we get here, exec failed
-         * NOTE: This fprintf to stderr is acceptable because we are in a forked
-         * child process after dup2 has redirected stderr to a pipe (line 45).
-         * The stderr output goes to ctx->stderr_pipe[1] which the parent reads,
-         * not to the terminal. This is the standard pattern for capturing child
-         * process errors in fork/exec scenarios. */
+        /* If we get here, exec failed */
+        /* GUIDELINE_APPROVED: Child process error before exit, stderr redirected to pipe */
         fprintf(stderr, CLAUDE_EXEC_FAILED_MSG "%s\n", strerror(errno));
         exit(1);
     }

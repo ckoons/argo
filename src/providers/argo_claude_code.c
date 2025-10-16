@@ -80,7 +80,7 @@ ci_provider_t* claude_code_create_provider(const char* model) {
     strncpy(ctx->model, model ? model : "claude-sonnet-4", sizeof(ctx->model) - 1);
 
     /* Configure provider metadata */
-    strncpy(ctx->provider.name, "claude_code", sizeof(ctx->provider.name) - 1);
+    strncpy(ctx->provider.name, CLAUDE_CODE_PROVIDER_NAME, sizeof(ctx->provider.name) - 1);
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = true;   /* Streaming visible to user */
     ctx->provider.supports_memory = false;     /* Memory via --continue flag */
@@ -216,6 +216,7 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
         execlp("claude", "claude", "-p", NULL);
 
         /* If exec fails */
+        /* GUIDELINE_APPROVED: Child process error before exit */
         fprintf(stderr, "Failed to exec claude: %s\n", strerror(errno));
         exit(127);
     }

@@ -88,7 +88,7 @@ ci_provider_t* ollama_create_provider(const char* model_name) {
     }
 
     /* Set provider metadata */
-    strncpy(ctx->provider.name, "ollama", sizeof(ctx->provider.name) - 1);
+    strncpy(ctx->provider.name, OLLAMA_PROVIDER_NAME, sizeof(ctx->provider.name) - 1);
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = true;
     ctx->provider.supports_memory = false;

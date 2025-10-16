@@ -145,7 +145,7 @@ ci_provider_t* mock_provider_create(const char* model) {
     strncpy(ctx->model, model ? model : "mock-model", sizeof(ctx->model) - 1);
 
     /* Set provider metadata */
-    strncpy(ctx->provider.name, "mock", sizeof(ctx->provider.name) - 1);
+    strncpy(ctx->provider.name, MOCK_PROVIDER_NAME, sizeof(ctx->provider.name) - 1);
     strncpy(ctx->provider.model, ctx->model, sizeof(ctx->provider.model) - 1);
     ctx->provider.supports_streaming = true;
     ctx->provider.supports_memory = false;
