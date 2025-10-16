@@ -23,6 +23,7 @@ int arc_workflow_templates(int argc, char** argv);
 int arc_workflow_status(int argc, char** argv);
 int arc_workflow_states(int argc, char** argv);
 int arc_workflow_attach(int argc, char** argv);
+int arc_workflow_attach_auto(const char* workflow_id);  /* Auto-attach from start */
 int arc_workflow_pause(int argc, char** argv);
 int arc_workflow_resume(int argc, char** argv);
 int arc_workflow_abandon(int argc, char** argv);

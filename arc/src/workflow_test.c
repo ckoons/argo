@@ -12,32 +12,48 @@
 
 /* Find tests directory for template */
 static int find_tests_dir(const char* template_name, char* tests_dir, size_t tests_dir_size) {
-    char template_path[512];
+    char user_template_path[512];
+    char system_template_path[512];
     const char* home = getenv("HOME");
+    struct stat st;
+
     if (!home) {
         LOG_USER_ERROR("HOME environment variable not set\n");
         return ARC_EXIT_ERROR;
     }
 
-    /* Try directory-based template first */
-    snprintf(template_path, sizeof(template_path),
+    /* Try user template: ~/.argo/workflows/templates/{name}/tests */
+    snprintf(user_template_path, sizeof(user_template_path),
             "%s/.argo/workflows/templates/%s/tests", home, template_name);
 
-    struct stat st;
-    if (stat(template_path, &st) == 0 && S_ISDIR(st.st_mode)) {
-        strncpy(tests_dir, template_path, tests_dir_size - 1);
+    if (stat(user_template_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        strncpy(tests_dir, user_template_path, tests_dir_size - 1);
+        tests_dir[tests_dir_size - 1] = '\0';
+        return ARC_EXIT_SUCCESS;
+    }
+
+    /* Try system template: workflows/templates/{name}/tests */
+    snprintf(system_template_path, sizeof(system_template_path),
+            "workflows/templates/%s/tests", template_name);
+
+    if (stat(system_template_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        strncpy(tests_dir, system_template_path, tests_dir_size - 1);
         tests_dir[tests_dir_size - 1] = '\0';
         return ARC_EXIT_SUCCESS;
     }
 
     /* No tests directory found */
     LOG_USER_ERROR("No tests directory found for template: %s\n", template_name);
-    LOG_USER_INFO("  Expected: %s\n", template_path);
+    LOG_USER_INFO("  Tried:\n");
+    LOG_USER_INFO("    - %s\n", user_template_path);
+    LOG_USER_INFO("    - %s\n", system_template_path);
     return ARC_EXIT_ERROR;
 }
 
 /* Run a single test script */
 static int run_test_script(const char* test_path, const char* test_name, const char* tests_dir) {
+    (void)test_path;  /* Used for stat check by caller, not needed in execution */
+
     LOG_USER_INFO("Running test: %s\n", test_name);
 
     pid_t pid = fork();
@@ -52,9 +68,10 @@ static int run_test_script(const char* test_path, const char* test_name, const c
             LOG_USER_ERROR("Failed to change to tests directory: %s\n", tests_dir);
             exit(1);
         }
-        execl("/bin/bash", "bash", test_path, NULL);
+        /* Execute test with just filename (we're already in tests_dir) */
+        execl("/bin/bash", "bash", test_name, NULL);
         /* If exec fails */
-        LOG_USER_ERROR("Failed to execute test: %s\n", test_path);
+        LOG_USER_ERROR("Failed to execute test: %s\n", test_name);
         exit(1);
     }
 

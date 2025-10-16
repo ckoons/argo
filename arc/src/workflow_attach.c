@@ -23,15 +23,12 @@ static void handle_sigint(int sig) {
     g_running = 0;
 }
 
-/* arc workflow attach command handler - tail log file and send input */
-int arc_workflow_attach(int argc, char** argv) {
-    if (argc < 1) {
+/* Internal attach implementation with seek control */
+static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end) {
+    if (!workflow_id) {
         LOG_USER_ERROR("workflow ID required\n");
-        LOG_USER_INFO("Usage: arc workflow attach <workflow_id>\n");
         return ARC_EXIT_ERROR;
     }
-
-    const char* workflow_id = argv[0];
 
     /* Verify workflow exists */
     char endpoint[512];
@@ -72,8 +69,10 @@ int arc_workflow_attach(int argc, char** argv) {
         return ARC_EXIT_ERROR;
     }
 
-    /* Seek to end of file */
-    lseek(log_fd, 0, SEEK_END);
+    /* Seek to end of file if requested (for manual attach, not auto-attach) */
+    if (seek_to_end) {
+        lseek(log_fd, 0, SEEK_END);
+    }
 
     /* Setup signal handler for Ctrl+C */
     signal(SIGINT, handle_sigint);
@@ -135,4 +134,24 @@ int arc_workflow_attach(int argc, char** argv) {
     LOG_USER_INFO("Detached from workflow: %s\n", workflow_id);
 
     return ARC_EXIT_SUCCESS;
+}
+
+/* arc workflow attach command handler - tail log file and send input */
+int arc_workflow_attach(int argc, char** argv) {
+    if (argc < 1) {
+        LOG_USER_ERROR("workflow ID required\n");
+        LOG_USER_INFO("Usage: arc workflow attach <workflow_id>\n");
+        return ARC_EXIT_ERROR;
+    }
+
+    const char* workflow_id = argv[0];
+
+    /* Manual attach - seek to end to show only new output */
+    return arc_workflow_attach_internal(workflow_id, 1);
+}
+
+/* Auto-attach from workflow start - show all output from beginning */
+int arc_workflow_attach_auto(const char* workflow_id) {
+    /* Auto-attach - start from beginning to show all output */
+    return arc_workflow_attach_internal(workflow_id, 0);
 }

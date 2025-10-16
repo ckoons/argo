@@ -182,10 +182,15 @@ int arc_workflow_start(int argc, char** argv) {
     /* Print confirmation */
     LOG_USER_SUCCESS("Started workflow: %s\n", workflow_id);
     LOG_USER_INFO("Script: %s\n", script_path);
-    LOG_USER_INFO("Logs: ~/.argo/logs/%s.log\n", workflow_id);
+    LOG_USER_INFO("Logs: ~/.argo/logs/%s.log\n\n", workflow_id);
 
     /* Cleanup HTTP response */
     arc_http_response_free(response);
+
+    /* Auto-attach to workflow to show output from beginning */
+    if (workflow_id[0] != '\0') {
+        return arc_workflow_attach_auto(workflow_id);
+    }
 
     return ARC_EXIT_SUCCESS;
 }
