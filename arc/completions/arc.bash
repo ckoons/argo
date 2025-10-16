@@ -13,11 +13,8 @@ _arc_completion() {
     local cur prev words cword
     _init_completion || return
 
-    # Main commands
-    local commands="workflow list start abandon status pause resume attach logs switch context help version"
-
-    # Workflow subcommands
-    local workflow_cmds="start abandon status pause resume attach logs describe"
+    # Main commands (all workflow commands work as shortcuts)
+    local commands="help start list templates status states attach pause resume abandon test docs"
 
     # Current word being completed
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -32,43 +29,26 @@ _arc_completion() {
             ;;
         2)
             # Second argument - depends on first command
-            case "${words[1]}" in
-                workflow)
-                    # arc workflow <subcommand>
-                    COMPREPLY=( $(compgen -W "$workflow_cmds" -- "$cur") )
-                    return 0
-                    ;;
+            case "${prev}" in
                 start)
                     # arc start <template>
                     COMPREPLY=( $(compgen -W "$(_arc_templates)" -- "$cur") )
                     return 0
                     ;;
-                abandon|status|pause|resume|attach|logs)
+                status|attach|pause|resume|abandon)
                     # arc <command> <workflow_id>
                     COMPREPLY=( $(compgen -W "$(_arc_workflows)" -- "$cur") )
                     return 0
                     ;;
-                switch)
-                    # arc switch <workflow_id>
-                    COMPREPLY=( $(compgen -W "$(_arc_workflows)" -- "$cur") )
+                docs|test)
+                    # arc docs/test <template>
+                    COMPREPLY=( $(compgen -W "$(_arc_templates)" -- "$cur") )
                     return 0
                     ;;
-            esac
-            ;;
-        3)
-            # Third argument - for workflow subcommands
-            case "${words[1]}" in
-                workflow)
-                    case "${words[2]}" in
-                        start)
-                            COMPREPLY=( $(compgen -W "$(_arc_templates)" -- "$cur") )
-                            return 0
-                            ;;
-                        abandon|status|pause|resume|attach|logs|describe)
-                            COMPREPLY=( $(compgen -W "$(_arc_workflows)" -- "$cur") )
-                            return 0
-                            ;;
-                    esac
+                help)
+                    # arc help <command>
+                    COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
+                    return 0
                     ;;
             esac
             ;;
@@ -80,52 +60,40 @@ _arc_completion() {
 # Get list of active workflow IDs
 _arc_workflows() {
     # Try to get from daemon via arc list
-    # Parse output for workflow IDs (second column after stripping whitespace)
-    # Try different arc paths: installed, local build, or in PATH
     local arc_cmd=""
     if command -v arc >/dev/null 2>&1; then
         arc_cmd="arc"
-    elif [ -x "./arc/bin/arc" ]; then
-        arc_cmd="./arc/bin/arc"
-    elif [ -x "bin/arc" ]; then
-        arc_cmd="bin/arc"
+    elif [ -x "./bin/arc" ]; then
+        arc_cmd="./bin/arc"
+    elif [ -x "../bin/arc" ]; then
+        arc_cmd="../bin/arc"
     else
         return 1
     fi
 
+    # Parse workflow IDs from arc list output
     $arc_cmd list 2>/dev/null | awk '
-        BEGIN { in_workflows = 0; }
-        /ACTIVE WORKFLOWS:/ { in_workflows = 1; next; }
-        /TEMPLATES:/ { in_workflows = 0; }
-        in_workflows && NF > 0 && $1 != "CONTEXT" && $1 != "--------" {
-            # Print second field (workflow name/id)
-            if (NF >= 2) print $2;
-        }
+        /^  wf_/ { print $1; }
     '
 }
 
 # Get list of available template names
 _arc_templates() {
-    # Parse arc list output for template names
-    # Try different arc paths: installed, local build, or in PATH
+    # Get templates from arc templates command
     local arc_cmd=""
     if command -v arc >/dev/null 2>&1; then
         arc_cmd="arc"
-    elif [ -x "./arc/bin/arc" ]; then
-        arc_cmd="./arc/bin/arc"
-    elif [ -x "bin/arc" ]; then
-        arc_cmd="bin/arc"
+    elif [ -x "./bin/arc" ]; then
+        arc_cmd="./bin/arc"
+    elif [ -x "../bin/arc" ]; then
+        arc_cmd="../bin/arc"
     else
         return 1
     fi
 
-    $arc_cmd list 2>/dev/null | awk '
-        BEGIN { in_templates = 0; }
-        /TEMPLATES:/ { in_templates = 1; next; }
-        in_templates && NF > 0 && $1 != "SCOPE" && $1 != "--------" {
-            # Print second field (template name)
-            if (NF >= 2) print $2;
-        }
+    # Parse template names from arc templates output
+    $arc_cmd templates 2>/dev/null | awk '
+        /^  [a-zA-Z]/ && !/^  arc/ { print $1; }
     '
 }
 

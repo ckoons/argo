@@ -147,7 +147,11 @@ ui: arc
 ui-argo-term: arc
 	@$(MAKE) -C ui/argo-term
 
-all-components: $(CORE_LIB) $(DAEMON_LIB) $(DAEMON_BINARY) arc ui
+all-components: $(CORE_LIB) $(DAEMON_LIB) $(DAEMON_BINARY) arc ui arc-completions
+
+# Install arc shell completions
+arc-completions:
+	@$(MAKE) -C arc install-completion
 
 # Build just the scripts
 scripts: $(CORE_LIB) $(SCRIPT_TARGETS)
