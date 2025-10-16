@@ -59,25 +59,45 @@ static int resolve_template_path(const char* template_name, char* script_path, s
 int arc_workflow_start(int argc, char** argv) {
     if (argc < 1) {
         LOG_USER_ERROR("template or script path required\n");
-        LOG_USER_INFO("Usage: arc workflow start <template_or_script> [args...]\n");
+        LOG_USER_INFO("Usage: arc start <template> [instance] [args...]\n");
         LOG_USER_INFO("Examples:\n");
-        LOG_USER_INFO("  arc workflow start build_and_test arg1 arg2\n");
-        LOG_USER_INFO("  arc workflow start workflows/examples/hello.sh\n");
+        LOG_USER_INFO("  arc start create_workflow\n");
+        LOG_USER_INFO("  arc start create_workflow my_feature\n");
+        LOG_USER_INFO("  arc start build test_branch arg1 arg2\n");
         return ARC_EXIT_ERROR;
+    }
+
+    const char* template_name = argv[0];
+    const char* instance_suffix = NULL;
+    int arg_start_index = 1;
+
+    /* Check if argv[1] is an instance name or a regular arg/env var */
+    if (argc >= 2) {
+        /* If argv[1] doesn't contain '=' and doesn't start with '-', treat as instance */
+        if (strchr(argv[1], '=') == NULL && argv[1][0] != '-') {
+            instance_suffix = argv[1];
+            arg_start_index = 2;
+        }
     }
 
     /* Resolve template name to script path */
     char script_path[512];
-    if (resolve_template_path(argv[0], script_path, sizeof(script_path)) != ARC_EXIT_SUCCESS) {
+    if (resolve_template_path(template_name, script_path, sizeof(script_path)) != ARC_EXIT_SUCCESS) {
         return ARC_EXIT_ERROR;
     }
 
-    /* Build JSON request with args and env if provided */
+    /* Build JSON request with script, template, instance, args, and env */
     char json_body[4096];  /* Larger buffer for args + env */
     size_t offset = 0;
 
     offset += snprintf(json_body + offset, sizeof(json_body) - offset,
-                      "{\"script\":\"%s\"", script_path);
+                      "{\"script\":\"%s\",\"template\":\"%s\"", script_path, template_name);
+
+    /* Add instance suffix if provided */
+    if (instance_suffix) {
+        offset += snprintf(json_body + offset, sizeof(json_body) - offset,
+                         ",\"instance\":\"%s\"", instance_suffix);
+    }
 
     /* Parse arguments - separate regular args from KEY=VALUE env vars */
     int env_count = 0;
@@ -85,7 +105,7 @@ int arc_workflow_start(int argc, char** argv) {
     char* env_values[32];
 
     /* First pass: identify and extract env vars */
-    for (int i = 1; i < argc && env_count < 32; i++) {
+    for (int i = arg_start_index; i < argc && env_count < 32; i++) {
         char* eq = strchr(argv[i], '=');
         if (eq && eq != argv[i]) {
             /* This is KEY=VALUE format */
@@ -102,9 +122,9 @@ int arc_workflow_start(int argc, char** argv) {
 
     /* Add args array (non-env arguments) */
     int args_added = 0;
-    if (argc > 1) {
+    if (argc > arg_start_index) {
         offset += snprintf(json_body + offset, sizeof(json_body) - offset, ",\"args\":[");
-        for (int i = 1; i < argc; i++) {
+        for (int i = arg_start_index; i < argc; i++) {
             if (!strchr(argv[i], '=') || strchr(argv[i], '=') == argv[i]) {
                 /* Not an env var */
                 offset += snprintf(json_body + offset, sizeof(json_body) - offset,
