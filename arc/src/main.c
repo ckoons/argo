@@ -21,13 +21,14 @@ int main(int argc, char** argv) {
     }
     else {
         /* Try as workflow subcommand (e.g., 'arc status' -> 'arc workflow status') */
-        /* Known workflow subcommands: start, list, status, states, attach, pause, resume, abandon, test, docs */
+        /* Known workflow subcommands: start, list, templates, status, states, attach, pause, resume, abandon, test, docs */
         const char* cmd = argv[1];
         if (strcmp(cmd, "start") == 0 || strcmp(cmd, "list") == 0 ||
-            strcmp(cmd, "status") == 0 || strcmp(cmd, "states") == 0 ||
-            strcmp(cmd, "attach") == 0 || strcmp(cmd, "pause") == 0 ||
-            strcmp(cmd, "resume") == 0 || strcmp(cmd, "abandon") == 0 ||
-            strcmp(cmd, "test") == 0 || strcmp(cmd, "docs") == 0) {
+            strcmp(cmd, "templates") == 0 || strcmp(cmd, "status") == 0 ||
+            strcmp(cmd, "states") == 0 || strcmp(cmd, "attach") == 0 ||
+            strcmp(cmd, "pause") == 0 || strcmp(cmd, "resume") == 0 ||
+            strcmp(cmd, "abandon") == 0 || strcmp(cmd, "test") == 0 ||
+            strcmp(cmd, "docs") == 0) {
             /* Dispatch to workflow handler */
             return arc_cmd_workflow(argc - 1, argv + 1);
         }

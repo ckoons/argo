@@ -13,7 +13,7 @@
 #include "argo_error.h"
 #include "argo_output.h"
 
-/* Resolve template name to script path */
+/* Resolve template name to workflow.sh path (directory-based only) */
 static int resolve_template_path(const char* template_name, char* script_path, size_t path_size) {
     const char* home = getenv("HOME");
     if (!home) {
@@ -21,42 +21,37 @@ static int resolve_template_path(const char* template_name, char* script_path, s
         return ARC_EXIT_ERROR;
     }
 
-    /* Check if it's already a valid file path */
     struct stat st;
-    if (stat(template_name, &st) == 0 && S_ISREG(st.st_mode)) {
-        strncpy(script_path, template_name, path_size - 1);
+    char user_template[512];
+    char system_template[512];
+
+    /* Try user template: ~/.argo/workflows/templates/{name}/workflow.sh */
+    snprintf(user_template, sizeof(user_template),
+            "%s/.argo/workflows/templates/%s/workflow.sh", home, template_name);
+
+    if (stat(user_template, &st) == 0 && S_ISREG(st.st_mode)) {
+        strncpy(script_path, user_template, path_size - 1);
         script_path[path_size - 1] = '\0';
         return ARC_EXIT_SUCCESS;
     }
 
-    /* Try directory-based template */
-    char dir_path[512];
-    snprintf(dir_path, sizeof(dir_path), "%s/.argo/workflows/templates/%s/workflow.sh",
-            home, template_name);
+    /* Try system template: workflows/templates/{name}/workflow.sh */
+    snprintf(system_template, sizeof(system_template),
+            "workflows/templates/%s/workflow.sh", template_name);
 
-    if (stat(dir_path, &st) == 0 && S_ISREG(st.st_mode)) {
-        strncpy(script_path, dir_path, path_size - 1);
-        script_path[path_size - 1] = '\0';
-        return ARC_EXIT_SUCCESS;
-    }
-
-    /* Try single-file template */
-    char file_path[512];
-    snprintf(file_path, sizeof(file_path), "%s/.argo/workflows/templates/%s.sh",
-            home, template_name);
-
-    if (stat(file_path, &st) == 0 && S_ISREG(st.st_mode)) {
-        strncpy(script_path, file_path, path_size - 1);
+    if (stat(system_template, &st) == 0 && S_ISREG(st.st_mode)) {
+        strncpy(script_path, system_template, path_size - 1);
         script_path[path_size - 1] = '\0';
         return ARC_EXIT_SUCCESS;
     }
 
     /* Not found */
-    LOG_USER_ERROR("Template or script not found: %s\n", template_name);
+    LOG_USER_ERROR("Template not found: %s\n", template_name);
     LOG_USER_INFO("  Tried:\n");
-    LOG_USER_INFO("    - %s\n", template_name);
-    LOG_USER_INFO("    - %s\n", dir_path);
-    LOG_USER_INFO("    - %s\n", file_path);
+    LOG_USER_INFO("    - %s\n", user_template);
+    LOG_USER_INFO("    - %s\n", system_template);
+    LOG_USER_INFO("\n");
+    LOG_USER_INFO("  Use 'arc templates' to see available templates\n");
     return ARC_EXIT_ERROR;
 }
 

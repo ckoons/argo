@@ -10,97 +10,149 @@ static void show_general_help(void) {
     printf("arc - Argo Workflow CLI\n\n");
     printf("Terminal-facing client for Argo daemon. Communicates via HTTP API.\n\n");
     printf("Usage:\n");
-    printf("  arc help [command]          Show help for a specific command\n");
-    printf("  arc switch [workflow_name]  Set active workflow context\n");
-    printf("  arc workflow <subcommand>   Manage workflows\n\n");
-    printf("Workflow Subcommands:\n");
-    printf("  start [template] [instance]     Create and start workflow\n");
-    printf("  list [active|template]          List workflows or templates\n");
-    printf("  status [workflow_name]          Show workflow status\n");
-    printf("  states                          Show all workflow states\n");
-    printf("  attach [workflow_name]          Attach to workflow (tail logs + send input)\n");
-    printf("  pause [workflow_name]           Pause workflow at next checkpoint\n");
-    printf("  resume [workflow_name]          Resume paused workflow\n");
-    printf("  abandon [workflow_name]         Stop and remove workflow\n");
-    printf("  test [template]                 Run tests for workflow template\n");
-    printf("  docs [template]                 Show documentation for template\n\n");
-    printf("Environment Filtering:\n");
-    printf("  --env <env>                     Filter/create in specific environment\n");
-    printf("  ARC_ENV=<env>                   Set default environment for terminal\n");
-    printf("  Environments: test, dev, stage, prod (default: dev)\n\n");
+    printf("  arc <command> [args...]     Execute command\n");
+    printf("  arc help [command]          Show help for command\n\n");
+    printf("Common Commands:\n");
+    printf("  start <template> [args...]  Start workflow from template\n");
+    printf("  list                        List active workflows\n");
+    printf("  templates                   List available templates\n");
+    printf("  status <workflow_id>        Show workflow status\n");
+    printf("  abandon <workflow_id>       Stop and remove workflow\n");
+    printf("  pause <workflow_id>         Pause workflow execution\n");
+    printf("  resume <workflow_id>        Resume paused workflow\n");
+    printf("  attach <workflow_id>        Attach to workflow logs\n");
+    printf("  docs <template>             Show template documentation\n");
+    printf("  test <template>             Run template tests\n\n");
+    printf("Templates:\n");
+    printf("  System templates: workflows/templates/\n");
+    printf("  User templates:   ~/.argo/workflows/templates/\n\n");
     printf("Prerequisites:\n");
-    printf("  Start daemon first: argo-daemon --port 9876\n\n");
-    printf("For more details: arc help <command>\n");
+    printf("  Daemon must be running: argo-daemon --port 9876\n\n");
+    printf("Examples:\n");
+    printf("  arc templates               # List available templates\n");
+    printf("  arc start create_workflow   # Start interactive workflow creator\n");
+    printf("  arc list                    # Show running workflows\n");
+    printf("  arc status wf_12345_67890   # Check workflow status\n\n");
+    printf("For command details: arc help <command>\n");
 }
 
 /* Help for specific commands */
 static void show_command_help(const char* command) {
-    if (strcmp(command, "switch") == 0) {
-        printf("arc switch [workflow_name]\n\n");
-        printf("Set the active workflow context for the current terminal.\n\n");
+    if (strcmp(command, "start") == 0) {
+        printf("arc start <template> [args...] [KEY=VALUE...]\n\n");
+        printf("Start a workflow from a template.\n\n");
         printf("Arguments:\n");
-        printf("  workflow_name  - Full workflow ID (template_instance)\n\n");
-        printf("Example:\n");
-        printf("  arc switch create_proposal_my_feature\n");
-    }
-    else if (strcmp(command, "workflow") == 0) {
-        printf("arc workflow <subcommand>\n\n");
-        printf("Manage Argo workflows.\n\n");
-        printf("Subcommands:\n");
-        printf("  start [template] [instance]     Create and start workflow\n");
-        printf("  list [active|template]          List workflows or templates\n");
-        printf("  status [workflow_name]          Show workflow status\n");
-        printf("  states                          Show all workflow states\n");
-        printf("  attach [workflow_name]          Attach to workflow (tail logs + send input)\n");
-        printf("  pause [workflow_name]           Pause workflow at next checkpoint\n");
-        printf("  resume [workflow_name]          Resume paused workflow\n");
-        printf("  abandon [workflow_name]         Stop and remove workflow\n");
-        printf("  test [template]                 Run tests for workflow template\n");
-        printf("  docs [template]                 Show documentation for template\n\n");
-        printf("Environment Filtering:\n");
-        printf("  Most commands support --env <env> to filter by environment\n");
-        printf("  or set ARC_ENV environment variable for terminal-wide filtering\n\n");
-        printf("Use 'arc help workflow <subcommand>' for details on each.\n");
-    }
-    else if (strcmp(command, "start") == 0 ||
-             (strstr(command, "workflow") && strstr(command, "start"))) {
-        printf("arc workflow start [template] [instance] [branch] [--env <env>]\n\n");
-        printf("Creates a new workflow instance and starts background execution.\n\n");
-        printf("Arguments:\n");
-        printf("  template  - Workflow template name (from system or user templates)\n");
-        printf("  instance  - Unique instance identifier\n");
-        printf("  branch    - Optional git branch (default: main)\n");
-        printf("  --env     - Optional environment (default: dev or ARC_ENV)\n\n");
-        printf("Workflow name format: template_instance\n\n");
+        printf("  template   - Template name (from system or user templates)\n");
+        printf("  args...    - Arguments passed to workflow script\n");
+        printf("  KEY=VALUE  - Environment variables for workflow\n\n");
+        printf("Templates are directory-based with this structure:\n");
+        printf("  template_name/\n");
+        printf("    workflow.sh     - Main executable script\n");
+        printf("    README.md       - Documentation\n");
+        printf("    metadata.yaml   - Template metadata\n");
+        printf("    tests/          - Test scripts\n");
+        printf("    config/         - Configuration files\n\n");
         printf("Examples:\n");
-        printf("  arc workflow start create_proposal my_feature\n");
-        printf("  arc workflow start create_proposal my_feature --env test\n");
-        printf("  ARC_ENV=prod arc workflow start deploy release_v1\n");
+        printf("  arc start create_workflow\n");
+        printf("  arc start my_build arg1 arg2\n");
+        printf("  arc start deploy VERSION=1.2.3 ENV=prod\n\n");
+        printf("See also: arc templates, arc docs <template>\n");
     }
-    else if (strcmp(command, "list") == 0 ||
-             (strstr(command, "workflow") && strstr(command, "list"))) {
-        printf("arc workflow list [active|template] [--env <env>]\n\n");
-        printf("List workflows or templates.\n\n");
-        printf("Options:\n");
-        printf("  (no args)  - Show all active workflows and available templates\n");
-        printf("  active     - Show only active workflows\n");
-        printf("  template   - Show only available templates\n");
-        printf("  --env      - Filter by environment (or use ARC_ENV)\n\n");
+    else if (strcmp(command, "templates") == 0) {
+        printf("arc templates\n\n");
+        printf("List all available workflow templates.\n\n");
+        printf("Shows templates from:\n");
+        printf("  - System: workflows/templates/ (shipped with Argo)\n");
+        printf("  - User:   ~/.argo/workflows/templates/ (your templates)\n\n");
+        printf("Each template includes:\n");
+        printf("  - Name and description\n");
+        printf("  - Source location (system or user)\n\n");
         printf("Examples:\n");
-        printf("  arc workflow list\n");
-        printf("  arc workflow list active\n");
-        printf("  arc workflow list --env test\n");
-        printf("  ARC_ENV=prod arc workflow list active\n");
+        printf("  arc templates\n");
+        printf("  arc start <template_name>\n");
+        printf("  arc docs <template_name>\n");
     }
-    else if (strcmp(command, "status") == 0 ||
-             (strstr(command, "workflow") && strstr(command, "status"))) {
-        printf("arc workflow status [workflow_name]\n\n");
-        printf("Show workflow status.\n\n");
+    else if (strcmp(command, "list") == 0) {
+        printf("arc list\n\n");
+        printf("List active workflows.\n\n");
+        printf("Shows:\n");
+        printf("  - Workflow ID\n");
+        printf("  - Script path\n");
+        printf("  - State (running, paused, completed, failed, abandoned)\n");
+        printf("  - Process ID\n\n");
+        printf("Examples:\n");
+        printf("  arc list\n");
+        printf("  arc status <workflow_id>\n");
+        printf("  arc abandon <workflow_id>\n");
+    }
+    else if (strcmp(command, "status") == 0) {
+        printf("arc status <workflow_id>\n\n");
+        printf("Show detailed workflow status.\n\n");
         printf("Arguments:\n");
-        printf("  workflow_name  - Optional. If omitted, shows all active workflows\n\n");
-        printf("Example:\n");
-        printf("  arc workflow status\n");
-        printf("  arc workflow status create_proposal_my_feature\n");
+        printf("  workflow_id  - Workflow ID (from 'arc list')\n\n");
+        printf("Shows:\n");
+        printf("  - Workflow ID and script\n");
+        printf("  - Current state\n");
+        printf("  - Process ID\n");
+        printf("  - Start/end times\n");
+        printf("  - Exit code (if completed)\n\n");
+        printf("Examples:\n");
+        printf("  arc status wf_12345_67890\n");
+        printf("  arc attach wf_12345_67890  # View logs\n");
+    }
+    else if (strcmp(command, "pause") == 0) {
+        printf("arc pause <workflow_id>\n\n");
+        printf("Pause a running workflow.\n\n");
+        printf("Sends SIGSTOP to the workflow process, suspending execution.\n");
+        printf("Use 'arc resume' to continue.\n\n");
+        printf("Examples:\n");
+        printf("  arc pause wf_12345_67890\n");
+        printf("  arc resume wf_12345_67890\n");
+    }
+    else if (strcmp(command, "resume") == 0) {
+        printf("arc resume <workflow_id>\n\n");
+        printf("Resume a paused workflow.\n\n");
+        printf("Sends SIGCONT to the workflow process, continuing execution.\n\n");
+        printf("Examples:\n");
+        printf("  arc resume wf_12345_67890\n");
+    }
+    else if (strcmp(command, "abandon") == 0) {
+        printf("arc abandon <workflow_id>\n\n");
+        printf("Stop and remove a workflow.\n\n");
+        printf("Sends SIGTERM to the workflow process and marks it as abandoned.\n\n");
+        printf("Arguments:\n");
+        printf("  workflow_id  - Workflow ID (from 'arc list')\n\n");
+        printf("Examples:\n");
+        printf("  arc abandon wf_12345_67890\n");
+    }
+    else if (strcmp(command, "attach") == 0) {
+        printf("arc attach <workflow_id>\n\n");
+        printf("Attach to workflow logs (tail -f).\n\n");
+        printf("Shows real-time log output from the workflow.\n");
+        printf("Press Ctrl-C to detach (workflow keeps running).\n\n");
+        printf("Arguments:\n");
+        printf("  workflow_id  - Workflow ID (from 'arc list')\n\n");
+        printf("Examples:\n");
+        printf("  arc attach wf_12345_67890\n");
+    }
+    else if (strcmp(command, "docs") == 0) {
+        printf("arc docs <template>\n\n");
+        printf("Show documentation for a template.\n\n");
+        printf("Displays the README.md from the template directory.\n\n");
+        printf("Arguments:\n");
+        printf("  template  - Template name\n\n");
+        printf("Examples:\n");
+        printf("  arc docs create_workflow\n");
+        printf("  arc templates  # List available templates\n");
+    }
+    else if (strcmp(command, "test") == 0) {
+        printf("arc test <template>\n\n");
+        printf("Run tests for a workflow template.\n\n");
+        printf("Executes test scripts from the template's tests/ directory.\n\n");
+        printf("Arguments:\n");
+        printf("  template  - Template name\n\n");
+        printf("Examples:\n");
+        printf("  arc test create_workflow\n");
     }
     else {
         LOG_USER_ERROR("Unknown command: %s\n", command);

@@ -23,6 +23,9 @@ int arc_cmd_workflow(int argc, char** argv) {
     else if (strcmp(subcommand, "list") == 0) {
         return arc_workflow_list(argc - 1, argv + 1);
     }
+    else if (strcmp(subcommand, "templates") == 0) {
+        return arc_workflow_templates(argc - 1, argv + 1);
+    }
     else if (strcmp(subcommand, "status") == 0) {
         return arc_workflow_status(argc - 1, argv + 1);
     }

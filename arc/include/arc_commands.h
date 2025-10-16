@@ -19,6 +19,7 @@ int arc_cmd_workflow(int argc, char** argv);
 /* Workflow subcommands */
 int arc_workflow_start(int argc, char** argv);
 int arc_workflow_list(int argc, char** argv);
+int arc_workflow_templates(int argc, char** argv);
 int arc_workflow_status(int argc, char** argv);
 int arc_workflow_states(int argc, char** argv);
 int arc_workflow_attach(int argc, char** argv);

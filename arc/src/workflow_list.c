@@ -112,9 +112,25 @@ static int list_active_workflows(const char* environment) {
 
 /* arc workflow list command handler */
 int arc_workflow_list(int argc, char** argv) {
+    /* Check for --templates flag */
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "--templates") == 0) {
+            /* Redirect to templates command */
+            return arc_workflow_templates(0, NULL);
+        }
+    }
+
     /* Get effective environment filter */
     const char* environment = arc_get_effective_environment(argc, argv);
 
     /* List active workflows */
-    return list_active_workflows(environment);
+    int result = list_active_workflows(environment);
+
+    /* If no active workflows, suggest viewing templates */
+    if (result == ARC_EXIT_SUCCESS) {
+        /* Check if there were any workflows (by examining previous output) */
+        LOG_USER_INFO("Tip: Use 'arc templates' to see available workflow templates\n\n");
+    }
+
+    return result;
 }
