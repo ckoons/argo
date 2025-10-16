@@ -63,8 +63,15 @@ int yaml_parse_simple(const char* content, yaml_kv_callback_t callback, void* us
             key[--key_len] = '\0';
         }
 
-        /* Trim value */
+        /* Trim value and strip inline comments */
         while (*value == ' ' || *value == '\t') value++;
+
+        /* Find and remove inline comment (but not in quoted strings) */
+        char* comment = strchr(value, '#');
+        if (comment) {
+            *comment = '\0';
+        }
+
         size_t val_len = strlen(value);
         while (val_len > 0 && (value[val_len-1] == ' ' || value[val_len-1] == '\t' ||
                                value[val_len-1] == '\r')) {

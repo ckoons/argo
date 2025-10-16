@@ -20,6 +20,73 @@
 #include "argo_log.h"
 #include "argo_limits.h"
 
+/* Wait for child process with timeout enforcement */
+process_wait_result_t process_wait_with_timeout(pid_t pid, int timeout_seconds, int timeout_exit_code) {
+    process_wait_result_t result = {
+        .exit_code = 0,
+        .timed_out = false,
+        .wait_failed = false
+    };
+
+    time_t start_time = time(NULL);
+    int status = 0;
+
+    while (1) {
+        pid_t wait_result = waitpid(pid, &status, WNOHANG);
+
+        if (wait_result == pid) {
+            /* Child exited normally */
+            if (WIFEXITED(status)) {
+                result.exit_code = WEXITSTATUS(status);
+            } else {
+                /* Abnormal termination (signal, etc.) */
+                result.exit_code = 1;
+            }
+            break;
+        } else if (wait_result < 0) {
+            /* Wait failed */
+            if (errno == EINTR) {
+                continue;  /* Interrupted by signal, retry */
+            }
+            /* Real error */
+            argo_report_error(E_SYSTEM_PROCESS, "process_wait_with_timeout",
+                             "waitpid failed: %s", strerror(errno));
+            result.exit_code = -1;
+            result.wait_failed = true;
+            break;
+        }
+
+        /* Check timeout */
+        if (timeout_seconds > 0) {
+            time_t elapsed = time(NULL) - start_time;
+            if (elapsed >= timeout_seconds) {
+                /* Timeout reached - terminate process */
+                LOG_WARN("Process timed out after %d seconds, killing PID %d",
+                        timeout_seconds, (int)pid);
+
+                /* Try graceful termination first */
+                kill(pid, SIGTERM);
+                sleep(1);
+
+                /* Force kill if still running */
+                kill(pid, SIGKILL);
+
+                /* Wait for process to die */
+                waitpid(pid, &status, 0);
+
+                result.exit_code = timeout_exit_code;
+                result.timed_out = true;
+                break;
+            }
+        }
+
+        /* Sleep briefly before next check */
+        usleep(WORKFLOW_POLL_INTERVAL_USEC);
+    }
+
+    return result;
+}
+
 /* Execute workflow script */
 int workflow_execute(workflow_t* workflow, const char* log_path) {
     if (!workflow) {
@@ -95,56 +162,25 @@ int workflow_execute(workflow_t* workflow, const char* log_path) {
     }
 
     /* Parent process - wait for child with timeout */
-    time_t start_time = time(NULL);
-    int status = 0;
-    bool timed_out = false;
+    process_wait_result_t wait_result = process_wait_with_timeout(
+        script_pid,
+        workflow->timeout_seconds,
+        WORKFLOW_TIMEOUT_EXIT_CODE
+    );
 
-    while (1) {
-        pid_t wait_result = waitpid(script_pid, &status, WNOHANG);
-
-        if (wait_result == script_pid) {
-            /* Child exited */
-            if (WIFEXITED(status)) {
-                workflow->exit_code = WEXITSTATUS(status);
-            } else {
-                workflow->exit_code = 1;
-            }
-            break;
-        } else if (wait_result < 0) {
-            if (errno == EINTR) {
-                continue;  /* Interrupted, retry */
-            }
-            argo_report_error(E_SYSTEM_PROCESS, "workflow_execute",
-                             "waitpid failed: %s", strerror(errno));
-            result = E_SYSTEM_PROCESS;
-            goto cleanup;
-        }
-
-        /* Check timeout */
-        if (workflow->timeout_seconds > 0) {
-            time_t elapsed = time(NULL) - start_time;
-            if (elapsed >= workflow->timeout_seconds) {
-                /* Timeout - kill child */
-                LOG_WARN("Workflow timed out after %d seconds, killing process",
-                        workflow->timeout_seconds);
-                kill(script_pid, SIGTERM);
-                sleep(1);
-                kill(script_pid, SIGKILL);
-                waitpid(script_pid, &status, 0);
-                workflow->exit_code = WORKFLOW_TIMEOUT_EXIT_CODE;
-                timed_out = true;
-                break;
-            }
-        }
-
-        /* Sleep briefly before next check */
-        usleep(WORKFLOW_POLL_INTERVAL_USEC);
-    }
-
-    /* Update final state */
+    /* Update workflow with wait results */
+    workflow->exit_code = wait_result.exit_code;
     workflow->end_time = time(NULL);
 
-    if (timed_out) {
+    /* Handle wait failures */
+    if (wait_result.wait_failed) {
+        workflow->state = WORKFLOW_STATE_FAILED;
+        result = E_SYSTEM_PROCESS;
+        goto cleanup;
+    }
+
+    /* Update final state based on result */
+    if (wait_result.timed_out) {
         workflow->state = WORKFLOW_STATE_FAILED;
         result = E_TIMEOUT;
     } else if (workflow->exit_code == 0) {

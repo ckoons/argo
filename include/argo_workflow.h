@@ -92,6 +92,30 @@ workflow_t* workflow_load_from_file(const char* json_path, const char* workflow_
 workflow_t* workflow_load_from_string(const char* json_content, const char* workflow_id);
 
 /**
+ * Result from waiting for a child process with timeout
+ */
+typedef struct {
+    int exit_code;      /* Exit code from process (or timeout code) */
+    bool timed_out;     /* True if process was killed due to timeout */
+    bool wait_failed;   /* True if waitpid failed */
+} process_wait_result_t;
+
+/**
+ * Wait for child process with timeout enforcement
+ *
+ * Non-blocking wait with periodic polling. If timeout is reached,
+ * sends SIGTERM, waits 1 second, then sends SIGKILL.
+ *
+ * This is a reusable subprocess monitoring utility.
+ *
+ * @param pid Process ID to wait for
+ * @param timeout_seconds Maximum time to wait (0 = no timeout)
+ * @param timeout_exit_code Exit code to return on timeout
+ * @return Process wait result with exit code and timeout status
+ */
+process_wait_result_t process_wait_with_timeout(pid_t pid, int timeout_seconds, int timeout_exit_code);
+
+/**
  * Execute workflow script
  *
  * Forks process, executes bash script, waits with timeout.
