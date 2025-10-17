@@ -18,11 +18,18 @@ User I/O            State Management                CI Interaction
                     I/O Queue (HTTP)                Progress Reporting (HTTP)
                          ↑                               ↓
                          └────────HTTP I/O Channel───────┘
+
+ci tool  <--HTTP-->  argo-daemon  <--direct-->  CI Providers
+   ↓                      ↓                          ↓
+Query                Provider Selection         API/CLI Execution
+stdin/stdout        Config Defaults             AI Response
 ```
 
 **Communication:**
 - `arc → daemon`: HTTP REST API (POST, GET, DELETE)
+- `ci → daemon`: HTTP POST /api/ci/query
 - `daemon → executor`: fork/exec process creation + signals (SIGTERM, SIGINT)
+- `daemon → providers`: Direct ci_provider_t calls (for ci tool queries)
 - `executor → daemon`: HTTP progress updates + I/O channel reads/writes
 - `arc ↔ daemon ↔ executor`: Interactive workflow I/O via HTTP message passing
 
@@ -196,14 +203,27 @@ Executor exits, daemon updates workflow status
 
 **Key Feature:** All workflow steps use `io_channel_t` abstraction for I/O, enabling background execution without terminal access.
 
-### Arc CLI (Minimal)
+### Arc CLI (Terminal-Facing)
 
 **Contents:**
 - Command parsing (`arc/src/*.c`)
-- HTTP calls to daemon
+- HTTP calls to daemon (workflow operations)
 - Output formatting
+- Terminal user interaction
 
 **Links:** `libargo_core.a` only (HTTP client)
+
+### CI Tool (Workflow Query Tool)
+
+**Contents:**
+- Minimal command-line interface (`ci/src/*.c`)
+- HTTP calls to daemon (AI query only)
+- Stdin/stdout handling
+- Daemon auto-start
+
+**Links:** `libargo_core.a` only (HTTP client)
+
+**Purpose:** Enable bash workflows to query AI providers with a single command
 
 ## REST API Design
 
@@ -254,6 +274,43 @@ GET  /api/workflow/input/{id}          Executor polls for user input (non-blocki
 2. Arc CLI polls GET `/api/workflow/output/{id}` → displays to user
 3. User types input in arc → HTTP POST to `/api/workflow/input/{id}`
 4. Workflow step polls GET `/api/workflow/input/{id}` with retry logic → receives input
+
+#### CI Query API
+
+```
+POST /api/ci/query                     Query AI provider (used by ci tool)
+```
+
+**Request:**
+```json
+{
+  "query": "What is 2+2?",
+  "provider": "claude_code",  // optional (defaults from config)
+  "model": "claude-sonnet-4-5"  // optional (defaults from config)
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "provider": "claude_code",
+  "response": "2+2 equals 4"
+}
+```
+
+**Flow:**
+1. ci tool sends query → HTTP POST to `/api/ci/query`
+2. Daemon selects provider (command line > config > default)
+3. Daemon executes query via ci_provider_t interface
+4. Daemon returns AI response as JSON
+5. ci tool outputs response to stdout
+
+**Configuration:** Daemon reads defaults from `~/.argo/config`:
+```ini
+CI_DEFAULT_PROVIDER=claude_code
+CI_DEFAULT_MODEL=claude-sonnet-4-5
+```
 
 #### Daemon Management
 

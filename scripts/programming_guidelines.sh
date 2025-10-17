@@ -81,16 +81,16 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "4. ERROR REPORTING CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-# Count ALL fprintf(stderr) uses
-TOTAL_STDERR=$(grep -rn 'fprintf(stderr' src/ --include="*.c" | wc -l | tr -d ' ')
+# Count ALL fprintf(stderr) uses (all components)
+TOTAL_STDERR=$(grep -rn 'fprintf(stderr' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
 
 # Count approved uses
-# 1. In legitimate files (argo_error.c, argo_daemon_main.c, argo_print_utils.c)
-LEGITIMATE_FILES=$(grep -rn 'fprintf(stderr' src/ --include="*.c" | \
-  grep -E "argo_error.c|argo_daemon_main.c|argo_print_utils.c" | wc -l | tr -d ' ')
+# 1. In legitimate files (argo_error.c, argo_daemon_main.c, argo_print_utils.c, arc_main.c, ci_main.c)
+LEGITIMATE_FILES=$(grep -rn 'fprintf(stderr' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
+  grep -E "argo_error.c|argo_daemon_main.c|argo_print_utils.c|arc_main.c|ci_main.c" | wc -l | tr -d ' ')
 
 # 2. With GUIDELINE_APPROVED marker in previous line (search for GUIDELINE_APPROVED, then check next line for fprintf)
-GUIDELINE_APPROVED=$(grep -rn 'GUIDELINE_APPROVED' src/ --include="*.c" -A 1 | \
+GUIDELINE_APPROVED=$(grep -rn 'GUIDELINE_APPROVED' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 1 | \
   grep "fprintf(stderr" | wc -l | tr -d ' ')
 
 APPROVED_STDERR=$((LEGITIMATE_FILES + GUIDELINE_APPROVED))
@@ -110,10 +110,10 @@ if [ "$UNAPPROVED_STDERR" -gt 0 ]; then
   echo "Action: Add GUIDELINE_APPROVED comment or use argo_report_error()"
   echo ""
   echo "Unapproved locations:"
-  grep -rn 'fprintf(stderr' src/ --include="*.c" -B 1 | \
+  grep -rn 'fprintf(stderr' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -B 1 | \
     grep -B 1 -v "GUIDELINE_APPROVED" | \
     grep "fprintf(stderr" | \
-    grep -v "argo_error.c\|argo_daemon_main.c\|argo_print_utils.c" | head -5
+    grep -v "argo_error.c\|argo_daemon_main.c\|argo_print_utils.c\|arc_main.c\|ci_main.c" | head -5
   echo ""
   echo "Note: Add /* GUIDELINE_APPROVED: reason */ comment above fprintf(stderr)"
   WARNINGS=$((WARNINGS + 1))
@@ -131,14 +131,14 @@ echo "5. COPYRIGHT HEADER CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Exclude third-party libraries from copyright check
 EXCLUDED_FILES="include/jsmn.h"
-MISSING_COPYRIGHT=$(find src/ include/ -name "*.c" -o -name "*.h" | \
+MISSING_COPYRIGHT=$(find src/ include/ arc/src/ arc/include/ ci/src/ ci/include/ -name "*.c" -o -name "*.h" 2>/dev/null | \
   grep -v "jsmn.h" | \
   xargs grep -L "© 2025 Casey Koons" 2>/dev/null | wc -l | tr -d ' ')
 if [ "$MISSING_COPYRIGHT" -gt 0 ]; then
   echo "⚠ WARN: $MISSING_COPYRIGHT files missing copyright header"
   echo ""
   echo "Files missing copyright:"
-  find src/ include/ -name "*.c" -o -name "*.h" | \
+  find src/ include/ arc/src/ arc/include/ ci/src/ ci/include/ -name "*.c" -o -name "*.h" 2>/dev/null | \
     grep -v "jsmn.h" | \
     xargs grep -L "© 2025 Casey Koons" 2>/dev/null | head -10
   echo ""
@@ -153,7 +153,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "6. TODO COMMENTS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-TODOS=$(grep -rn "TODO" src/ include/ --include="*.c" --include="*.h" | wc -l | tr -d ' ')
+TODOS=$(grep -rn "TODO" src/ include/ arc/src/ arc/include/ ci/src/ ci/include/ --include="*.c" --include="*.h" 2>/dev/null | wc -l | tr -d ' ')
 echo "Found $TODOS TODO comments"
 if [ "$TODOS" -gt 30 ]; then
   echo "⚠ WARN: Consider cleaning up TODO comments"
@@ -167,7 +167,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "7. MEMORY MANAGEMENT PATTERNS"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-GOTO_CLEANUP=$(grep -rn "goto cleanup" src/ --include="*.c" | wc -l | tr -d ' ')
+GOTO_CLEANUP=$(grep -rn "goto cleanup" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
 echo "Functions using goto cleanup pattern: $GOTO_CLEANUP"
 echo "✓ PASS: Manual verification with 'make valgrind' recommended"
 echo ""
@@ -386,12 +386,12 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 UNCHECKED_CALLS=0
 
 # Check for standalone malloc/calloc calls (not assigned or checked)
-UNCHECKED_MALLOC=$(grep -rn "^\s*malloc\|^\s*calloc\|^\s*realloc\|^\s*strdup" src/ --include="*.c" | \
+UNCHECKED_MALLOC=$(grep -rn "^\s*malloc\|^\s*calloc\|^\s*realloc\|^\s*strdup" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   grep -v "=" | grep -v "if\s*(" | grep -v "//" | grep -v "/\*" | wc -l | tr -d ' ')
 UNCHECKED_CALLS=$((UNCHECKED_CALLS + UNCHECKED_MALLOC))
 
 # Check for standalone pthread calls
-UNCHECKED_PTHREAD=$(grep -rn "^\s*pthread_mutex_lock\|^\s*pthread_create" src/ --include="*.c" | \
+UNCHECKED_PTHREAD=$(grep -rn "^\s*pthread_mutex_lock\|^\s*pthread_create" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   grep -v "=" | grep -v "if\s*(" | grep -v "//" | grep -v "/\*" | wc -l | tr -d ' ')
 UNCHECKED_CALLS=$((UNCHECKED_CALLS + UNCHECKED_PTHREAD))
 
@@ -399,7 +399,7 @@ if [ "$UNCHECKED_CALLS" -gt 5 ]; then
   echo "⚠ WARN: Found $UNCHECKED_CALLS potentially unchecked critical function calls"
   echo ""
   echo "Sample violations:"
-  grep -rn "^\s*malloc\|^\s*calloc\|^\s*realloc\|^\s*strdup\|^\s*pthread_mutex_lock" src/ --include="*.c" | \
+  grep -rn "^\s*malloc\|^\s*calloc\|^\s*realloc\|^\s*strdup\|^\s*pthread_mutex_lock" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
     grep -v "=" | grep -v "if\s*(" | grep -v "//" | grep -v "/\*" | head -5
   echo ""
   echo "Action: Check return values of malloc, pthread_mutex_lock, fopen, etc."
@@ -418,8 +418,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # This is a heuristic - looks for functions that open files but might not close them
 
 # Count open operations
-FOPEN_COUNT=$(grep -rn "\bfopen\b\|\bopen\b" src/ --include="*.c" | wc -l | tr -d ' ')
-FCLOSE_COUNT=$(grep -rn "\bfclose\b\|\bclose\b" src/ --include="*.c" | wc -l | tr -d ' ')
+FOPEN_COUNT=$(grep -rn "\bfopen\b\|\bopen\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+FCLOSE_COUNT=$(grep -rn "\bfclose\b\|\bclose\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
 
 if [ "$FOPEN_COUNT" -gt 0 ]; then
   # Check ratio - should be roughly equal
@@ -474,8 +474,8 @@ echo "21. NULL POINTER DEREFERENCE CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check for potential NULL pointer dereferences (functions that don't check parameters)
 # Look for functions that dereference pointers without NULL checks
-NULL_CHECK_MACROS=$(grep -rn "ARGO_CHECK_NULL\|if\s*(!.*)" src/ --include="*.c" | wc -l | tr -d ' ')
-POINTER_DEREFS=$(grep -rn '\->.*=' src/ --include="*.c" | wc -l | tr -d ' ')
+NULL_CHECK_MACROS=$(grep -rn "ARGO_CHECK_NULL\|if\s*(!.*)" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+POINTER_DEREFS=$(grep -rn '\->.*=' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
 
 if [ "$POINTER_DEREFS" -gt 0 ]; then
   # Rough heuristic: should have at least some NULL checks
@@ -508,7 +508,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # Threshold: more than 15 branches suggests function is too complex
 
 COMPLEX_FUNCTIONS=0
-for file in $(find src/ -name "*.c"); do
+for file in $(find src/ arc/src/ ci/src/ -name "*.c" 2>/dev/null); do
   # Extract function bodies and count control flow statements
   # This is a simplified check - counts if/for/while/switch per function
   FUNC_LINES=$(grep -n "^[a-zA-Z_].*{$\|^static.*{$" "$file" 2>/dev/null)
@@ -552,13 +552,13 @@ echo "23. CONSTANT STRING EXTERNALIZATION CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check for string literals in .c files that should be in headers
 # Exclude: #define (already in headers), format strings, log messages, GUIDELINE_APPROVED
-TOTAL_STRINGS=$(grep -rn '"[^"]*"' src/ --include="*.c" | \
+TOTAL_STRINGS=$(grep -rn '"[^"]*"' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   grep -v "^\s*//" | grep -v "^\s*\*" | \
   grep -v "#include" | grep -v "#define" | \
   wc -l | tr -d ' ')
 
 # Count strings that ARE acceptable (approved or format/log strings + legitimate patterns)
-APPROVED_STRINGS=$(grep -rn '"[^"]*"' src/ --include="*.c" | \
+APPROVED_STRINGS=$(grep -rn '"[^"]*"' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   grep -v "#define" | \
   grep -E "GUIDELINE_APPROVED|%|LOG_|printf\|fprintf\|snprintf\|dprintf|argo_report_error|static const char|\
 strstr\(|strcmp\(|strncmp\(|strchr\(|strrchr\(|strpbrk\(|strspn\(|strcspn\(|\
@@ -580,7 +580,7 @@ if [ "$UNAPPROVED_STRINGS" -gt 400 ]; then
   echo "Action: Move constant strings to headers or add GUIDELINE_APPROVED"
   echo ""
   echo "Common unapproved patterns (first 10):"
-  grep -rn '"[^"]*"' src/ --include="*.c" | \
+  grep -rn '"[^"]*"' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
     grep -v "^\s*//" | grep -v "^\s*\*" | \
     grep -v "#include" | grep -v "#define" | \
     grep -v "GUIDELINE_APPROVED" | \
@@ -611,8 +611,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "24. RESOURCE CLEANUP VERIFICATION"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Verify that functions with cleanup labels actually free resources
-CLEANUP_LABELS=$(grep -rn "^cleanup:" src/ --include="*.c" | wc -l | tr -d ' ')
-FREE_IN_CLEANUP=$(grep -rn "^cleanup:" src/ --include="*.c" -A 20 | \
+CLEANUP_LABELS=$(grep -rn "^cleanup:" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+FREE_IN_CLEANUP=$(grep -rn "^cleanup:" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 20 | \
   grep -c "free\|fclose\|pthread_mutex_unlock\|close" || echo "0")
 
 if [ "$CLEANUP_LABELS" -gt 0 ]; then
@@ -641,9 +641,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "25. MEMORY INITIALIZATION CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that allocated memory is initialized (prefer calloc or explicit memset)
-CALLOC_COUNT=$(grep -rn "\bcalloc\b" src/ --include="*.c" | wc -l | tr -d ' ')
-MALLOC_COUNT=$(grep -rn "\bmalloc\b" src/ --include="*.c" | wc -l | tr -d ' ')
-MEMSET_COUNT=$(grep -rn "\bmemset\b.*0" src/ --include="*.c" | wc -l | tr -d ' ')
+CALLOC_COUNT=$(grep -rn "\bcalloc\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+MALLOC_COUNT=$(grep -rn "\bmalloc\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+MEMSET_COUNT=$(grep -rn "\bmemset\b.*0" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
 
 TOTAL_ALLOC=$((CALLOC_COUNT + MALLOC_COUNT))
 INITIALIZED=$((CALLOC_COUNT + MEMSET_COUNT))
@@ -674,8 +674,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "26. BUFFER SIZE VALIDATION CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that buffer operations use sizeof() for size calculation
-STRING_OPS=$(grep -rn "strncpy\|snprintf\|strncat" src/ --include="*.c" | wc -l | tr -d ' ')
-STRING_OPS_WITH_SIZEOF=$(grep -rn "strncpy\|snprintf\|strncat" src/ --include="*.c" | grep -c "sizeof" || echo "0")
+STRING_OPS=$(grep -rn "strncpy\|snprintf\|strncat" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+STRING_OPS_WITH_SIZEOF=$(grep -rn "strncpy\|snprintf\|strncat" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -c "sizeof" || echo "0")
 
 if [ "$STRING_OPS" -gt 0 ]; then
   SIZEOF_RATIO=$((STRING_OPS_WITH_SIZEOF * 100 / STRING_OPS))
@@ -704,9 +704,9 @@ echo "27. DEFENSIVE PROGRAMMING CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check for early return pattern (fail-fast principle)
 # Count functions with parameter validation at the top
-ARGO_CHECK_NULL_COUNT=$(grep -rn "ARGO_CHECK_NULL" src/ --include="*.c" | wc -l | tr -d ' ')
-EARLY_RETURNS=$(grep -rn "if\s*(!.*)\s*return" src/ --include="*.c" | wc -l | tr -d ' ')
-PUBLIC_FUNCTIONS=$(grep -rn "^[a-zA-Z_].*{$\|^int\s\|^void\s\|^const\s\|^static" src/ --include="*.c" | \
+ARGO_CHECK_NULL_COUNT=$(grep -rn "ARGO_CHECK_NULL" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+EARLY_RETURNS=$(grep -rn "if\s*(!.*)\s*return" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+PUBLIC_FUNCTIONS=$(grep -rn "^[a-zA-Z_].*{$\|^int\s\|^void\s\|^const\s\|^static" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   grep -v "^\s*//" | grep -v "^\s*\*" | wc -l | tr -d ' ')
 
 DEFENSIVE_CHECKS=$((ARGO_CHECK_NULL_COUNT + EARLY_RETURNS))
@@ -732,9 +732,9 @@ echo "28. ERROR PATH COVERAGE CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that functions have error handling paths
 # Look for functions with goto cleanup and error returns
-FUNCTIONS_WITH_GOTO=$(grep -rn "goto cleanup\|goto error" src/ --include="*.c" | \
+FUNCTIONS_WITH_GOTO=$(grep -rn "goto cleanup\|goto error" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   cut -d: -f1 | sort -u | wc -l | tr -d ' ')
-FUNCTIONS_WITH_ERROR_RETURNS=$(grep -rn "return E_\|return ARGO_\|return -1" src/ --include="*.c" | \
+FUNCTIONS_WITH_ERROR_RETURNS=$(grep -rn "return E_\|return ARGO_\|return -1\|return ARC_\|return CI_" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   cut -d: -f1 | sort -u | wc -l | tr -d ' ')
 
 TOTAL_ERROR_HANDLING=$((FUNCTIONS_WITH_GOTO + FUNCTIONS_WITH_ERROR_RETURNS))
@@ -759,8 +759,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "29. MUTEX LOCK/UNLOCK BALANCE CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Verify pthread_mutex_lock and pthread_mutex_unlock are balanced
-MUTEX_LOCK=$(grep -rn "pthread_mutex_lock" src/ --include="*.c" | wc -l | tr -d ' ')
-MUTEX_UNLOCK=$(grep -rn "pthread_mutex_unlock" src/ --include="*.c" | wc -l | tr -d ' ')
+MUTEX_LOCK=$(grep -rn "pthread_mutex_lock" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+MUTEX_UNLOCK=$(grep -rn "pthread_mutex_unlock" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
 
 echo "Mutex operations:"
 echo "  pthread_mutex_lock calls: $MUTEX_LOCK"
@@ -789,8 +789,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "30. INCLUDE GUARD COVERAGE CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that all header files have include guards
-TOTAL_HEADERS=$(find include/ -name "*.h" | wc -l | tr -d ' ')
-HEADERS_WITH_GUARDS=$(grep -l "#ifndef.*_H" include/*.h 2>/dev/null | wc -l | tr -d ' ')
+TOTAL_HEADERS=$(find include/ arc/include/ ci/include/ -name "*.h" 2>/dev/null | wc -l | tr -d ' ')
+HEADERS_WITH_GUARDS=$(find include/ arc/include/ ci/include/ -name "*.h" 2>/dev/null | xargs grep -l "#ifndef.*_H" 2>/dev/null | wc -l | tr -d ' ')
 
 echo "Header files: $TOTAL_HEADERS"
 echo "Headers with include guards: $HEADERS_WITH_GUARDS"
@@ -803,7 +803,7 @@ if [ "$TOTAL_HEADERS" -gt 0 ]; then
     echo "Action: Add #ifndef/#define/#endif guards to all headers"
     echo ""
     echo "Headers without guards:"
-    for header in include/*.h; do
+    for header in $(find include/ arc/include/ ci/include/ -name "*.h" 2>/dev/null); do
       if ! grep -q "#ifndef.*_H" "$header" 2>/dev/null; then
         echo "  $header"
       fi
@@ -823,8 +823,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "31. ERROR REPORTING CONSISTENCY CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Verify proper use of argo_report_error vs LOG_ERROR
-ARGO_REPORT_ERROR=$(grep -rn "argo_report_error" src/ --include="*.c" | wc -l | tr -d ' ')
-LOG_ERROR_CALLS=$(grep -rn "LOG_ERROR" src/ --include="*.c" | wc -l | tr -d ' ')
+ARGO_REPORT_ERROR=$(grep -rn "argo_report_error" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+LOG_ERROR_CALLS=$(grep -rn "LOG_ERROR" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
 
 echo "Error reporting calls:"
 echo "  argo_report_error: $ARGO_REPORT_ERROR"
@@ -847,9 +847,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "32. STRING ALLOCATION SAFETY CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that strdup/strndup calls have return value checking
-STRDUP_CALLS=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+STRDUP_CALLS=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 # Check for NULL checks on same line OR next line (common pattern)
-STRDUP_CHECKED=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ --include="*.c" -A 1 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(!|if\s*\(.*==.*NULL|if\s*\(.*!=.*NULL|\|\|" | wc -l | tr -d ' ')
+STRDUP_CHECKED=$(grep -rn "\bstrdup\b\|\bstrndup\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 1 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(!|if\s*\(.*==.*NULL|if\s*\(.*!=.*NULL|\|\|" | wc -l | tr -d ' ')
 
 echo "String allocation calls:"
 echo "  strdup/strndup calls: $STRDUP_CALLS"
@@ -879,7 +879,7 @@ echo "33. UNSAFE CONVERSION FUNCTIONS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check for unsafe conversion functions (atoi, atol, atof)
 # Prefer strtol, strtoll, strtod with error checking
-UNSAFE_CONVERSIONS=$(grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+UNSAFE_CONVERSIONS=$(grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
 echo "Unsafe conversion function calls: $UNSAFE_CONVERSIONS"
 
@@ -888,7 +888,7 @@ if [ "$UNSAFE_CONVERSIONS" -gt 10 ]; then
   echo "Action: Replace with strtol/strtoll/strtod and check errno"
   echo ""
   echo "Sample unsafe conversions:"
-  grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | head -3
+  grep -rn "\batoi\b\|\batol\b\|\batof\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | head -3
   WARNINGS=$((WARNINGS + 1))
 elif [ "$UNSAFE_CONVERSIONS" -gt 0 ]; then
   echo "ℹ INFO: Some unsafe conversion functions found (${UNSAFE_CONVERSIONS})"
@@ -904,9 +904,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "34. PROCESS EXECUTION SAFETY CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check process execution functions for proper usage
-SYSTEM_CALLS=$(grep -rn "system(" src/ --include="*.c" | grep -v "//" | grep -v "/\*" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
-EXEC_CALLS=$(grep -rn "\bexecl\b\|\bexeclp\b\|\bexecv\b\|\bexecvp\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
-POPEN_CALLS=$(grep -rn "\bpopen\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+SYSTEM_CALLS=$(grep -rn "system(" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "//" | grep -v "/\*" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+EXEC_CALLS=$(grep -rn "\bexecl\b\|\bexeclp\b\|\bexecv\b\|\bexecvp\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+POPEN_CALLS=$(grep -rn "\bpopen\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
 TOTAL_EXEC=$((SYSTEM_CALLS + EXEC_CALLS + POPEN_CALLS))
 
@@ -936,8 +936,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "35. SWITCH STATEMENT COMPLETENESS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that switch statements have default cases
-SWITCH_COUNT=$(grep -rn "switch\s*(" src/ --include="*.c" | wc -l | tr -d ' ')
-DEFAULT_COUNT=$(grep -rn "default\s*:" src/ --include="*.c" | wc -l | tr -d ' ')
+SWITCH_COUNT=$(grep -rn "switch\s*(" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
+DEFAULT_COUNT=$(grep -rn "default\s*:" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | wc -l | tr -d ' ')
 
 echo "Switch statements: $SWITCH_COUNT"
 echo "Default cases: $DEFAULT_COUNT"
@@ -965,14 +965,14 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "37. FILE I/O ERROR CHECKING"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check that file I/O operations check return values
-FREAD_COUNT=$(grep -rn "\bfread\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
-FWRITE_COUNT=$(grep -rn "\bfwrite\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
-FGETS_COUNT=$(grep -rn "\bfgets\b" src/ --include="*.c" | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+FREAD_COUNT=$(grep -rn "\bfread\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+FWRITE_COUNT=$(grep -rn "\bfwrite\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
+FGETS_COUNT=$(grep -rn "\bfgets\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
 # Check how many are actually checked (look for ferror or return value checks within next few lines)
-FREAD_CHECKED=$(grep -rn "\bfread\b" src/ --include="*.c" -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
-FWRITE_CHECKED=$(grep -rn "\bfwrite\b" src/ --include="*.c" -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
-FGETS_CHECKED=$(grep -rn "\bfgets\b" src/ --include="*.c" -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|==|!=|NULL" | wc -l | tr -d ' ')
+FREAD_CHECKED=$(grep -rn "\bfread\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
+FWRITE_CHECKED=$(grep -rn "\bfwrite\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
+FGETS_CHECKED=$(grep -rn "\bfgets\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|==|!=|NULL" | wc -l | tr -d ' ')
 
 TOTAL_FILE_IO=$((FREAD_COUNT + FWRITE_COUNT + FGETS_COUNT))
 TOTAL_CHECKED=$((FREAD_CHECKED + FWRITE_CHECKED + FGETS_CHECKED))

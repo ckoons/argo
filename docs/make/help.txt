@@ -20,16 +20,24 @@ CORE TARGETS
 COMPONENT BUILDS
 ----------------
   arc                  Build arc CLI
+  ci                   Build ci tool
   ui                   Build argo-term UI
   ui-argo-term         Build argo-term UI (explicit)
-  all-components       Build all components
+  all-components       Build all components (argo + arc + ci + ui)
 
 TESTING
 -------
   test-quick           Run all unit tests (fast, no external deps)
-  test-all-components  Run all tests (core + arc + ui)
+  test-all-components  Run all tests (core + arc + ci + ui)
   test-arc             Run arc CLI tests
+  test-ci              Run ci tool tests
   test-ui              Run argo-term UI tests
+
+Integration tests (requires daemon):
+  test-integration-bash      Bash workflow tests
+  test-integration-daemon    Daemon API + CI tests
+  test-integration-complete  Complete end-to-end tests
+  test-integration-all       All integration tests
 
 Individual test targets:
   test-registry        Registry and messaging tests
@@ -37,7 +45,7 @@ Individual test targets:
   test-lifecycle       CI lifecycle tests
   test-workflow        Workflow orchestration tests
   test-providers       Provider system tests
-  (and more - see 'make help test' for full list)
+  (and more - see 'make help-test' for full list)
 
 SIZE TRACKING
 -------------
@@ -50,11 +58,13 @@ INSTALLATION
 ------------
   install              Install argo core (daemon + executor)
   install-arc          Install arc CLI
+  install-ci           Install ci tool
   install-term         Install argo-term UI
-  install-all          Install everything (core + arc + ui) and restart daemon
+  install-all          Install everything (core + arc + ci + ui) and restart daemon
   restart-daemon       Restart the argo-daemon with new binaries
   uninstall            Uninstall argo core
   uninstall-arc        Uninstall arc CLI
+  uninstall-ci         Uninstall ci tool
   uninstall-term       Uninstall argo-term UI
   uninstall-all        Uninstall everything
 
@@ -105,4 +115,5 @@ Examples:
 
 For component-specific help:
   cd arc && make help
+  cd ci && make help
   cd ui/argo-term && make help

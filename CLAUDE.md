@@ -138,6 +138,11 @@ POST /api/workflow/input/{id}      /* Arc writes user input */
 GET  /api/workflow/input/{id}      /* Executor polls for input */
 ```
 
+**CI Query Endpoint** (`argo_daemon_ci_api.c`):
+```c
+POST /api/ci/query  /* Query AI provider (used by ci tool) */
+```
+
 **Info Endpoints**:
 ```c
 GET /api/health    /* Daemon health check */
@@ -176,6 +181,67 @@ GET /api/version   /* Daemon version */
 - Thin HTTP client
 - Links only libargo_core.a
 - All operations via REST API to daemon
+
+**ci** (~50 KB):
+- Lightweight AI query tool for bash workflows
+- Thin HTTP client (similar to arc)
+- Single-purpose: query AI providers via daemon
+- Auto-starts daemon if not running
+
+## CI Tool (Companion Intelligence)
+
+The CI tool provides a simple command-line interface for querying AI providers from bash workflows and scripts.
+
+### Purpose
+- **Primary use**: Enable bash workflows to query AI providers
+- **Architecture**: Thin HTTP client that communicates with argo-daemon
+- **Simplicity**: Single command for quick AI queries
+
+### Basic Usage
+```bash
+# Simple query (command line argument)
+ci "What is the capital of France?"
+
+# Or via stdin
+echo "What is 2+2?" | ci
+
+# With provider override
+ci --provider=claude_api --model=claude-opus-4 "Explain quantum computing"
+
+# In bash workflows
+REVIEW=$(ci "Review this code: $(cat script.sh)")
+echo "AI Review: $REVIEW"
+```
+
+### Configuration
+CI uses daemon-side configuration from `~/.argo/config`:
+```ini
+# CI tool defaults (managed by daemon)
+CI_DEFAULT_PROVIDER=claude_code
+CI_DEFAULT_MODEL=claude-sonnet-4-5
+```
+
+**Configuration Precedence**:
+1. Command-line flags (`--provider`, `--model`) - highest priority
+2. Daemon configuration (`~/.argo/config`)
+3. Built-in defaults - lowest priority
+
+### CI vs Arc
+Both are thin HTTP clients to argo-daemon, but serve different purposes:
+
+**Arc** (terminal-facing CLI):
+- User-facing commands (workflow start, list, status)
+- Interactive workflow management
+- Progress tracking
+- Full REST API client
+
+**CI** (workflow query tool):
+- Single-purpose AI query tool
+- Non-interactive (command → response)
+- No workflow management
+- Minimal REST API usage (only /api/ci/query)
+
+**See:** [CI Tool Documentation](ci/CLAUDE.md) for implementation details.
 
 ## Core Philosophy
 
@@ -674,6 +740,14 @@ argo/
 │   │   ├── arc                 # Arc CLI
 │   │   └── tests/              # Arc test executables
 │   ├── src/
+│   └── build/
+├── ci/               # CI query tool component
+│   ├── bin/                    # CI executables
+│   │   ├── ci                  # CI query tool
+│   │   └── tests/              # CI test executables
+│   ├── src/
+│   ├── include/
+│   ├── tests/
 │   └── build/
 └── workflows/        # Workflow templates (JSON)
 ```
