@@ -7,21 +7,14 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include <signal.h>
 #include "arc_commands.h"
 #include "arc_http_client.h"
 #include "arc_constants.h"
 #include "argo_output.h"
 #include "argo_error.h"
 
-/* Global flag for signal handling */
-static volatile sig_atomic_t g_running = 1;
-
-/* Signal handler for SIGINT (Ctrl+C) */
-static void handle_sigint(int sig) {
-    (void)sig;
-    g_running = 0;
-}
+/* Global flag for attach loop */
+static int g_running = 1;
 
 /* Internal attach implementation with seek control */
 static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end) {
@@ -74,12 +67,9 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
         lseek(log_fd, 0, SEEK_END);
     }
 
-    /* Setup signal handler for Ctrl+C */
-    signal(SIGINT, handle_sigint);
-
     LOG_USER_SUCCESS("Attached to workflow: %s\n", workflow_id);
     LOG_USER_INFO("Logs: %s\n", log_path);
-    LOG_USER_INFO("Press Ctrl+C to detach\n");
+    LOG_USER_INFO("Press Ctrl+D to detach\n");
     printf("----------------------------------------\n");
 
     /* Main loop: tail log file and check for input */
@@ -121,6 +111,11 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
                     /* Continue anyway - workflow might have ended */
                 } else {
                     arc_http_response_free(input_resp);
+                }
+            } else {
+                /* EOF detected (Ctrl+D) - detach */
+                if (feof(stdin)) {
+                    g_running = 0;
                 }
             }
         }
