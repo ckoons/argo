@@ -553,20 +553,25 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "23. CONSTANT STRING EXTERNALIZATION CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check for string literals in .c files that should be in headers
-# Exclude: #define (already in headers), format strings, log messages, GUIDELINE_APPROVED
+# Exclude: #define (already in headers), format strings, log messages, GUIDELINE_APPROVED, comments
+# Filter by checking content after "filename:linenum:" prefix
 TOTAL_STRINGS=$(grep -rn '"[^"]*"' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
-  grep -v "^\s*//" | grep -v "^\s*\*" | \
+  grep -v ":[[:space:]]*//" | grep -v ":[[:space:]]*\*" | grep -v ":[[:space:]]/\*" | \
   grep -v "#include" | grep -v "#define" | \
   wc -l | tr -d ' ')
 
 # Count strings that ARE acceptable (approved or format/log strings + legitimate patterns)
 APPROVED_STRINGS=$(grep -rn '"[^"]*"' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   grep -v "#define" | \
+  grep -v ":[[:space:]]*//" | grep -v ":[[:space:]]*\*" | grep -v ":[[:space:]]/\*" | \
   grep -E "GUIDELINE_APPROVED|%|LOG_|printf\|fprintf\|snprintf\|dprintf|argo_report_error|static const char|\
 strstr\(|strcmp\(|strncmp\(|strchr\(|strrchr\(|strpbrk\(|strspn\(|strcspn\(|\
 execlp\(|execv\(|execvp\(|execve\(|execl\(|\
+fopen\(|popen\(|freopen\(|getenv\(|setenv\(|putenv\(|\
+argo_config_get\(|argo_config_set\(|\
 write\([^,]+,[[:space:]]*\"|\
-\\..*=[[:space:]]*\"" | \
+\\..*=[[:space:]]*\"|return\s+\"|\
+:\s*\"\"" | \
   wc -l | tr -d ' ')
 
 # Unapproved strings (candidates for externalization)
@@ -583,14 +588,17 @@ if [ "$UNAPPROVED_STRINGS" -gt 400 ]; then
   echo ""
   echo "Common unapproved patterns (first 10):"
   grep -rn '"[^"]*"' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
-    grep -v "^\s*//" | grep -v "^\s*\*" | \
+    grep -v ":[[:space:]]*//" | grep -v ":[[:space:]]*\*" | grep -v ":[[:space:]]/\*" | \
     grep -v "#include" | grep -v "#define" | \
     grep -v "GUIDELINE_APPROVED" | \
     grep -v "%" | grep -v "LOG_\|printf\|fprintf\|snprintf\|dprintf" | \
     grep -v "argo_report_error" | grep -v "static const char" | \
     grep -vE "strstr\(|strcmp\(|strncmp\(|strchr\(|strrchr\(" | \
     grep -vE "execlp\(|execv\(|execvp\(|execve\(|execl\(" | \
-    grep -vE "write\([^,]+,[[:space:]]*\"|\\..*=[[:space:]]*\"" | head -10
+    grep -vE "fopen\(|popen\(|freopen\(|getenv\(|setenv\(|putenv\(" | \
+    grep -vE "argo_config_get\(|argo_config_set\(" | \
+    grep -vE "write\([^,]+,[[:space:]]*\"|\\..*=[[:space:]]*\"|return\s+\"" | \
+    grep -vE ":\s*\"\"" | head -10
   echo ""
   echo "Note: Add GUIDELINE_APPROVED comment for legitimate constants (JSON, API paths, etc.)"
   WARNINGS=$((WARNINGS + 1))
@@ -603,7 +611,12 @@ else
   echo "  - Error contexts (argo_report_error)"
   echo "  - Pattern matching (strstr, strcmp, strchr, etc.)"
   echo "  - Process execution (execlp, execv, etc.)"
+  echo "  - File operations (fopen, popen, freopen)"
+  echo "  - Environment access (getenv, setenv, putenv)"
+  echo "  - Configuration access (argo_config_get, argo_config_set)"
   echo "  - Struct initialization (.field = \"value\")"
+  echo "  - Function returns (return \"value\")"
+  echo "  - Ternary empty strings (condition ? value : \"\")"
   echo "  - GUIDELINE_APPROVED markers"
 fi
 echo ""
