@@ -78,13 +78,16 @@ test-ci-unit: $(TEST_TARGETS)
 		./$$test || exit 1; \
 	done
 
-# CLI tests (bash script)
-test-ci-cli: $(TARGET)
+# Integration tests (bash script)
+test-ci-integration: $(TARGET)
 	@echo ""
 	@echo "=========================================="
-	@echo "CI CLI Tests"
+	@echo "CI Integration Tests"
 	@echo "=========================================="
-	@cd $(TEST_DIR) && ./test_ci_cli.sh
+	@$(TEST_DIR)/test_ci_integration.sh
+
+# CLI tests (backward compatibility)
+test-ci-cli: test-ci-integration
 
 # Standard ci testing (unit + cli)
 test-ci: test-ci-unit test-ci-cli

@@ -384,6 +384,133 @@ else
     test_fail "Response: $response"
 fi
 
+# ==========================================
+# CI Endpoint Tests
+# ==========================================
+
+# Test 21: CI query endpoint exists
+test_start "POST /api/ci/query (endpoint exists)"
+response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"query":"test"}' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if json_contains "$response" "provider" || json_contains "$response" "error"; then
+    test_pass
+else
+    test_fail "Unexpected response: $response"
+fi
+
+# Test 22: CI query with valid query
+test_start "CI query with simple question"
+response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"query":"What is 2+2?"}' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if json_contains "$response" "status" && json_contains "$response" "response"; then
+    test_pass
+else
+    test_fail "Response: $response"
+fi
+
+# Test 23: CI query response contains provider
+test_start "CI query response contains provider field"
+response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"query":"hello"}' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if json_contains "$response" "provider"; then
+    test_pass
+else
+    test_fail "No provider field in response"
+fi
+
+# Test 24: CI query with explicit provider
+test_start "CI query with explicit provider"
+response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"query":"test","provider":"claude_code"}' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if json_contains "$response" "provider" && echo "$response" | grep -q "claude_code"; then
+    test_pass
+else
+    test_fail "Provider not reflected in response"
+fi
+
+# Test 25: CI query with explicit model
+test_start "CI query with explicit model"
+response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"query":"test","model":"claude-sonnet-4-5"}' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if json_contains "$response" "status"; then
+    test_pass
+else
+    test_fail "Model parameter not accepted"
+fi
+
+# Test 26: CI query missing query field
+test_start "CI query missing query field returns 400"
+status_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"wrong_field":"value"}' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if [ "$status_code" = "400" ]; then
+    test_pass
+else
+    test_fail "Got HTTP $status_code, expected 400"
+fi
+
+# Test 27: CI query with invalid JSON
+test_start "CI query with invalid JSON returns 400"
+status_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d 'invalid json{' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if [ "$status_code" = "400" ]; then
+    test_pass
+else
+    test_fail "Got HTTP $status_code, expected 400"
+fi
+
+# Test 28: CI query with unknown provider
+test_start "CI query with unknown provider returns 400"
+status_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"query":"test","provider":"nonexistent_provider"}' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if [ "$status_code" = "400" ]; then
+    test_pass
+else
+    test_fail "Got HTTP $status_code, expected 400"
+fi
+
+# Test 29: CI query with missing request body
+test_start "CI query with missing body returns 400"
+status_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST \
+    -H "Content-Type: application/json" \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if [ "$status_code" = "400" ]; then
+    test_pass
+else
+    test_fail "Got HTTP $status_code, expected 400"
+fi
+
+# Test 30: CI query with special characters
+test_start "CI query with special characters (JSON escaping)"
+response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"query":"Test \"quotes\" and \nNewlines"}' \
+    "http://localhost:$DAEMON_PORT/api/ci/query")
+if json_contains "$response" "status"; then
+    test_pass
+else
+    test_fail "Special characters not handled"
+fi
+
 # Print summary
 echo ""
 echo "=========================================="
