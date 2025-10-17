@@ -34,7 +34,8 @@ full-build: clean-all all-components install-all
         test-workflow test-persistence test-workflow-loader \
         test-session test-env test-config test-isolated-env test-api test-api-calls test-harnesses test-http \
         test-json test-claude-providers test-arc test-arc-workflow test-arc-background \
-        test-arc-full test-arc-all count-core clean distclean check debug \
+        test-arc-full test-arc-all test-ci test-integration-bash test-integration-daemon \
+        test-integration-complete test-integration-all count-core clean distclean check debug \
         update-models harnesses harness-init-basic harness-env-inspect harness-reinit \
         harness-init-error harness-socket harness-terminal harness-workflow-context \
         harness-control-flow harness-ci-interactive harness-loop harness-persona \

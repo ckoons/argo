@@ -27,8 +27,16 @@ Individual test modules:
 COMPONENT TESTS
 ---------------
   test-arc                   Arc CLI tests
+  test-ci                    CI tool tests
   test-ui                    Argo-term UI tests
-  test-all-components        All tests (core + arc + ui)
+  test-all-components        All tests (core + arc + ci + ui)
+
+INTEGRATION TESTS (Requires Daemon)
+------------------------------------
+  test-integration-bash      Bash workflow integration tests
+  test-integration-daemon    Daemon API + CI tool tests
+  test-integration-complete  Complete end-to-end tests
+  test-integration-all       All integration tests
 
 API TESTS (Costs Money!)
 ------------------------

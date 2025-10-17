@@ -17,12 +17,17 @@ test-integration-bash: $(DAEMON_BINARY) arc
 	@echo "=========================================="
 	@./tests/integration/test_bash_workflows.sh
 
-test-integration-daemon: $(DAEMON_BINARY)
+test-integration-daemon: $(DAEMON_BINARY) bin/ci
 	@echo ""
 	@echo "=========================================="
 	@echo "Daemon API Integration Tests"
 	@echo "=========================================="
 	@./tests/integration/test_daemon_api.sh
+	@echo ""
+	@echo "=========================================="
+	@echo "CI Tool Integration Tests"
+	@echo "=========================================="
+	@ci/tests/test_ci_integration.sh
 
 test-integration-complete: $(DAEMON_BINARY) arc
 	@echo ""
@@ -278,6 +283,13 @@ test-arc-full: arc
 test-arc-all: arc
 	@$(MAKE) -C arc test-arc-all
 
+test-ci: $(DAEMON_BINARY) bin/ci
+	@echo ""
+	@echo "=========================================="
+	@echo "CI Tool Tests"
+	@echo "=========================================="
+	@ci/tests/test_ci_integration.sh
+
 test-api: $(API_TEST_TARGET)
 	@echo ""
 	@echo "=========================================="
@@ -458,4 +470,4 @@ test-stress-all: test-concurrency-stress test-soak
 test-ui: ui
 	@$(MAKE) -C ui/argo-term test
 
-test-all-components: test test-arc test-ui
+test-all-components: test test-arc test-ci test-ui
