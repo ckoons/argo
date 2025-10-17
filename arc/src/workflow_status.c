@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "arc_commands.h"
+#include "arc_constants.h"
 #include "arc_context.h"
 #include "arc_error.h"
 #include "arc_http_client.h"
@@ -73,10 +74,10 @@ int arc_workflow_status(int argc, char** argv) {
         const char* exit_str = strstr(response->body, "\"exit_code\"");
 
         if (script_str) {
-            sscanf(script_str, "\"script\":\"%ARC_SSCANF_FIELD_PATH[^\"]\"", script);
+            sscanf(script_str, "\"script\":\"%511[^\"]\"", script);
         }
         if (state_str) {
-            sscanf(state_str, "\"state\":\"%ARC_SSCANF_FIELD_SMALL[^\"]\"", state);
+            sscanf(state_str, "\"state\":\"%31[^\"]\"", state);
         }
         if (pid_str) {
             sscanf(pid_str, "\"pid\":%d", &pid);

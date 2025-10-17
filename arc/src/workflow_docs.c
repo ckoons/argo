@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "arc_commands.h"
+#include "arc_constants.h"
 #include "argo_output.h"
 
 /* Find README for template */

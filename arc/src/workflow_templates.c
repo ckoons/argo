@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include "arc_commands.h"
+#include "arc_constants.h"
 #include "arc_context.h"
 #include "argo_error.h"
 #include "argo_output.h"

@@ -18,6 +18,34 @@
 /* API Version strings */
 #define ANTHROPIC_API_VERSION "2023-06-01"
 
+/* Provider name constants */
+#define PROVIDER_NAME_CLAUDE_API "claude-api"
+#define PROVIDER_NAME_OPENAI_API "openai-api"
+#define PROVIDER_NAME_GEMINI_API "gemini-api"
+#define PROVIDER_NAME_GROK_API "grok-api"
+#define PROVIDER_NAME_DEEPSEEK_API "deepseek-api"
+#define PROVIDER_NAME_OPENROUTER "openrouter"
+#define PROVIDER_NAME_CLAUDE_CODE "claude-code"
+#define PROVIDER_NAME_MOCK "mock"
+
+/* CLI command names */
+#define CLAUDE_CLI_COMMAND "claude"
+#define CLAUDE_CLI_ARG_PIPE "-p"
+
+/* Claude binary paths */
+#define CLAUDE_PATH_USR_LOCAL_BIN "/usr/local/bin/claude"
+#define CLAUDE_PATH_USR_BIN "/usr/bin/claude"
+#define CLAUDE_PATH_HOMEBREW "/opt/homebrew/bin/claude"
+
+/* Error messages for providers */
+#define ERR_MSG_CLAUDE_NOT_IN_PATH "claude command not found in PATH"
+#define ERR_MSG_OPENROUTER_KEY_NOT_SET "OPENROUTER_API_KEY not set"
+
+/* Provider-specific constants */
+#define CLAUDE_CODE_STREAMING_ID "claude-code-streaming"
+#define MOCK_DEFAULT_MODEL "mock-model"
+#define MOCK_DEFAULT_RESPONSE "Mock CI response"
+
 /* Context sizes */
 #define CLAUDE_MAX_CONTEXT 200000
 #define OPENAI_MAX_CONTEXT 128000
@@ -53,7 +81,8 @@ bool openrouter_is_available(void);
 #include "argo_local_models.h"
 #else
 /* Built-in defaults - Last verified: 2025-09-30 */
-#define CLAUDE_DEFAULT_MODEL "claude-sonnet-4-5-20250929"     /* Claude Sonnet 4.5 (latest) */
+#define CLAUDE_CODE_DEFAULT_MODEL "claude-sonnet-4"            /* Claude Code (simple name) */
+#define CLAUDE_DEFAULT_MODEL "claude-sonnet-4-5-20250929"      /* Claude Sonnet 4.5 (latest) */
 #define OPENAI_DEFAULT_MODEL "gpt-4o"                          /* GPT-4o (current) */
 #define GEMINI_DEFAULT_MODEL "gemini-2.5-flash"                /* Gemini 2.5 Flash */
 #define GROK_DEFAULT_MODEL "grok-3"                            /* Grok 3 (current) */

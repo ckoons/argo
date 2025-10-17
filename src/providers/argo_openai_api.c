@@ -28,7 +28,7 @@ static int openai_build_request(char* json_body, size_t buffer_size,
 static const char* openai_response_path[] = {"message", "content"};
 
 static const api_provider_config_t openai_config = {
-    .provider_name = "openai-api",
+    .provider_name = PROVIDER_NAME_OPENAI_API,
     .default_model = OPENAI_DEFAULT_MODEL,
     .api_url = OPENAI_API_URL,
     .url_includes_model = false,

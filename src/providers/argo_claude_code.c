@@ -21,6 +21,7 @@
 /* Project includes */
 #include "argo_ci.h"
 #include "argo_ci_common.h"
+#include "argo_api_providers.h"
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
@@ -77,7 +78,7 @@ ci_provider_t* claude_code_create_provider(const char* model) {
                       claude_code_query, claude_code_stream, claude_code_cleanup);
 
     /* Set model */
-    strncpy(ctx->model, model ? model : "claude-sonnet-4", sizeof(ctx->model) - 1);
+    strncpy(ctx->model, model ? model : CLAUDE_CODE_DEFAULT_MODEL, sizeof(ctx->model) - 1);
 
     /* Configure provider metadata */
     strncpy(ctx->provider.name, CLAUDE_CODE_PROVIDER_NAME, sizeof(ctx->provider.name) - 1);
@@ -122,14 +123,14 @@ static int claude_code_connect(ci_provider_t* provider) {
     ARGO_CHECK_NULL(provider);
 
     /* Check if 'claude' command exists in common locations */
-    if (access("/usr/local/bin/claude", X_OK) != 0 &&
-        access("/usr/bin/claude", X_OK) != 0 &&
-        access("/opt/homebrew/bin/claude", X_OK) != 0) {
+    if (access(CLAUDE_PATH_USR_LOCAL_BIN, X_OK) != 0 &&
+        access(CLAUDE_PATH_USR_BIN, X_OK) != 0 &&
+        access(CLAUDE_PATH_HOMEBREW, X_OK) != 0) {
         /* Last resort: try to execute 'claude --version' */
         FILE* pipe = popen("claude --version 2>&1", "r"); /* GUIDELINE_APPROVED: popen with fixed command string */
         if (!pipe) {
             argo_report_error(E_CI_NO_PROVIDER, "claude_code_connect",
-                             "claude command not found in PATH");
+                             ERR_MSG_CLAUDE_NOT_IN_PATH);
             return E_CI_NO_PROVIDER;
         }
         pclose(pipe);
@@ -156,7 +157,7 @@ static int claude_code_query(ci_provider_t* provider, const char* prompt,
     /* Build response structure */
     ci_response_t response;
     build_ci_response(&response, true, ARGO_SUCCESS,
-                     ctx->response_content, "claude-code-streaming");
+                     ctx->response_content, CLAUDE_CODE_STREAMING_ID);
 
     /* Update statistics */
     ctx->total_queries++;
@@ -213,7 +214,7 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
         /* Keep stderr visible for debugging */
 
         /* Execute: claude -p (prompt comes from stdin) */
-        execlp("claude", "claude", "-p", NULL);
+        execlp(CLAUDE_CLI_COMMAND, CLAUDE_CLI_COMMAND, CLAUDE_CLI_ARG_PIPE, NULL);
 
         /* If exec fails */
         /* GUIDELINE_APPROVED: Child process error before exit */

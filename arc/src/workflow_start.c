@@ -195,7 +195,7 @@ int arc_workflow_start(int argc, char** argv) {
     if (response->body) {
         const char* id_str = strstr(response->body, "\"workflow_id\":\"");
         if (id_str) {
-            sscanf(id_str, "\"workflow_id\":\"%ARC_SSCANF_FIELD_MEDIUM[^\"]\"", workflow_id);
+            sscanf(id_str, "\"workflow_id\":\"%127[^\"]\"", workflow_id);
         }
     }
 

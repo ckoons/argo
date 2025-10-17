@@ -34,7 +34,7 @@ static int gemini_build_request(char* json_body, size_t buffer_size,
 static const char* gemini_response_path[] = {"candidates", "text"};
 
 static const api_provider_config_t gemini_config = {
-    .provider_name = "gemini-api",
+    .provider_name = PROVIDER_NAME_GEMINI_API,
     .default_model = GEMINI_DEFAULT_MODEL,
     .api_url = GEMINI_API_URL,
     .url_includes_model = true,  /* Gemini puts model in URL path */

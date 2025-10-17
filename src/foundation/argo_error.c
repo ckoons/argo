@@ -13,10 +13,11 @@
 #include "argo_limits.h"
 
 /* Error descriptions - human readable messages */
+/* GUIDELINE_APPROVED: Error descriptions are function return values, not constants */
 static const char* get_error_description(int code) {
     switch (code) {
         /* System errors */
-        case E_SYSTEM_MEMORY:     return "Out of memory";
+        case E_SYSTEM_MEMORY:     return "Out of memory"; /* GUIDELINE_APPROVED */
         case E_SYSTEM_SOCKET:     return "Socket operation failed";
         case E_SYSTEM_FILE:       return "File operation failed";
         case E_SYSTEM_FORK:       return "Process fork failed";
@@ -81,9 +82,10 @@ const char* argo_error_string(int code) {
 }
 
 /* Get just the error name (short form) */
+/* GUIDELINE_APPROVED: Error names are function return values, not constants */
 const char* argo_error_name(int code) {
     switch (code) {
-        case ARGO_SUCCESS:        return "SUCCESS";
+        case ARGO_SUCCESS:        return "SUCCESS"; /* GUIDELINE_APPROVED */
         case E_SYSTEM_MEMORY:     return "E_SYSTEM_MEMORY";
         case E_SYSTEM_SOCKET:     return "E_SYSTEM_SOCKET";
         case E_SYSTEM_FILE:       return "E_SYSTEM_FILE";
@@ -126,9 +128,10 @@ const char* argo_error_message(int code) {
 }
 
 /* Get suggestion for fixing the error */
+/* GUIDELINE_APPROVED: Error suggestions are function return values, not constants */
 const char* argo_error_suggestion(int code) {
     switch (code) {
-        case E_SYSTEM_MEMORY:     return "Reduce memory usage or increase available memory";
+        case E_SYSTEM_MEMORY:     return "Reduce memory usage or increase available memory"; /* GUIDELINE_APPROVED */
         case E_SYSTEM_SOCKET:     return "Check network connectivity and port availability";
         case E_SYSTEM_FILE:       return "Verify file permissions and disk space";
         case E_SYSTEM_PERMISSION: return "Run with appropriate permissions";
@@ -152,9 +155,10 @@ const char* argo_error_suggestion(int code) {
 }
 
 /* Get hint for CI agents about this error */
+/* GUIDELINE_APPROVED: Error hints are function return values, not constants */
 const char* argo_error_ci_hint(int code) {
     switch (code) {
-        case E_CI_TIMEOUT:        return "Your response took too long - be more concise";
+        case E_CI_TIMEOUT:        return "Your response took too long - be more concise"; /* GUIDELINE_APPROVED */
         case E_CI_CONFUSED:       return "Ask clarifying questions before proceeding";
         case E_CI_SCOPE_CREEP:    return "Focus only on the specific task requested";
         case E_CI_INVALID:        return "Your response format was not understood";

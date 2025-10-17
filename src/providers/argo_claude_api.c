@@ -32,7 +32,7 @@ static const char* claude_extra_headers[] = {
 static const char* claude_response_path[] = {"content", "text"};
 
 static const api_provider_config_t claude_config = {
-    .provider_name = "claude-api",
+    .provider_name = PROVIDER_NAME_CLAUDE_API,
     .default_model = CLAUDE_DEFAULT_MODEL,
     .api_url = ANTHROPIC_API_URL,
     .url_includes_model = false,

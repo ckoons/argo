@@ -8,6 +8,7 @@
 
 #include "argo_mock.h"
 #include "argo_ci_common.h"
+#include "argo_api_providers.h"
 #include "argo_error.h"
 #include "argo_log.h"
 
@@ -25,9 +26,6 @@ typedef struct {
     uint64_t total_queries;        /* For ARGO_UPDATE_STATS */
     time_t last_query;             /* For ARGO_UPDATE_STATS */
 } mock_context_t;
-
-/* Default response if none configured */
-static const char* DEFAULT_MOCK_RESPONSE = "Mock CI response";
 
 /* Initialize mock provider */
 static int mock_init(ci_provider_t* provider) {
@@ -63,7 +61,7 @@ static int mock_query(ci_provider_t* provider, const char* prompt,
     }
 
     /* Get response */
-    const char* response_text = DEFAULT_MOCK_RESPONSE;
+    const char* response_text = MOCK_DEFAULT_RESPONSE;
 
     if (ctx->responses && ctx->response_count > 0) {
         /* Use configured responses (cycle through them) */
@@ -142,7 +140,7 @@ ci_provider_t* mock_provider_create(const char* model) {
                       mock_query, mock_stream, mock_cleanup);
 
     /* Set model */
-    strncpy(ctx->model, model ? model : "mock-model", sizeof(ctx->model) - 1);
+    strncpy(ctx->model, model ? model : MOCK_DEFAULT_MODEL, sizeof(ctx->model) - 1);
 
     /* Set provider metadata */
     strncpy(ctx->provider.name, MOCK_PROVIDER_NAME, sizeof(ctx->provider.name) - 1);

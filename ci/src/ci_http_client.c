@@ -9,7 +9,9 @@
 
 /* Project includes */
 #include "ci_http_client.h"
+#include "ci_constants.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 
 /* Write callback for curl */
 static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {

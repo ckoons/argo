@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "arc_commands.h"
+#include "arc_constants.h"
 #include "arc_context.h"
 #include "arc_http_client.h"
 #include "argo_error.h"

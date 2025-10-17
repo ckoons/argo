@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include "arc_commands.h"
+#include "arc_constants.h"
 #include "argo_output.h"
 
 /* Find tests directory for template */

@@ -54,7 +54,7 @@ static const char* openrouter_response_path[] = { "choices", "message", "content
 
 /* OpenRouter API configuration */
 static api_provider_config_t openrouter_config = {
-    .provider_name = "openrouter",
+    .provider_name = PROVIDER_NAME_OPENROUTER,
     .default_model = OPENROUTER_DEFAULT_MODEL,
     .api_url = OPENROUTER_API_URL,
     .url_includes_model = false,
@@ -75,7 +75,7 @@ ci_provider_t* openrouter_create_provider(const char* model) {
     const char* api_key = openrouter_get_api_key();
     if (!api_key) {
         argo_report_error(E_CI_NO_PROVIDER, "openrouter_create_provider",
-                         "OPENROUTER_API_KEY not set");
+                         ERR_MSG_OPENROUTER_KEY_NOT_SET);
         return NULL;
     }
 

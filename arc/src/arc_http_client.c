@@ -9,8 +9,10 @@
 
 /* Project includes */
 #include "arc_http_client.h"
+#include "arc_constants.h"
 #include "arc_error.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 
 /* Write callback for curl */
 static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
