@@ -571,7 +571,9 @@ fopen\(|popen\(|freopen\(|getenv\(|setenv\(|putenv\(|\
 argo_config_get\(|argo_config_set\(|\
 write\([^,]+,[[:space:]]*\"|\
 \\..*=[[:space:]]*\"|return\s+\"|\
-:\s*\"\"" | \
+:\s*\"\"|\
+(==|!=)[[:space:]]*\"[^\"]{1,2}\"|\
+=[[:space:]]*{[[:space:]]*\"" | \
   wc -l | tr -d ' ')
 
 # Unapproved strings (candidates for externalization)
@@ -598,7 +600,9 @@ if [ "$UNAPPROVED_STRINGS" -gt 400 ]; then
     grep -vE "fopen\(|popen\(|freopen\(|getenv\(|setenv\(|putenv\(" | \
     grep -vE "argo_config_get\(|argo_config_set\(" | \
     grep -vE "write\([^,]+,[[:space:]]*\"|\\..*=[[:space:]]*\"|return\s+\"" | \
-    grep -vE ":\s*\"\"" | head -10
+    grep -vE ":\s*\"\"" | \
+    grep -vE "(==|!=)[[:space:]]*\"[^\"]{1,2}\"" | \
+    grep -vE "=[[:space:]]*{[[:space:]]*\"" | head -10
   echo ""
   echo "Note: Add GUIDELINE_APPROVED comment for legitimate constants (JSON, API paths, etc.)"
   WARNINGS=$((WARNINGS + 1))
@@ -615,8 +619,10 @@ else
   echo "  - Environment access (getenv, setenv, putenv)"
   echo "  - Configuration access (argo_config_get, argo_config_set)"
   echo "  - Struct initialization (.field = \"value\")"
+  echo "  - Array initialization (= { \"value\" })"
   echo "  - Function returns (return \"value\")"
   echo "  - Ternary empty strings (condition ? value : \"\")"
+  echo "  - Single-char comparisons (== \"\\\"\", != \"\\n\", etc.)"
   echo "  - GUIDELINE_APPROVED markers"
 fi
 echo ""

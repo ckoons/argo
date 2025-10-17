@@ -22,6 +22,8 @@
 #include "argo_log.h"
 #include "argo_ollama.h"
 #include "argo_urls.h"
+#include "argo_http.h"
+#include "argo_json.h"
 
 /* Ollama context structure */
 typedef struct ollama_context {
@@ -190,7 +192,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
 
             /* Look for end of HTTP headers if not found yet */
             if (!headers_complete) {
-                char* header_end = strstr(ctx->buffer, "\r\n\r\n");
+                char* header_end = strstr(ctx->buffer, HTTP_HEADER_DELIMITER);
                 if (header_end) {
                     json_start = header_end + 4;
                     headers_complete = true;
@@ -225,7 +227,7 @@ static int ollama_query(ci_provider_t* provider, const char* prompt,
     }
 
     /* Simple extraction of response field - jsmn has issues with emojis */
-    char* response_start = strstr(json_start, "\"response\":\"");
+    char* response_start = strstr(json_start, JSON_RESPONSE_FIELD);
     if (!response_start) {
         argo_report_error(E_PROTOCOL_FORMAT, "ollama_query", ERR_MSG_NO_RESPONSE_FIELD);
         ollama_disconnect(ctx);
@@ -326,7 +328,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
 
             /* Skip headers if not done yet */
             if (!headers_complete) {
-                char* header_end = strstr(ctx->buffer, "\r\n\r\n");
+                char* header_end = strstr(ctx->buffer, HTTP_HEADER_DELIMITER);
                 if (header_end) {
                     /* Move past headers */
                     char* json_start = header_end + 4;
@@ -370,7 +372,7 @@ static int ollama_stream(ci_provider_t* provider, const char* prompt,
                             }
 
                             /* Check if done */
-                            if (strstr(line_buffer, "\"done\":true")) {
+                            if (strstr(line_buffer, JSON_DONE_FIELD)) {
                                 /* Streaming complete */
                                 ollama_disconnect(ctx);
                                 ARGO_UPDATE_STATS(ctx);

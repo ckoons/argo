@@ -62,6 +62,11 @@
 #define LOCALHOST_IP "127.0.0.1"
 #define LOCALHOST_ADDR "127.0.0.1"
 
+/* HTTP protocol delimiters */
+#define HTTP_HEADER_DELIMITER "\r\n\r\n"
+#define HTTP_LINE_DELIMITER "\r\n"
+#define HTTP_VERSION_PREFIX "HTTP/1.1 "
+
 /* HTTP methods */
 typedef enum {
     HTTP_GET,

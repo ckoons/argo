@@ -9,6 +9,10 @@
 #define JSON_MAX_FIELD_DEPTH 5
 #define JSON_FIELD_NAME_SIZE 64
 
+/* JSON protocol patterns (for Ollama streaming) */
+#define JSON_RESPONSE_FIELD "\"response\":\""
+#define JSON_DONE_FIELD "\"done\":true"
+
 /* Extract a string field from JSON
  *
  * Searches for "field_name" in json string and extracts the quoted string value.
