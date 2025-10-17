@@ -455,7 +455,7 @@ static int parse_json_message(const char* json, ci_message_t* msg) {
     }
 
     msg->timestamp = time(NULL);
-    msg->type = strdup("request");  /* Default type */
+    msg->type = strdup(SOCKET_DEFAULT_MESSAGE_TYPE);  /* Default type */
     if (!msg->type) {
         result = E_SYSTEM_MEMORY;
         goto cleanup;

@@ -66,6 +66,13 @@
 #define HTTP_HEADER_DELIMITER "\r\n\r\n"
 #define HTTP_LINE_DELIMITER "\r\n"
 #define HTTP_VERSION_PREFIX "HTTP/1.1 "
+#define HTTP_HEADER_CONNECTION_CLOSE "Connection: close\r\n"
+#define HTTP_HEADER_CONTENT_LENGTH_ZERO "Content-Length: 0\r\n"
+#define HTTP_ROOT_PATH "/"
+
+/* HTTP error messages */
+#define HTTP_DEFAULT_ERROR_MESSAGE "Unknown error"
+#define HTTP_METHOD_STR_UNKNOWN "UNKNOWN"
 
 /* HTTP methods */
 typedef enum {

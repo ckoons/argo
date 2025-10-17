@@ -138,7 +138,7 @@ int registry_broadcast_message(ci_registry_t* registry,
     }
 
     LOG_DEBUG("Broadcast from %s to role '%s': sent to %d CIs, %d errors",
-             from_ci, role_filter ? role_filter : "all", sent_count, error_count);
+             from_ci, role_filter ? role_filter : REGISTRY_ALL_ROLES, sent_count, error_count);
 
     return (sent_count > 0) ? ARGO_SUCCESS : E_CI_NO_PROVIDER;
 }
@@ -246,27 +246,27 @@ ci_message_t* message_from_json(const char* json) {
     char* content = NULL;
     size_t len = 0;
 
-    if (json_extract_string_field(json, "from", &from, &len) != ARGO_SUCCESS) {
+    if (json_extract_string_field(json, REGISTRY_JSON_FROM, &from, &len) != ARGO_SUCCESS) {
         free(msg);
         return NULL;
     }
     strncpy(msg->from, from, REGISTRY_NAME_MAX - 1);
     free(from);
 
-    if (json_extract_string_field(json, "to", &to, &len) != ARGO_SUCCESS) {
+    if (json_extract_string_field(json, REGISTRY_JSON_TO, &to, &len) != ARGO_SUCCESS) {
         free(msg);
         return NULL;
     }
     strncpy(msg->to, to, REGISTRY_NAME_MAX - 1);
     free(to);
 
-    if (json_extract_string_field(json, "type", &type, &len) != ARGO_SUCCESS) {
+    if (json_extract_string_field(json, REGISTRY_JSON_TYPE, &type, &len) != ARGO_SUCCESS) {
         free(msg);
         return NULL;
     }
     msg->type = type;  /* Keep allocated */
 
-    if (json_extract_string_field(json, "content", &content, &len) != ARGO_SUCCESS) {
+    if (json_extract_string_field(json, REGISTRY_JSON_CONTENT, &content, &len) != ARGO_SUCCESS) {
         free(msg->type);
         free(msg);
         return NULL;
@@ -275,12 +275,12 @@ ci_message_t* message_from_json(const char* json) {
 
     /* Extract optional fields */
     char* thread_id = NULL;
-    if (json_extract_string_field(json, "thread_id", &thread_id, &len) == ARGO_SUCCESS) {
+    if (json_extract_string_field(json, REGISTRY_JSON_THREAD_ID, &thread_id, &len) == ARGO_SUCCESS) {
         msg->thread_id = thread_id;
     }
 
     char* priority = NULL;
-    if (json_extract_string_field(json, "priority", &priority, &len) == ARGO_SUCCESS) {
+    if (json_extract_string_field(json, REGISTRY_JSON_PRIORITY, &priority, &len) == ARGO_SUCCESS) {
         msg->metadata.priority = priority;
     }
 

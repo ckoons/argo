@@ -28,6 +28,16 @@ typedef enum {
     WORKFLOW_STATE_FAILED,         /* Finished with error */
     WORKFLOW_STATE_ABANDONED       /* User cancelled */
 } workflow_state_t;
+
+/* Workflow state string constants */
+#define WORKFLOW_STATE_STR_PENDING "pending"
+#define WORKFLOW_STATE_STR_RUNNING "running"
+#define WORKFLOW_STATE_STR_PAUSED "paused"
+#define WORKFLOW_STATE_STR_COMPLETED "completed"
+#define WORKFLOW_STATE_STR_FAILED "failed"
+#define WORKFLOW_STATE_STR_ABANDONED "abandoned"
+#define WORKFLOW_STATE_STR_COMPLETED_UPPER "COMPLETED"
+#define WORKFLOW_STATE_STR_FAILED_UPPER "FAILED"
 #endif
 
 /* Simplified workflow structure */

@@ -157,12 +157,12 @@ int registry_load_state(ci_registry_t* registry, const char* filepath) {
         char role[REGISTRY_ROLE_MAX] = {0};
         char model[REGISTRY_MODEL_MAX] = {0};
 
-        extract_string_field(ptr, entry_end, "name", name, sizeof(name));
-        extract_string_field(ptr, entry_end, "role", role, sizeof(role));
-        extract_string_field(ptr, entry_end, "model", model, sizeof(model));
+        extract_string_field(ptr, entry_end, REGISTRY_JSON_NAME, name, sizeof(name));
+        extract_string_field(ptr, entry_end, REGISTRY_JSON_ROLE, role, sizeof(role));
+        extract_string_field(ptr, entry_end, REGISTRY_JSON_MODEL, model, sizeof(model));
 
-        int port = extract_int_field(ptr, entry_end, "port");
-        int status = extract_int_field(ptr, entry_end, "status");
+        int port = extract_int_field(ptr, entry_end, REGISTRY_JSON_PORT);
+        int status = extract_int_field(ptr, entry_end, REGISTRY_JSON_STATUS);
 
         /* Add CI to registry */
         if (name[0] && role[0] && model[0] && port > 0) {

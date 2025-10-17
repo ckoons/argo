@@ -19,6 +19,7 @@
 
 /* Message format strings */
 #define MSG_JSON_FORMAT "{\"from\":\"%s\",\"to\":\"%s\",\"type\":\"%s\",\"content\":\"%s\"}"
+#define SOCKET_DEFAULT_MESSAGE_TYPE "request"
 
 /* Socket response structure (extends ci_response) */
 typedef struct socket_response {

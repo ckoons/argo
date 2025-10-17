@@ -20,6 +20,20 @@
 /* Registry message JSON field names */
 #define REGISTRY_JSON_TIMESTAMP "\"timestamp\":"
 #define REGISTRY_JSON_TIMEOUT "\"timeout_ms\":"
+#define REGISTRY_JSON_FROM "from"
+#define REGISTRY_JSON_TO "to"
+#define REGISTRY_JSON_TYPE "type"
+#define REGISTRY_JSON_CONTENT "content"
+#define REGISTRY_JSON_THREAD_ID "thread_id"
+#define REGISTRY_JSON_PRIORITY "priority"
+#define REGISTRY_JSON_NAME "name"
+#define REGISTRY_JSON_ROLE "role"
+#define REGISTRY_JSON_MODEL "model"
+#define REGISTRY_JSON_PORT "port"
+#define REGISTRY_JSON_STATUS "status"
+
+/* Registry constants */
+#define REGISTRY_ALL_ROLES "all"
 
 /* CI status */
 typedef enum ci_status {
@@ -30,6 +44,14 @@ typedef enum ci_status {
     CI_STATUS_ERROR,           /* In error state */
     CI_STATUS_SHUTDOWN         /* Shutting down */
 } ci_status_t;
+
+/* CI status string constants */
+#define CI_STATUS_STR_OFFLINE "OFFLINE"
+#define CI_STATUS_STR_STARTING "STARTING"
+#define CI_STATUS_STR_READY "READY"
+#define CI_STATUS_STR_BUSY "BUSY"
+#define CI_STATUS_STR_ERROR "ERROR"
+#define CI_STATUS_STR_SHUTDOWN "SHUTDOWN"
 
 /* Port configuration from .env.argo_local */
 typedef struct port_config {

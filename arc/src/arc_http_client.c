@@ -129,7 +129,7 @@ int arc_http_post(const char* endpoint, const char* json_body, arc_http_response
     snprintf(url, sizeof(url), "%s%s", arc_get_daemon_url(), endpoint);
 
     struct curl_slist* headers = NULL;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
+    headers = curl_slist_append(headers, "Content-Type: " HTTP_CONTENT_TYPE_JSON);
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -184,7 +184,7 @@ int arc_http_delete(const char* endpoint, arc_http_response_t** response) {
     snprintf(url, sizeof(url), "%s%s", arc_get_daemon_url(), endpoint);
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, HTTP_METHOD_STR_DELETE);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, resp);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);

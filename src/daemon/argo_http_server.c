@@ -85,21 +85,21 @@ int http_server_add_route(http_server_t* server, http_method_t method,
 /* Parse HTTP method */
 http_method_t http_method_from_string(const char* str) {
     if (!str) return HTTP_METHOD_UNKNOWN;
-    if (strcmp(str, "GET") == 0) return HTTP_METHOD_GET;
-    if (strcmp(str, "POST") == 0) return HTTP_METHOD_POST;
-    if (strcmp(str, "DELETE") == 0) return HTTP_METHOD_DELETE;
-    if (strcmp(str, "PUT") == 0) return HTTP_METHOD_PUT;
+    if (strcmp(str, HTTP_METHOD_STR_GET) == 0) return HTTP_METHOD_GET;
+    if (strcmp(str, HTTP_METHOD_STR_POST) == 0) return HTTP_METHOD_POST;
+    if (strcmp(str, HTTP_METHOD_STR_DELETE) == 0) return HTTP_METHOD_DELETE;
+    if (strcmp(str, HTTP_METHOD_STR_PUT) == 0) return HTTP_METHOD_PUT;
     return HTTP_METHOD_UNKNOWN;
 }
 
 /* Get HTTP method string */
 const char* http_method_string(http_method_t method) {
     switch (method) {
-        case HTTP_METHOD_GET: return "GET";
-        case HTTP_METHOD_POST: return "POST";
-        case HTTP_METHOD_DELETE: return "DELETE";
-        case HTTP_METHOD_PUT: return "PUT";
-        default: return "UNKNOWN";
+        case HTTP_METHOD_GET: return HTTP_METHOD_STR_GET;
+        case HTTP_METHOD_POST: return HTTP_METHOD_STR_POST;
+        case HTTP_METHOD_DELETE: return HTTP_METHOD_STR_DELETE;
+        case HTTP_METHOD_PUT: return HTTP_METHOD_STR_PUT;
+        default: return HTTP_METHOD_STR_UNKNOWN;
     }
 }
 
@@ -142,7 +142,7 @@ static int parse_http_request(const char* buffer, size_t len, http_request_t* re
     }
 
     /* Default content type */
-    strncpy(req->content_type, "application/json", sizeof(req->content_type) - 1);
+    strncpy(req->content_type, HTTP_CONTENT_TYPE_JSON, sizeof(req->content_type) - 1);
 
     return ARGO_SUCCESS;
 }
@@ -233,11 +233,7 @@ static void* handle_connection(void* arg) {
     int result = parse_http_request(buffer, bytes, &req);
 
     /* Log incoming request */
-    LOG_INFO("HTTP %s %s",
-             req.method == HTTP_METHOD_GET ? "GET" :
-             req.method == HTTP_METHOD_POST ? "POST" :
-             req.method == HTTP_METHOD_DELETE ? "DELETE" : "UNKNOWN",
-             req.path);
+    LOG_INFO("HTTP %s %s", http_method_string(req.method), req.path);
     if (req.body && strlen(req.body) > 0) {
         LOG_DEBUG("Request body: %s", req.body);
     }
@@ -262,7 +258,7 @@ static void* handle_connection(void* arg) {
 
     http_response_t resp = {0};
     resp.status_code = HTTP_STATUS_OK;
-    strncpy(resp.content_type, "application/json", sizeof(resp.content_type) - 1);
+    strncpy(resp.content_type, HTTP_CONTENT_TYPE_JSON, sizeof(resp.content_type) - 1);
 
     if (handler) {
         /* Call handler */
@@ -278,9 +274,7 @@ static void* handle_connection(void* arg) {
     /* Log response */
     LOG_INFO("HTTP Response %d for %s %s",
              resp.status_code,
-             req.method == HTTP_METHOD_GET ? "GET" :
-             req.method == HTTP_METHOD_POST ? "POST" :
-             req.method == HTTP_METHOD_DELETE ? "DELETE" : "UNKNOWN",
+             http_method_string(req.method),
              req.path);
     if (resp.status_code != HTTP_STATUS_OK) {
         LOG_WARN("non-OK response: %d", resp.status_code);
@@ -397,7 +391,7 @@ void http_response_set_json(http_response_t* resp, int status, const char* json_
     if (!resp) return;
 
     resp->status_code = status;
-    strncpy(resp->content_type, "application/json", sizeof(resp->content_type) - 1);
+    strncpy(resp->content_type, HTTP_CONTENT_TYPE_JSON, sizeof(resp->content_type) - 1);
 
     if (json_body) {
         size_t len = strlen(json_body);
@@ -417,7 +411,7 @@ void http_response_set_error(http_response_t* resp, int status, const char* erro
     char json[ARGO_PATH_MAX];
     snprintf(json, sizeof(json),
         "{\"status\":\"error\",\"message\":\"%s\"}",
-        error_msg ? error_msg : "Unknown error");
+        error_msg ? error_msg : HTTP_DEFAULT_ERROR_MESSAGE);
 
     http_response_set_json(resp, status, json);
 }

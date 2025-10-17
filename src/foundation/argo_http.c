@@ -348,7 +348,7 @@ int http_parse_url(const char* url, char** host, int* port, char** path) {
     if (slash) {
         parsed_path = strdup(slash);
     } else {
-        parsed_path = strdup("/");
+        parsed_path = strdup(HTTP_ROOT_PATH);
     }
 
     if (!parsed_path) {
