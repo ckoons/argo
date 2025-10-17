@@ -18,6 +18,7 @@ fi
 COMPONENTS=(
     ".:16000"
     "arc:5000"
+    "ci:5000"
     "ui/argo-term:3000"
 )
 
@@ -120,6 +121,12 @@ if [ -d "$PROJECT_ROOT/arc/src" ]; then
     ARC_LINES=$(echo "$ARC_JSON" | grep '"budget_lines"' | sed 's/.*: *\([0-9]*\).*/\1/')
 fi
 
+CI_LINES=0
+if [ -d "$PROJECT_ROOT/ci/src" ]; then
+    CI_JSON=$("$SCRIPT_DIR/count_component.sh" "ci" --budget 5000 2>/dev/null)
+    CI_LINES=$(echo "$CI_JSON" | grep '"budget_lines"' | sed 's/.*: *\([0-9]*\).*/\1/')
+fi
+
 TERM_LINES=0
 if [ -d "$PROJECT_ROOT/ui/argo-term/src" ]; then
     TERM_JSON=$("$SCRIPT_DIR/count_component.sh" "ui/argo-term" --budget 3000 2>/dev/null)
@@ -127,16 +134,21 @@ if [ -d "$PROJECT_ROOT/ui/argo-term/src" ]; then
 fi
 
 echo ""
-printf "  %-30s %10d lines\n" "Minimal (argo only):" "$ARGO_LINES"
+printf "  %-40s %10d lines\n" "Minimal (argo only):" "$ARGO_LINES"
 
 if [ $ARC_LINES -gt 0 ]; then
     CLI_TOTAL=$((ARGO_LINES + ARC_LINES))
-    printf "  %-30s %10d lines\n" "CLI (argo + arc):" "$CLI_TOTAL"
+    printf "  %-40s %10d lines\n" "CLI (argo + arc):" "$CLI_TOTAL"
+fi
+
+if [ $CI_LINES -gt 0 ]; then
+    CLI_CI_TOTAL=$((ARGO_LINES + ARC_LINES + CI_LINES))
+    printf "  %-40s %10d lines\n" "CLI + CI (argo + arc + ci):" "$CLI_CI_TOTAL"
 fi
 
 if [ $TERM_LINES -gt 0 ]; then
-    FULL_TOTAL=$((ARGO_LINES + ARC_LINES + TERM_LINES))
-    printf "  %-30s %10d lines\n" "Full (argo + arc + arc-term):" "$FULL_TOTAL"
+    FULL_TOTAL=$((ARGO_LINES + ARC_LINES + CI_LINES + TERM_LINES))
+    printf "  %-40s %10d lines\n" "Full (argo + arc + ci + argo-term):" "$FULL_TOTAL"
 fi
 
 echo ""

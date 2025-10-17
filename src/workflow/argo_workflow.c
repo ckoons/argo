@@ -87,88 +87,58 @@ process_wait_result_t process_wait_with_timeout(pid_t pid, int timeout_seconds, 
     return result;
 }
 
-/* Execute workflow script */
-int workflow_execute(workflow_t* workflow, const char* log_path) {
-    if (!workflow) {
-        return E_INPUT_NULL;
+/* Setup workflow log file and write header */
+static int setup_workflow_log(workflow_t* workflow, const char* log_path) {
+    int log_fd = open(log_path, O_CREAT | O_WRONLY | O_APPEND, ARGO_FILE_PERMISSIONS);
+    if (log_fd < 0) {
+        LOG_ERROR("Failed to open log file: %s", log_path);
+        return -1;
     }
 
-    if (workflow->script_path[0] == '\0') {
-        argo_report_error(E_INPUT_FORMAT, "workflow_execute",
-                         "No script path specified");
-        return E_INPUT_FORMAT;
+    /* Write workflow header to log */
+    dprintf(log_fd, "=== Workflow: %s (ID: %s) ===\n",
+           workflow->workflow_name, workflow->workflow_id);
+    dprintf(log_fd, "Description: %s\n", workflow->description);
+    dprintf(log_fd, "Script: %s\n", workflow->script_path);
+    dprintf(log_fd, "Started: %ld\n\n", (long)time(NULL));
+
+    return log_fd;
+}
+
+/* Execute workflow script in child process */
+static void execute_child_process(workflow_t* workflow, int log_fd) {
+    /* Redirect stdout/stderr to log file if provided */
+    if (log_fd >= 0) {
+        dup2(log_fd, STDOUT_FILENO);
+        dup2(log_fd, STDERR_FILENO);
+        close(log_fd);
     }
 
-    int result = ARGO_SUCCESS;
-    int log_fd = -1;
-    pid_t script_pid = 0;
-
-    /* Open log file if provided */
-    if (log_path) {
-        log_fd = open(log_path, O_CREAT | O_WRONLY | O_APPEND, ARGO_FILE_PERMISSIONS);
-        if (log_fd < 0) {
-            LOG_ERROR("Failed to open log file: %s", log_path);
-        } else {
-            /* Write workflow header to log */
-            dprintf(log_fd, "=== Workflow: %s (ID: %s) ===\n",
-                   workflow->workflow_name, workflow->workflow_id);
-            dprintf(log_fd, "Description: %s\n", workflow->description);
-            dprintf(log_fd, "Script: %s\n", workflow->script_path);
-            dprintf(log_fd, "Started: %ld\n\n", (long)time(NULL));
+    /* Change working directory if specified */
+    if (workflow->working_dir[0] != '\0') {
+        if (chdir(workflow->working_dir) != 0) {
+            /* GUIDELINE_APPROVED: Child process error before _exit */
+            fprintf(stderr, "Failed to change directory to: %s\n",
+                   workflow->working_dir);
+            _exit(1);
         }
     }
 
-    /* Update workflow state */
-    workflow->state = WORKFLOW_STATE_RUNNING;
-    workflow->start_time = time(NULL);
+    /* Execute script via bash */
+    char* exec_args[] = {"/bin/bash", workflow->script_path, NULL};
+    execv("/bin/bash", exec_args);
 
-    LOG_INFO("Starting workflow '%s' (ID: %s, script: %s)",
-            workflow->workflow_name, workflow->workflow_id, workflow->script_path);
+    /* If execv returns, it failed */
+    /* GUIDELINE_APPROVED: Child process error before _exit */
+    fprintf(stderr, "Failed to execute script: %s\n", workflow->script_path);
+    _exit(E_SYSTEM_PROCESS);
+}
 
-    /* Fork process to execute script */
-    script_pid = fork();
-    if (script_pid < 0) {
-        argo_report_error(E_SYSTEM_FORK, "workflow_execute", "fork failed");
-        result = E_SYSTEM_FORK;
-        goto cleanup;
-    }
-
-    if (script_pid == 0) {
-        /* Child process */
-
-        /* Redirect stdout/stderr to log file if provided */
-        if (log_fd >= 0) {
-            dup2(log_fd, STDOUT_FILENO);
-            dup2(log_fd, STDERR_FILENO);
-            close(log_fd);
-        }
-
-        /* Change working directory if specified */
-        if (workflow->working_dir[0] != '\0') {
-            if (chdir(workflow->working_dir) != 0) {
-                /* GUIDELINE_APPROVED: Child process error before _exit */
-                fprintf(stderr, "Failed to change directory to: %s\n",
-                       workflow->working_dir);
-                _exit(1);
-            }
-        }
-
-        /* Execute script via bash */
-        char* exec_args[] = {"/bin/bash", workflow->script_path, NULL};
-        execv("/bin/bash", exec_args);
-
-        /* If execv returns, it failed */
-        /* GUIDELINE_APPROVED: Child process error before _exit */
-        fprintf(stderr, "Failed to execute script: %s\n", workflow->script_path);
-        _exit(E_SYSTEM_PROCESS);
-    }
-
-    /* Parent process - wait for child with timeout */
-    process_wait_result_t wait_result = process_wait_with_timeout(
-        script_pid,
-        workflow->timeout_seconds,
-        WORKFLOW_TIMEOUT_EXIT_CODE
-    );
+/* Handle workflow execution results and update state */
+static int handle_execution_results(workflow_t* workflow,
+                                     process_wait_result_t wait_result,
+                                     int log_fd) {
+    int result;
 
     /* Update workflow with wait results */
     workflow->exit_code = wait_result.exit_code;
@@ -178,11 +148,7 @@ int workflow_execute(workflow_t* workflow, const char* log_path) {
     if (wait_result.wait_failed) {
         workflow->state = WORKFLOW_STATE_FAILED;
         result = E_SYSTEM_PROCESS;
-        goto cleanup;
-    }
-
-    /* Update final state based on result */
-    if (wait_result.timed_out) {
+    } else if (wait_result.timed_out) {
         workflow->state = WORKFLOW_STATE_FAILED;
         result = E_TIMEOUT;
     } else if (workflow->exit_code == 0) {
@@ -203,6 +169,7 @@ int workflow_execute(workflow_t* workflow, const char* log_path) {
         dprintf(log_fd, "Ended: %ld\n", (long)workflow->end_time);
     }
 
+    /* Log results */
     if (workflow->state == WORKFLOW_STATE_COMPLETED) {
         LOG_INFO("Workflow '%s' completed successfully (%ld seconds)",
                 workflow->workflow_name,
@@ -212,6 +179,61 @@ int workflow_execute(workflow_t* workflow, const char* log_path) {
                  workflow->workflow_name, workflow->exit_code,
                  (long)(workflow->end_time - workflow->start_time));
     }
+
+    return result;
+}
+
+/* Execute workflow script */
+int workflow_execute(workflow_t* workflow, const char* log_path) {
+    if (!workflow) {
+        return E_INPUT_NULL;
+    }
+
+    if (workflow->script_path[0] == '\0') {
+        argo_report_error(E_INPUT_FORMAT, "workflow_execute",
+                         "No script path specified");
+        return E_INPUT_FORMAT;
+    }
+
+    int result = ARGO_SUCCESS;
+    int log_fd = -1;
+    pid_t script_pid;
+
+    /* Setup log file if provided */
+    if (log_path) {
+        log_fd = setup_workflow_log(workflow, log_path);
+    }
+
+    /* Update workflow state */
+    workflow->state = WORKFLOW_STATE_RUNNING;
+    workflow->start_time = time(NULL);
+
+    LOG_INFO("Starting workflow '%s' (ID: %s, script: %s)",
+            workflow->workflow_name, workflow->workflow_id, workflow->script_path);
+
+    /* Fork process to execute script */
+    script_pid = fork();
+    if (script_pid < 0) {
+        argo_report_error(E_SYSTEM_FORK, "workflow_execute", "fork failed");
+        result = E_SYSTEM_FORK;
+        goto cleanup;
+    }
+
+    if (script_pid == 0) {
+        /* Child process - does not return */
+        execute_child_process(workflow, log_fd);
+        /* Not reached */
+    }
+
+    /* Parent process - wait for child with timeout */
+    process_wait_result_t wait_result = process_wait_with_timeout(
+        script_pid,
+        workflow->timeout_seconds,
+        WORKFLOW_TIMEOUT_EXIT_CODE
+    );
+
+    /* Handle execution results and update state */
+    result = handle_execution_results(workflow, wait_result, log_fd);
 
 cleanup:
     if (log_fd >= 0) {

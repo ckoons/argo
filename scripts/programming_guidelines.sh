@@ -21,8 +21,8 @@ INFOS=0
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "1. MAGIC NUMBERS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-# Exclude test files from magic number check (tests have specific test values)
-MAGIC_NUMBERS=$(grep -rn '\b[0-9]\{2,\}\b' src/ --include="*.c" | \
+# Check all component directories (src, arc/src, ci/src)
+MAGIC_NUMBERS=$(grep -rn '\b[0-9]\{2,\}\b' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   grep -v "^\s*//" | grep -v "^\s*\*" | grep -v "line " | \
   grep -v "errno" | grep -v "2025" | wc -l | tr -d ' ')
 echo "Found $MAGIC_NUMBERS potential magic numbers in production .c files"
@@ -39,7 +39,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "2. UNSAFE STRING FUNCTIONS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-UNSAFE_FUNCS=$(grep -rn '\bstrcpy\b\|\bstrcat\b\|\bsprintf\b\|\bgets\b' src/ --include="*.c" | \
+UNSAFE_FUNCS=$(grep -rn '\bstrcpy\b\|\bstrcat\b\|\bsprintf\b\|\bgets\b' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
   grep -v "strncpy\|strncat\|snprintf" | wc -l | tr -d ' ')
 if [ "$UNSAFE_FUNCS" -gt 0 ]; then
   echo "✗ FAIL: Found $UNSAFE_FUNCS unsafe string function calls"
@@ -60,7 +60,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "3. FILE SIZE CHECK (max 618 lines)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 LARGE_FILES=0
-for file in $(find src/ -name "*.c"); do
+for file in $(find src/ arc/src/ ci/src/ -name "*.c" 2>/dev/null); do
   LINES=$(wc -l < "$file" | tr -d ' ')
   if [ "$LINES" -gt 618 ]; then
     echo "⚠ $file: $LINES lines"
@@ -1005,7 +1005,8 @@ echo "38. FUNCTION LENGTH LIMITS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Use Python script to accurately identify longest functions
 if [ -f "scripts/utils/find_longest_functions.py" ]; then
-  FUNC_OUTPUT=$(python3 scripts/utils/find_longest_functions.py src/ 2>&1)
+  # Check all component directories
+  FUNC_OUTPUT=$(python3 scripts/utils/find_longest_functions.py src/ arc/src/ ci/src/ 2>&1)
   FUNC_STATUS=$?
 
   echo "$FUNC_OUTPUT"
