@@ -20,6 +20,35 @@
 /* External global daemon context (from argo_daemon_api_routes.c) */
 extern argo_daemon_t* g_api_daemon;
 
+/* Unescape JSON string sequences in place */
+static void unescape_json_string(char* str) {
+    if (!str) return;
+
+    char* src = str;
+    char* dst = str;
+
+    while (*src) {
+        if (*src == '\\' && *(src + 1)) {
+            src++;  /* Skip backslash */
+            switch (*src) {
+                case 'n':  *dst++ = '\n'; break;
+                case 'r':  *dst++ = '\r'; break;
+                case 't':  *dst++ = '\t'; break;
+                case 'b':  *dst++ = '\b'; break;
+                case 'f':  *dst++ = '\f'; break;
+                case '"':  *dst++ = '"'; break;
+                case '\\': *dst++ = '\\'; break;
+                case '/':  *dst++ = '/'; break;
+                default:   *dst++ = *src; break;  /* Unknown escape, keep as-is */
+            }
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+}
+
 /* POST /api/workflow/pause/{id} - Pause workflow execution */
 int api_workflow_pause(http_request_t* req, http_response_t* resp) {
     if (!req || !resp || !g_api_daemon || !g_api_daemon->workflow_registry) {
@@ -185,6 +214,10 @@ int api_workflow_input(http_request_t* req, http_response_t* resp) {
         free(input_text);
         return E_INPUT_FORMAT;
     }
+
+    /* Unescape JSON sequences (\n -> newline, etc.) */
+    unescape_json_string(input_text);
+    input_len = strlen(input_text);  /* Recalculate length after unescaping */
 
     /* Write input to workflow's stdin pipe */
     ssize_t written = write(entry->stdin_pipe, input_text, input_len);

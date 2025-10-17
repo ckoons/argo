@@ -9,6 +9,7 @@
 #include "argo_daemon_api.h"
 #include "argo_daemon.h"
 #include "argo_http_server.h"
+#include "argo_daemon_ci_api.h"
 #include "argo_error.h"
 #include "argo_log.h"
 
@@ -55,6 +56,10 @@ int argo_daemon_register_api_routes(argo_daemon_t* daemon) {
     http_server_add_route(daemon->http_server, HTTP_METHOD_GET,
                          "/api/registry/ci", api_registry_list_ci);
 
-    LOG_INFO("API routes registered (workflow API ready)");
+    /* CI query routes */
+    http_server_add_route(daemon->http_server, HTTP_METHOD_POST,
+                         "/api/ci/query", api_ci_query);
+
+    LOG_INFO("API routes registered (workflow + CI API ready)");
     return ARGO_SUCCESS;
 }

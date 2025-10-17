@@ -70,15 +70,19 @@ gather_requirements() {
     read -r ADDITIONAL_CONTEXT
 
     # Save requirements to state
-    cat > "$WORKFLOW_STATE" <<EOF
-{
+    # Note: Using jq would be safer, but keep it simple with printf for JSON escaping
+    printf '{
   "phase": "requirements_gathered",
-  "purpose": "$WORKFLOW_PURPOSE",
-  "test_method": "$TEST_METHOD",
-  "success_criteria": "$SUCCESS_CRITERIA",
-  "additional_context": "$ADDITIONAL_CONTEXT"
-}
-EOF
+  "purpose": %s,
+  "test_method": %s,
+  "success_criteria": %s,
+  "additional_context": %s
+}\n' \
+        "$(printf '%s' "$WORKFLOW_PURPOSE" | jq -Rs .)" \
+        "$(printf '%s' "$TEST_METHOD" | jq -Rs .)" \
+        "$(printf '%s' "$SUCCESS_CRITERIA" | jq -Rs .)" \
+        "$(printf '%s' "$ADDITIONAL_CONTEXT" | jq -Rs .)" \
+        > "$WORKFLOW_STATE"
 
     log "Requirements captured!"
 }
@@ -112,16 +116,19 @@ design_dialog() {
     fi
 
     # Update state
-    cat > "$WORKFLOW_STATE" <<EOF
-{
+    printf '{
   "phase": "design_approved",
-  "purpose": "$WORKFLOW_PURPOSE",
-  "test_method": "$TEST_METHOD",
-  "success_criteria": "$SUCCESS_CRITERIA",
-  "additional_context": "$ADDITIONAL_CONTEXT",
+  "purpose": %s,
+  "test_method": %s,
+  "success_criteria": %s,
+  "additional_context": %s,
   "approved": true
-}
-EOF
+}\n' \
+        "$(printf '%s' "$WORKFLOW_PURPOSE" | jq -Rs .)" \
+        "$(printf '%s' "$TEST_METHOD" | jq -Rs .)" \
+        "$(printf '%s' "$SUCCESS_CRITERIA" | jq -Rs .)" \
+        "$(printf '%s' "$ADDITIONAL_CONTEXT" | jq -Rs .)" \
+        > "$WORKFLOW_STATE"
 }
 
 # Build the workflow template
@@ -273,14 +280,16 @@ CONFIG_EOF
     echo ""
 
     # Update state
-    cat > "$WORKFLOW_STATE" <<EOF
-{
+    printf '{
   "phase": "completed",
-  "template_name": "$TEMPLATE_NAME",
-  "template_dir": "$TEMPLATE_DIR",
-  "created": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-}
-EOF
+  "template_name": %s,
+  "template_dir": %s,
+  "created": %s
+}\n' \
+        "$(printf '%s' "$TEMPLATE_NAME" | jq -Rs .)" \
+        "$(printf '%s' "$TEMPLATE_DIR" | jq -Rs .)" \
+        "$(date -u +"%Y-%m-%dT%H:%M:%SZ" | jq -Rs .)" \
+        > "$WORKFLOW_STATE"
 }
 
 # Main workflow execution

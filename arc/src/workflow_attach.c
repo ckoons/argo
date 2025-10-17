@@ -16,6 +16,43 @@
 /* Global flag for attach loop */
 static int g_running = 1;
 
+/* Escape JSON string - caller must free result */
+static char* json_escape_string(const char* input) {
+    if (!input) return NULL;
+
+    /* Calculate required size (worst case: every char needs escaping) */
+    size_t max_size = strlen(input) * 2 + 1;
+    char* output = malloc(max_size);
+    if (!output) return NULL;
+
+    const char* src = input;
+    char* dst = output;
+
+    while (*src) {
+        switch (*src) {
+            case '"':  *dst++ = '\\'; *dst++ = '"'; break;
+            case '\\': *dst++ = '\\'; *dst++ = '\\'; break;
+            case '\b': *dst++ = '\\'; *dst++ = 'b'; break;
+            case '\f': *dst++ = '\\'; *dst++ = 'f'; break;
+            case '\n': *dst++ = '\\'; *dst++ = 'n'; break;
+            case '\r': *dst++ = '\\'; *dst++ = 'r'; break;
+            case '\t': *dst++ = '\\'; *dst++ = 't'; break;
+            default:
+                /* Control characters need \uXXXX escaping */
+                if (*src < 0x20) {
+                    dst += snprintf(dst, 7, "\\u%04x", (unsigned char)*src);
+                } else {
+                    *dst++ = *src;
+                }
+                break;
+        }
+        src++;
+    }
+    *dst = '\0';
+
+    return output;
+}
+
 /* Internal attach implementation with seek control */
 static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end) {
     if (!workflow_id) {
@@ -96,21 +133,28 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
             /* Read line from stdin */
             char input_line[1024];
             if (fgets(input_line, sizeof(input_line), stdin)) {
-                /* Send input to workflow via HTTP */
-                char json_body[2048];
-                snprintf(json_body, sizeof(json_body), "{\"input\":\"%s\"}", input_line);
-
-                snprintf(endpoint, sizeof(endpoint), "/api/workflow/input/%s", workflow_id);
-
-                arc_http_response_t* input_resp = NULL;
-                result = arc_http_post(endpoint, json_body, &input_resp);
-
-                if (result != ARGO_SUCCESS || !input_resp || input_resp->status_code != 200) {
-                    LOG_USER_WARN("Failed to send input to workflow\n");
-                    if (input_resp) arc_http_response_free(input_resp);
-                    /* Continue anyway - workflow might have ended */
+                /* Escape input for JSON */
+                char* escaped_input = json_escape_string(input_line);
+                if (!escaped_input) {
+                    LOG_USER_ERROR("Failed to escape input\n");
                 } else {
-                    arc_http_response_free(input_resp);
+                    /* Send input to workflow via HTTP */
+                    char json_body[2048];
+                    snprintf(json_body, sizeof(json_body), "{\"input\":\"%s\"}", escaped_input);
+                    free(escaped_input);
+
+                    snprintf(endpoint, sizeof(endpoint), "/api/workflow/input/%s", workflow_id);
+
+                    arc_http_response_t* input_resp = NULL;
+                    result = arc_http_post(endpoint, json_body, &input_resp);
+
+                    if (result != ARGO_SUCCESS || !input_resp || input_resp->status_code != 200) {
+                        LOG_USER_WARN("Failed to send input to workflow\n");
+                        if (input_resp) arc_http_response_free(input_resp);
+                        /* Continue anyway - workflow might have ended */
+                    } else {
+                        arc_http_response_free(input_resp);
+                    }
                 }
             } else {
                 /* EOF detected (Ctrl+D) - detach */

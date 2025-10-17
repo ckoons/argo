@@ -141,13 +141,16 @@ $(WORKFLOW_LOADER_TEST_TARGET): $(TEST_UNIT_DIR)/test_workflow_loader.c $(WORKFL
 arc: $(CORE_LIB) $(DAEMON_LIB)
 	@$(MAKE) -C arc
 
+ci: $(CORE_LIB) $(DAEMON_LIB)
+	@$(MAKE) -C ci
+
 ui: arc
 	@$(MAKE) -C ui/argo-term
 
 ui-argo-term: arc
 	@$(MAKE) -C ui/argo-term
 
-all-components: $(CORE_LIB) $(DAEMON_LIB) $(DAEMON_BINARY) arc ui arc-completions
+all-components: $(CORE_LIB) $(DAEMON_LIB) $(DAEMON_BINARY) arc ci ui arc-completions
 
 # Install arc shell completions
 arc-completions:

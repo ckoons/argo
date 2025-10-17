@@ -38,10 +38,10 @@ full-build: clean-all all-components install-all
         update-models harnesses harness-init-basic harness-env-inspect harness-reinit \
         harness-init-error harness-socket harness-terminal harness-workflow-context \
         harness-control-flow harness-ci-interactive harness-loop harness-persona \
-        harness-workflow-chain arc ui ui-argo-term all-components test-arc test-ui \
+        harness-workflow-chain arc ci ui ui-argo-term all-components test-arc test-ui \
         test-all-components count count-summary count-report count-snapshot count-json \
-        clean-arc clean-ui clean-all install install-arc install-term install-completion \
-        install-all uninstall uninstall-arc uninstall-term uninstall-all \
+        clean-arc clean-ci clean-ui clean-all install install-arc install-ci install-term install-completion \
+        install-all uninstall uninstall-arc uninstall-ci uninstall-term uninstall-all \
         test-shutdown-signals test-concurrent-workflows test-env-precedence \
         test-shared-services test-workflow-registry test-valgrind build-asan \
         test-asan test-asan-full help help-test help-count restart-daemon \

@@ -20,7 +20,10 @@ distclean: clean
 clean-arc:
 	@$(MAKE) -C arc clean
 
+clean-ci:
+	@$(MAKE) -C ci clean
+
 clean-ui:
 	@$(MAKE) -C ui/argo-term clean
 
-clean-all: clean clean-arc clean-ui
+clean-all: clean clean-arc clean-ci clean-ui
