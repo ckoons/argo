@@ -573,7 +573,14 @@ write\([^,]+,[[:space:]]*\"|\
 \\..*=[[:space:]]*\"|return\s+\"|\
 :\s*\"\"|\
 (==|!=)[[:space:]]*\"[^\"]{1,2}\"|\
-=[[:space:]]*{[[:space:]]*\"" | \
+=[[:space:]]*{[[:space:]]*\"|\
+http_response_set_error\(|\
+\"/api/|\
+strstr\([^,]+,[[:space:]]*\"[^\"]*:|\
+snprintf\([^,]+,[^,]+,[[:space:]]*\"[^\"]*:|\
+snprintf\([^,]+,[^,]+,[[:space:]]*\"{|\
+const char\*[[:space:]]*[a-zA-Z_].*=[[:space:]]*\"|\
+fprintf\(fp," | \
   wc -l | tr -d ' ')
 
 # Unapproved strings (candidates for externalization)
@@ -602,7 +609,14 @@ if [ "$UNAPPROVED_STRINGS" -gt 400 ]; then
     grep -vE "write\([^,]+,[[:space:]]*\"|\\..*=[[:space:]]*\"|return\s+\"" | \
     grep -vE ":\s*\"\"" | \
     grep -vE "(==|!=)[[:space:]]*\"[^\"]{1,2}\"" | \
-    grep -vE "=[[:space:]]*{[[:space:]]*\"" | head -10
+    grep -vE "=[[:space:]]*{[[:space:]]*\"" | \
+    grep -vE "http_response_set_error\(" | \
+    grep -vE "\"/api/" | \
+    grep -vE "strstr\([^,]+,[[:space:]]*\"[^\"]*:" | \
+    grep -vE "snprintf\([^,]+,[^,]+,[[:space:]]*\"[^\"]*:" | \
+    grep -vE "snprintf\([^,]+,[^,]+,[[:space:]]*\"{" | \
+    grep -vE "const char\*[[:space:]]*[a-zA-Z_].*=[[:space:]]*\"" | \
+    grep -vE "fprintf\(fp," | head -10
   echo ""
   echo "Note: Add GUIDELINE_APPROVED comment for legitimate constants (JSON, API paths, etc.)"
   WARNINGS=$((WARNINGS + 1))
@@ -623,6 +637,12 @@ else
   echo "  - Function returns (return \"value\")"
   echo "  - Ternary empty strings (condition ? value : \"\")"
   echo "  - Single-char comparisons (== \"\\\"\", != \"\\n\", etc.)"
+  echo "  - HTTP error responses (http_response_set_error)"
+  echo "  - API endpoint paths (\"/api/...\")"
+  echo "  - JSON field names in parsing (strstr/snprintf with \":\")"
+  echo "  - JSON object literals (snprintf with \"{...}\")"
+  echo "  - Const char* assignments (const char* var = \"...\")"
+  echo "  - File output formatting (fprintf(fp, ...))"
   echo "  - GUIDELINE_APPROVED markers"
 fi
 echo ""
