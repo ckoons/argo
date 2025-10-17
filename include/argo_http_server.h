@@ -26,6 +26,19 @@ typedef enum {
     HTTP_METHOD_UNKNOWN
 } http_method_t;
 
+/* HTTP method string constants */
+#define HTTP_METHOD_STR_GET "GET"
+#define HTTP_METHOD_STR_POST "POST"
+#define HTTP_METHOD_STR_DELETE "DELETE"
+#define HTTP_METHOD_STR_PUT "PUT"
+#define HTTP_METHOD_STR_UNKNOWN "UNKNOWN"
+
+/* HTTP content types */
+#define HTTP_CONTENT_TYPE_JSON "application/json"
+
+/* HTTP error messages */
+#define HTTP_DEFAULT_ERROR_MESSAGE "Unknown error"
+
 /* HTTP request structure */
 typedef struct {
     http_method_t method;

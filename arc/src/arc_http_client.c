@@ -13,6 +13,7 @@
 #include "arc_error.h"
 #include "argo_error.h"
 #include "argo_limits.h"
+#include "argo_http_server.h"  /* For HTTP constants */
 
 /* Write callback for curl */
 static size_t write_callback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -129,7 +130,9 @@ int arc_http_post(const char* endpoint, const char* json_body, arc_http_response
     snprintf(url, sizeof(url), "%s%s", arc_get_daemon_url(), endpoint);
 
     struct curl_slist* headers = NULL;
-    headers = curl_slist_append(headers, "Content-Type: " HTTP_CONTENT_TYPE_JSON);
+    char content_type_header[128];
+    snprintf(content_type_header, sizeof(content_type_header), "Content-Type: %s", HTTP_CONTENT_TYPE_JSON);
+    headers = curl_slist_append(headers, content_type_header);
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
