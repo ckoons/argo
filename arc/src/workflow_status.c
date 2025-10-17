@@ -73,10 +73,10 @@ int arc_workflow_status(int argc, char** argv) {
         const char* exit_str = strstr(response->body, "\"exit_code\"");
 
         if (script_str) {
-            sscanf(script_str, "\"script\":\"%511[^\"]\"", script);
+            sscanf(script_str, "\"script\":\"%ARC_SSCANF_FIELD_PATH[^\"]\"", script);
         }
         if (state_str) {
-            sscanf(state_str, "\"state\":\"%31[^\"]\"", state);
+            sscanf(state_str, "\"state\":\"%ARC_SSCANF_FIELD_SMALL[^\"]\"", state);
         }
         if (pid_str) {
             sscanf(pid_str, "\"pid\":%d", &pid);

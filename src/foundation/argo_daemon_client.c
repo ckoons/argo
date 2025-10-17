@@ -39,8 +39,8 @@ int argo_get_daemon_port(void) {
     const char* port_str = argo_config_get("daemon_port");
     if (port_str && port_str[0]) {
         char* endptr = NULL;
-        long port = strtol(port_str, &endptr, 10);
-        if (endptr != port_str && port > 0 && port < 65536) {
+        long port = strtol(port_str, &endptr, DECIMAL_BASE);
+        if (endptr != port_str && port > 0 && port < MAX_VALID_PORT + 1) {
             return (int)port;
         }
     }
@@ -49,8 +49,8 @@ int argo_get_daemon_port(void) {
     port_str = argo_getenv(ARGO_DAEMON_PORT_ENV);
     if (port_str && port_str[0]) {
         char* endptr = NULL;
-        long port = strtol(port_str, &endptr, 10);
-        if (endptr != port_str && port > 0 && port < 65536) {
+        long port = strtol(port_str, &endptr, DECIMAL_BASE);
+        if (endptr != port_str && port > 0 && port < MAX_VALID_PORT + 1) {
             return (int)port;
         }
     }

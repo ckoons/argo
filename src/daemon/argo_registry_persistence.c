@@ -13,6 +13,7 @@
 #include "argo_error.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 #include "argo_file_utils.h"
 
 /* Save registry state to file */
@@ -60,7 +61,7 @@ int registry_save_state(ci_registry_t* registry, const char* filepath) {
 /* Helper: Extract string field from JSON entry */
 static int extract_string_field(const char* ptr, const char* entry_end, const char* field_name,
                                 char* out_buffer, size_t buffer_size) {
-    char search_str[64];
+    char search_str[ARGO_BUFFER_SMALL];
     snprintf(search_str, sizeof(search_str), "\"%s\":", field_name);
 
     const char* field_start = strstr(ptr, search_str);
@@ -91,7 +92,7 @@ static int extract_string_field(const char* ptr, const char* entry_end, const ch
 
 /* Helper: Extract integer field from JSON entry */
 static int extract_int_field(const char* ptr, const char* entry_end, const char* field_name) {
-    char search_str[64];
+    char search_str[ARGO_BUFFER_SMALL];
     snprintf(search_str, sizeof(search_str), "\"%s\":", field_name);
 
     const char* field_start = strstr(ptr, search_str);

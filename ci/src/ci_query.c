@@ -106,7 +106,7 @@ int ci_cmd_query(int argc, char** argv) {
     }
 
     /* Build JSON request with escaped prompt */
-    size_t json_size = strlen(prompt) * 2 + 512;  /* Extra space for escaping + JSON structure */
+    size_t json_size = strlen(prompt) * CI_JSON_SIZE_MULTIPLIER + CI_JSON_OVERHEAD;  /* Extra space for escaping + JSON structure */
     json_request = malloc(json_size);
     if (!json_request) {
         LOG_USER_ERROR("Out of memory\n");
@@ -155,13 +155,13 @@ int ci_cmd_query(int argc, char** argv) {
     int http_result = ci_http_post("/api/ci/query", json_request, &response);
     if (http_result != ARGO_SUCCESS) {
         LOG_USER_ERROR("Failed to connect to daemon\n");
-        LOG_USER_INFO("  Make sure daemon is running: argo-daemon --port 9876\n");
+        LOG_USER_INFO("  Make sure daemon is running: argo-daemon --port %d\n", CI_DEFAULT_DAEMON_PORT);
         result = CI_EXIT_ERROR;
         goto cleanup;
     }
 
     /* Check HTTP status */
-    if (response->status_code != 200) {
+    if (response->status_code != CI_HTTP_STATUS_OK) {
         LOG_USER_ERROR("Query failed (HTTP %d)\n", response->status_code);
         if (response->body) {
             LOG_USER_INFO("  %s\n", response->body);

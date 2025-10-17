@@ -12,6 +12,7 @@
 #include "argo_daemon_workflow_helpers.h"
 #include "argo_workflow_registry.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 #include "argo_log.h"
 
 /* Parse args array from JSON body */
@@ -218,7 +219,7 @@ int generate_workflow_id(workflow_registry_t* registry, const char* template_nam
     }
 
     /* Build search prefix: "template_name_" */
-    char prefix[128];
+    char prefix[ARGO_BUFFER_NAME];
     snprintf(prefix, sizeof(prefix), "%s_", template_name);
     size_t prefix_len = strlen(prefix);
 

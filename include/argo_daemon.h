@@ -10,6 +10,14 @@
 #include "argo_lifecycle.h"
 #include "argo_daemon_exit_queue.h"
 
+/* Common daemon error messages */
+#define DAEMON_ERR_INTERNAL_SERVER "Internal server error"
+#define DAEMON_ERR_WORKFLOW_NOT_FOUND "Workflow not found"
+#define DAEMON_ERR_MISSING_WORKFLOW_ID "Missing workflow ID"
+#define DAEMON_ERR_MISSING_REQUEST_BODY "Missing request body"
+#define DAEMON_ERR_INVALID_JSON "Invalid JSON"
+#define DAEMON_ERR_ALLOCATION_FAILED "allocation failed"
+
 /* Forward declarations */
 typedef struct workflow_registry workflow_registry_t;
 typedef struct shared_services shared_services_t;

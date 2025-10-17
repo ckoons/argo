@@ -12,8 +12,8 @@
 
 /* Find tests directory for template */
 static int find_tests_dir(const char* template_name, char* tests_dir, size_t tests_dir_size) {
-    char user_template_path[512];
-    char system_template_path[512];
+    char user_template_path[ARC_PATH_BUFFER];
+    char system_template_path[ARC_PATH_BUFFER];
     const char* home = getenv("HOME");
     struct stat st;
 
@@ -116,7 +116,7 @@ static int run_all_tests(const char* tests_dir) {
         if (strncmp(entry->d_name, "test_", 5) != 0) continue;
         if (!strstr(entry->d_name, ".sh")) continue;
 
-        char test_path[512];
+        char test_path[ARC_PATH_BUFFER];
         snprintf(test_path, sizeof(test_path), "%s/%s", tests_dir, entry->d_name);
 
         /* Verify it's a regular file */
@@ -165,7 +165,7 @@ int arc_workflow_test(int argc, char** argv) {
     const char* template_name = argv[0];
 
     /* Find tests directory */
-    char tests_dir[512];
+    char tests_dir[ARC_PATH_BUFFER];
     if (find_tests_dir(template_name, tests_dir, sizeof(tests_dir)) != ARC_EXIT_SUCCESS) {
         return ARC_EXIT_ERROR;
     }
@@ -176,7 +176,7 @@ int arc_workflow_test(int argc, char** argv) {
     /* Run specific test or all tests */
     if (argc >= 2) {
         const char* test_name = argv[1];
-        char test_path[512];
+        char test_path[ARC_PATH_BUFFER];
 
         /* Add .sh extension if not present */
         if (strstr(test_name, ".sh")) {

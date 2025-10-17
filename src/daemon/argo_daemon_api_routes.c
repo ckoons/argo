@@ -21,7 +21,7 @@ int api_registry_list_ci(http_request_t* req, http_response_t* resp) {
     (void)req;  /* Unused */
 
     if (!resp || !g_api_daemon || !g_api_daemon->registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 

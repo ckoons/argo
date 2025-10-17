@@ -27,7 +27,7 @@ static void show_general_help(void) {
     printf("  System templates: workflows/templates/\n");
     printf("  User templates:   ~/.argo/workflows/templates/\n\n");
     printf("Prerequisites:\n");
-    printf("  Daemon must be running: argo-daemon --port 9876\n\n");
+    printf("  Daemon must be running: argo-daemon --port ARC_DEFAULT_DAEMON_PORT\n\n");
     printf("Examples:\n");
     printf("  arc templates                      # List available templates\n");
     printf("  arc start create_workflow          # Start with auto-naming (create_workflow_01)\n");

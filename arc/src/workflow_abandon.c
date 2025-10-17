@@ -19,7 +19,7 @@ static int get_confirmation(const char* workflow_name) {
         return 1;  /* Auto-confirm in non-interactive mode */
     }
 
-    char response[10];
+    char response[ARC_RESPONSE_BUFFER_TINY];
     LOG_USER_INFO("Abandon workflow '%s'? (y/N): ", workflow_name);
     if (fgets(response, sizeof(response), stdin) == NULL) {
         return 0;

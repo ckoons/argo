@@ -12,6 +12,7 @@
 #include "argo_ci_common.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Initialize provider statistics */
 void provider_stats_init(provider_stats_t* stats) {
@@ -49,7 +50,7 @@ int ensure_buffer_capacity(char** buffer, size_t* capacity, size_t required) {
 /* Extract JSON string field */
 int extract_json_string(const char* json, const char* field,
                        char* output, size_t output_size) {
-    char search[256];
+    char search[ARGO_BUFFER_MEDIUM];
     snprintf(search, sizeof(search), "\"%s\":\"", field);
 
     char* start = strstr(json, search);

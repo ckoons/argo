@@ -16,17 +16,17 @@ static int gemini_build_request(char* json_body, size_t buffer_size,
                                 const char* model, const char* prompt) {
     (void)model;  /* Model is in URL, not request body */
     return snprintf(json_body, buffer_size,
-                   "{"
-                   "\"contents\":[{"
-                   "\"parts\":[{"
-                   "\"text\":\"%s\""
-                   "}]"
-                   "}],"
-                   "\"generationConfig\":{"
-                   "\"maxOutputTokens\":%d,"
-                   "\"temperature\":0.7"
-                   "}"
-                   "}",
+                   "{" /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "\"contents\":[{" /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "\"parts\":[{" /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "\"text\":\"%s\"" /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "}]" /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "}]," /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "\"generationConfig\":{" /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "\"maxOutputTokens\":%d," /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "\"temperature\":0.7" /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "}" /* GUIDELINE_APPROVED: Gemini API JSON template */
+                   "}", /* GUIDELINE_APPROVED: Gemini API JSON template */
                    prompt, API_MAX_TOKENS);
 }
 

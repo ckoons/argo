@@ -31,7 +31,7 @@ static size_t write_callback(void* contents, size_t size, size_t nmemb, void* us
 
 /* Get daemon base URL */
 const char* ci_get_daemon_url(void) {
-    static char url_buffer[256];
+    static char url_buffer[CI_URL_BUFFER];
     static int initialized = 0;
 
     if (!initialized) {
@@ -39,8 +39,8 @@ const char* ci_get_daemon_url(void) {
         const char* port_env = getenv(CI_DAEMON_PORT_ENV);
         if (port_env) {
             char* endptr = NULL;
-            long port_num = strtol(port_env, &endptr, 10);
-            if (endptr != port_env && port_num > 0 && port_num < 65536) {
+            long port_num = strtol(port_env, &endptr, DECIMAL_BASE);
+            if (endptr != port_env && port_num > 0 && port_num < CI_MAX_PORT) {
                 port = (int)port_num;
             }
         }
@@ -75,7 +75,7 @@ int ci_http_post(const char* endpoint, const char* json_body, ci_http_response_t
         return E_SYSTEM_MEMORY;
     }
 
-    char url[512];
+    char url[CI_URL_BUFFER];
     snprintf(url, sizeof(url), "%s%s", ci_get_daemon_url(), endpoint);
 
     struct curl_slist* headers = NULL;
@@ -122,7 +122,7 @@ static int is_daemon_running(void) {
         return 0;
     }
 
-    char url[512];
+    char url[CI_URL_BUFFER];
     snprintf(url, sizeof(url), "%s/api/health", ci_get_daemon_url());
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -149,7 +149,7 @@ static int start_daemon(void) {
         freopen("/dev/null", "w", stderr);
 
         /* Get port from environment or use default */
-        char port_str[16];
+        char port_str[CI_PORT_STRING_BUFFER];
         snprintf(port_str, sizeof(port_str), "%d", CI_DAEMON_DEFAULT_PORT);
 
         const char* port_env = getenv(CI_DAEMON_PORT_ENV);

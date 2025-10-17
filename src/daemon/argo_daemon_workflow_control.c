@@ -14,6 +14,7 @@
 #include "argo_http_server.h"
 #include "argo_workflow_registry.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 #include "argo_log.h"
 #include "argo_json.h"
 
@@ -52,14 +53,14 @@ static void unescape_json_string(char* str) {
 /* POST /api/workflow/pause/{id} - Pause workflow execution */
 int api_workflow_pause(http_request_t* req, http_response_t* resp) {
     if (!req || !resp || !g_api_daemon || !g_api_daemon->workflow_registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 
     /* Extract workflow ID from path */
     const char* id_start = strrchr(req->path, '/');
     if (!id_start || !*(id_start + 1)) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, DAEMON_ERR_MISSING_WORKFLOW_ID);
         return E_INPUT_NULL;
     }
     const char* workflow_id = id_start + 1;
@@ -67,13 +68,13 @@ int api_workflow_pause(http_request_t* req, http_response_t* resp) {
     /* Find workflow in registry */
     const workflow_entry_t* entry = workflow_registry_find(g_api_daemon->workflow_registry, workflow_id);
     if (!entry) {
-        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, DAEMON_ERR_WORKFLOW_NOT_FOUND);
         return E_NOT_FOUND;
     }
 
     /* Check if workflow is running */
     if (entry->state != WORKFLOW_STATE_RUNNING) {
-        char error_msg[128];
+        char error_msg[ARGO_BUFFER_NAME];
         snprintf(error_msg, sizeof(error_msg),
                 "Workflow is not running (state: %s)",
                 workflow_state_to_string(entry->state));
@@ -96,7 +97,7 @@ int api_workflow_pause(http_request_t* req, http_response_t* resp) {
     mutable_entry->state = WORKFLOW_STATE_PAUSED;
 
     /* Build success response */
-    char response_json[256];
+    char response_json[ARGO_BUFFER_MEDIUM];
     snprintf(response_json, sizeof(response_json),
             "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"paused\"}",
             workflow_id);
@@ -108,14 +109,14 @@ int api_workflow_pause(http_request_t* req, http_response_t* resp) {
 /* POST /api/workflow/resume/{id} - Resume paused workflow */
 int api_workflow_resume(http_request_t* req, http_response_t* resp) {
     if (!req || !resp || !g_api_daemon || !g_api_daemon->workflow_registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 
     /* Extract workflow ID from path */
     const char* id_start = strrchr(req->path, '/');
     if (!id_start || !*(id_start + 1)) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, DAEMON_ERR_MISSING_WORKFLOW_ID);
         return E_INPUT_NULL;
     }
     const char* workflow_id = id_start + 1;
@@ -123,13 +124,13 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
     /* Find workflow in registry */
     const workflow_entry_t* entry = workflow_registry_find(g_api_daemon->workflow_registry, workflow_id);
     if (!entry) {
-        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, DAEMON_ERR_WORKFLOW_NOT_FOUND);
         return E_NOT_FOUND;
     }
 
     /* Check if workflow is paused */
     if (entry->state != WORKFLOW_STATE_PAUSED) {
-        char error_msg[128];
+        char error_msg[ARGO_BUFFER_NAME];
         snprintf(error_msg, sizeof(error_msg),
                 "Workflow is not paused (state: %s)",
                 workflow_state_to_string(entry->state));
@@ -152,7 +153,7 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
     mutable_entry->state = WORKFLOW_STATE_RUNNING;
 
     /* Build success response */
-    char response_json[256];
+    char response_json[ARGO_BUFFER_MEDIUM];
     snprintf(response_json, sizeof(response_json),
             "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"resumed\"}",
             workflow_id);
@@ -164,14 +165,14 @@ int api_workflow_resume(http_request_t* req, http_response_t* resp) {
 /* POST /api/workflow/input/{id} - Send user input to workflow */
 int api_workflow_input(http_request_t* req, http_response_t* resp) {
     if (!req || !resp || !g_api_daemon || !g_api_daemon->workflow_registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 
     /* Extract workflow ID from path */
     const char* id_start = strrchr(req->path, '/');
     if (!id_start || !*(id_start + 1)) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, DAEMON_ERR_MISSING_WORKFLOW_ID);
         return E_INPUT_NULL;
     }
     const char* workflow_id = id_start + 1;
@@ -179,13 +180,13 @@ int api_workflow_input(http_request_t* req, http_response_t* resp) {
     /* Find workflow in registry */
     const workflow_entry_t* entry = workflow_registry_find(g_api_daemon->workflow_registry, workflow_id);
     if (!entry) {
-        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, DAEMON_ERR_WORKFLOW_NOT_FOUND);
         return E_NOT_FOUND;
     }
 
     /* Check if workflow is running */
     if (entry->state != WORKFLOW_STATE_RUNNING && entry->state != WORKFLOW_STATE_PAUSED) {
-        char error_msg[128];
+        char error_msg[ARGO_BUFFER_NAME];
         snprintf(error_msg, sizeof(error_msg),
                 "Workflow is not running (state: %s)",
                 workflow_state_to_string(entry->state));
@@ -201,7 +202,7 @@ int api_workflow_input(http_request_t* req, http_response_t* resp) {
 
     /* Parse JSON body to extract input text */
     if (!req->body) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing request body");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, DAEMON_ERR_MISSING_REQUEST_BODY);
         return E_INPUT_NULL;
     }
 
@@ -230,7 +231,7 @@ int api_workflow_input(http_request_t* req, http_response_t* resp) {
     }
 
     /* Build success response */
-    char response_json[256];
+    char response_json[ARGO_BUFFER_MEDIUM];
     snprintf(response_json, sizeof(response_json),
             "{\"status\":\"success\",\"workflow_id\":\"%s\",\"bytes_written\":%zd}",
             workflow_id, written);

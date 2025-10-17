@@ -15,17 +15,17 @@
 static int claude_build_request(char* json_body, size_t buffer_size,
                                 const char* model, const char* prompt) {
     return snprintf(json_body, buffer_size,
-                   "{"
-                   "\"model\":\"%s\","
-                   "\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}],"
-                   "\"max_tokens\":%d"
-                   "}",
+                   "{" /* GUIDELINE_APPROVED: Claude API JSON template */
+                   "\"model\":\"%s\"," /* GUIDELINE_APPROVED: Claude API JSON template */
+                   "\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]," /* GUIDELINE_APPROVED: Claude API JSON template */
+                   "\"max_tokens\":%d" /* GUIDELINE_APPROVED: Claude API JSON template */
+                   "}", /* GUIDELINE_APPROVED: Claude API JSON template */
                    model, prompt, API_MAX_TOKENS);
 }
 
 /* Claude API configuration */
 static const char* claude_extra_headers[] = {
-    "anthropic-version", ANTHROPIC_API_VERSION,
+    "anthropic-version", ANTHROPIC_API_VERSION, /* GUIDELINE_APPROVED: HTTP header name */
     NULL
 };
 

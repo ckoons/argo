@@ -14,6 +14,7 @@
 #include "argo_json.h"
 #include "argo_socket.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 #include "argo_error_messages.h"
 #include "argo_log.h"
 
@@ -287,7 +288,7 @@ ci_message_t* message_from_json(const char* json) {
     char* ts_start = strstr(json, REGISTRY_JSON_TIMESTAMP);
     if (ts_start) {
         char* endptr = NULL;
-        long ts = strtol(ts_start + strlen(REGISTRY_JSON_TIMESTAMP), &endptr, 10);
+        long ts = strtol(ts_start + strlen(REGISTRY_JSON_TIMESTAMP), &endptr, DECIMAL_BASE);
         if (endptr != ts_start + strlen(REGISTRY_JSON_TIMESTAMP) && ts >= 0) {
             msg->timestamp = (time_t)ts;
         } else {
@@ -301,7 +302,7 @@ ci_message_t* message_from_json(const char* json) {
     char* timeout_start = strstr(json, REGISTRY_JSON_TIMEOUT);
     if (timeout_start) {
         char* endptr = NULL;
-        long timeout = strtol(timeout_start + strlen(REGISTRY_JSON_TIMEOUT), &endptr, 10);
+        long timeout = strtol(timeout_start + strlen(REGISTRY_JSON_TIMEOUT), &endptr, DECIMAL_BASE);
         if (endptr != timeout_start + strlen(REGISTRY_JSON_TIMEOUT) && timeout >= 0 && timeout <= INT_MAX) {
             msg->metadata.timeout_ms = (int)timeout;
         }

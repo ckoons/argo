@@ -10,6 +10,7 @@
 /* Project includes */
 #include "argo_workflow.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 #include "argo_log.h"
 #include "argo_json.h"
 #include "argo_file_utils.h"

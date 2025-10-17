@@ -113,7 +113,7 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
     }
 
     /* Validate workflow_id */
-    if (strlen(workflow_id) > 63 || strlen(workflow_id) == 0) {
+    if (strlen(workflow_id) > WORKFLOW_ID_MAX_LENGTH || strlen(workflow_id) == 0) {
         argo_report_error(E_INVALID_PARAMS, "daemon_execute_bash_workflow",
                          "Invalid workflow_id length");
         return E_INVALID_PARAMS;

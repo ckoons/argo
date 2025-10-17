@@ -58,10 +58,10 @@ static void kill_existing_daemon(uint16_t port) {
 
         FILE* pipe = popen(lsof_cmd, "r"); /* GUIDELINE_APPROVED: popen with validated port number */
         if (pipe) {
-            char pid_str[32];
+            char pid_str[ARGO_BUFFER_TINY];
             if (fgets(pid_str, sizeof(pid_str), pipe)) { /* GUIDELINE_APPROVED: fgets in if condition */
                 char* endptr = NULL;
-                long pid_long = strtol(pid_str, &endptr, 10);
+                long pid_long = strtol(pid_str, &endptr, DECIMAL_BASE);
                 if (endptr != pid_str && pid_long > 0 && pid_long <= INT_MAX) {
                     kill((pid_t)pid_long, SIGKILL);
                 }
@@ -70,8 +70,8 @@ static void kill_existing_daemon(uint16_t port) {
         }
 
         /* Poll for port to become free (max 20 attempts × 100ms = 2 seconds) */
-        for (int attempt = 0; attempt < 20; attempt++) {
-            usleep(100000);  /* 100ms - under 0.5s threshold */
+        for (int attempt = 0; attempt < DAEMON_PORT_FREE_MAX_ATTEMPTS; attempt++) {
+            usleep(DAEMON_PORT_FREE_DELAY_USEC);  /* 100ms - under 0.5s threshold */
 
             int test_sock = socket(AF_INET, SOCK_STREAM, 0);
             if (test_sock >= 0) {
@@ -138,7 +138,7 @@ static uint16_t parse_port_config(int argc, char** argv) {
     const char* env_port = getenv("ARGO_DAEMON_PORT");
     if (env_port) {
         char* endptr = NULL;
-        long p = strtol(env_port, &endptr, 10);
+        long p = strtol(env_port, &endptr, DECIMAL_BASE);
         if (endptr != env_port && p > 0 && p <= MAX_TCP_PORT) {
             port = (uint16_t)p;
             fprintf(stderr, "Using port from ARGO_DAEMON_PORT: %d\n", port);
@@ -150,7 +150,7 @@ static uint16_t parse_port_config(int argc, char** argv) {
         if (strcmp(argv[i], "--port") == 0) {
             if (i + 1 < argc) {
                 char* endptr = NULL;
-                long p = strtol(argv[++i], &endptr, 10);
+                long p = strtol(argv[++i], &endptr, DECIMAL_BASE);
                 if (endptr != argv[i] && *endptr == '\0' && p > 0 && p <= MAX_TCP_PORT) {
                     port = (uint16_t)p;
                     fprintf(stderr, "Using port from --port argument: %d\n", port);

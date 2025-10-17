@@ -11,4 +11,21 @@
 /* HTTP timeouts */
 #define CI_QUERY_TIMEOUT_SECONDS 120
 
+/* Daemon defaults */
+#define CI_DEFAULT_DAEMON_PORT 9876
+
+/* Network limits */
+#define CI_MAX_PORT 65536
+
+/* HTTP client buffers */
+#define CI_URL_BUFFER 512
+#define CI_PORT_STRING_BUFFER 16
+
+/* HTTP status codes */
+#define CI_HTTP_STATUS_OK 200
+
+/* JSON size calculation constants */
+#define CI_JSON_OVERHEAD 512  /* Extra space for escaping + JSON structure */
+#define CI_JSON_SIZE_MULTIPLIER 2  /* Multiply prompt length for escaping */
+
 #endif /* CI_CONSTANTS_H */

@@ -53,7 +53,7 @@ static void get_template_description(const char* base_path, const char* name,
             while (*start == ' ' || *start == '\t' || *start == '#' || *start == '\n') {
                 start++;
             }
-            if (strlen(start) > 10) {  /* Minimum meaningful description */
+            if (strlen(start) > ARC_MIN_DESC_LEN) {  /* Minimum meaningful description */
                 /* Remove trailing newline */
                 char* end = start + strlen(start) - 1;
                 while (end > start && (*end == '\n' || *end == '\r')) {

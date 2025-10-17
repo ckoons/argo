@@ -66,7 +66,7 @@ int arc_workflow_states(int argc, char** argv) {
     const char* ptr = workflows_array;
     while ((ptr = strstr(ptr, "{\"workflow_id\":\"")) != NULL) {
         count++;
-        ptr += 16; /* strlen("{\"workflow_id\":\"") */
+        ptr += ARC_JSON_OFFSET_ID; /* strlen("{\"workflow_id\":\"") */
     }
 
     /* Print header */
@@ -91,12 +91,12 @@ int arc_workflow_states(int argc, char** argv) {
         int pid = 0;
 
         /* Extract fields */
-        if (sscanf(ptr, "{\"workflow_id\":\"%255[^\"]\"", workflow_id) == 1) {
+        if (sscanf(ptr, "{\"workflow_id\":\"%ARC_SSCANF_FIELD_LARGE[^\"]\"", workflow_id) == 1) {
             const char* status_str = strstr(ptr, "\"status\":\"");
             const char* pid_str = strstr(ptr, "\"pid\":");
 
             if (status_str) {
-                sscanf(status_str, "\"status\":\"%31[^\"]\"", status);
+                sscanf(status_str, "\"status\":\"%ARC_SSCANF_FIELD_SMALL[^\"]\"", status);
             }
             if (pid_str) {
                 sscanf(pid_str, "\"pid\":%d", &pid);

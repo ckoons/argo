@@ -12,6 +12,7 @@
 #include "argo_http.h"
 #include "argo_error.h"
 #include "argo_log.h"
+#include "argo_limits.h"
 
 /* Initialize HTTP client */
 int http_init(void) {
@@ -153,15 +154,15 @@ static int read_http_response(FILE* fp, http_response_t** resp) {
     char* last_newline = strrchr(response_buf, '\n');
     if (last_newline && last_newline > response_buf) {
         char* endptr = NULL;
-        long code = strtol(last_newline + 1, &endptr, 10);
-        if (endptr != last_newline + 1 && code >= 100 && code < 600) {
+        long code = strtol(last_newline + 1, &endptr, DECIMAL_BASE);
+        if (endptr != last_newline + 1 && code >= HTTP_STATUS_MIN_VALID && code < HTTP_STATUS_MAX_VALID) {
             status_code = (int)code;
         }
         *last_newline = '\0';
         response_size = last_newline - response_buf;
     }
 
-    /* Validate HTTP status code - catch non-200 responses */
+    /* Validate HTTP status code - catch non-OK responses */
     if (status_code < HTTP_STATUS_OK || status_code >= HTTP_STATUS_SERVER_ERROR) {
         LOG_WARN("HTTP request returned non-2xx status: %d", status_code);
         /* Still return the response so caller can handle it */
@@ -169,7 +170,7 @@ static int read_http_response(FILE* fp, http_response_t** resp) {
 
     /* Validate response body is not empty for successful requests */
     if (status_code == HTTP_STATUS_OK && response_size == 0) {
-        LOG_WARN("HTTP request returned 200 but empty body");
+        LOG_WARN("HTTP request returned OK but empty body");
         /* This might be valid for some APIs, so don't fail */
     }
 
@@ -328,8 +329,8 @@ int http_parse_url(const char* url, char** host, int* port, char** path) {
     if (colon && (!slash || colon < slash)) {
         host_len = colon - p;
         char* endptr = NULL;
-        long port_num = strtol(colon + 1, &endptr, 10);
-        if (endptr != colon + 1 && port_num > 0 && port_num <= 65535) {
+        long port_num = strtol(colon + 1, &endptr, DECIMAL_BASE);
+        if (endptr != colon + 1 && port_num > 0 && port_num <= MAX_VALID_PORT) {
             *port = (int)port_num;
         }
     } else if (slash) {

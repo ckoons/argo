@@ -40,12 +40,12 @@ bool openrouter_is_available(void) {
 static int openrouter_build_request(char* json_body, size_t buffer_size,
                                     const char* model, const char* prompt) {
     return snprintf(json_body, buffer_size,
-                   "{"
-                   "\"model\":\"%s\","
-                   "\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}],"
-                   "\"max_tokens\":%d,"
-                   "\"stream\":false"
-                   "}",
+                   "{" /* GUIDELINE_APPROVED: OpenRouter API JSON template */
+                   "\"model\":\"%s\"," /* GUIDELINE_APPROVED: OpenRouter API JSON template */
+                   "\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]," /* GUIDELINE_APPROVED: OpenRouter API JSON template */
+                   "\"max_tokens\":%d," /* GUIDELINE_APPROVED: OpenRouter API JSON template */
+                   "\"stream\":false" /* GUIDELINE_APPROVED: OpenRouter API JSON template */
+                   "}", /* GUIDELINE_APPROVED: OpenRouter API JSON template */
                    model, prompt, API_MAX_TOKENS);
 }
 

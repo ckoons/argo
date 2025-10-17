@@ -218,7 +218,7 @@ static int claude_code_execute_with_streaming(claude_code_context_t* ctx,
         /* If exec fails */
         /* GUIDELINE_APPROVED: Child process error before exit */
         fprintf(stderr, "Failed to exec claude: %s\n", strerror(errno));
-        exit(127);
+        exit(EXIT_CODE_COMMAND_NOT_FOUND);
     }
 
     /* Parent process: write prompt to stdin, then read stdout */

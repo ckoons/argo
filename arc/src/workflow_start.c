@@ -22,8 +22,8 @@ static int resolve_template_path(const char* template_name, char* script_path, s
     }
 
     struct stat st;
-    char user_template[512];
-    char system_template[512];
+    char user_template[ARC_PATH_BUFFER];
+    char system_template[ARC_PATH_BUFFER];
 
     /* Try user template: ~/.argo/workflows/templates/{name}/workflow.sh */
     snprintf(user_template, sizeof(user_template),
@@ -81,13 +81,13 @@ int arc_workflow_start(int argc, char** argv) {
     }
 
     /* Resolve template name to script path */
-    char script_path[512];
+    char script_path[ARC_PATH_BUFFER];
     if (resolve_template_path(template_name, script_path, sizeof(script_path)) != ARC_EXIT_SUCCESS) {
         return ARC_EXIT_ERROR;
     }
 
     /* Build JSON request with script, template, instance, args, and env */
-    char json_body[4096];  /* Larger buffer for args + env */
+    char json_body[ARC_JSON_BUFFER];  /* Larger buffer for args + env */
     size_t offset = 0;
 
     offset += snprintf(json_body + offset, sizeof(json_body) - offset,
@@ -101,11 +101,11 @@ int arc_workflow_start(int argc, char** argv) {
 
     /* Parse arguments - separate regular args from KEY=VALUE env vars */
     int env_count = 0;
-    char* env_keys[32];
-    char* env_values[32];
+    char* env_keys[ARC_MAX_ENV_VARS];
+    char* env_values[ARC_MAX_ENV_VARS];
 
     /* First pass: identify and extract env vars */
-    for (int i = arg_start_index; i < argc && env_count < 32; i++) {
+    for (int i = arg_start_index; i < argc && env_count < ARC_MAX_ENV_VARS; i++) {
         char* eq = strchr(argv[i], '=');
         if (eq && eq != argv[i]) {
             /* This is KEY=VALUE format */
@@ -130,7 +130,7 @@ int arc_workflow_start(int argc, char** argv) {
                 offset += snprintf(json_body + offset, sizeof(json_body) - offset,
                                  "%s\"%s\"", (args_added > 0 ? "," : ""), argv[i]);
                 args_added++;
-                if (offset >= sizeof(json_body) - 10) {
+                if (offset >= sizeof(json_body) - ARC_JSON_MARGIN) {
                     LOG_USER_ERROR("Too many arguments (buffer overflow)\n");
                     for (int j = 0; j < env_count; j++) {
                         free(env_keys[j]);
@@ -172,16 +172,16 @@ int arc_workflow_start(int argc, char** argv) {
     }
 
     /* Check HTTP status */
-    if (response->status_code == 404) {
+    if (response->status_code == ARC_HTTP_STATUS_NOT_FOUND) {
         LOG_USER_ERROR("Script not found: %s\n", script_path);
         arc_http_response_free(response);
         return ARC_EXIT_ERROR;
-    } else if (response->status_code == 409) {
+    } else if (response->status_code == ARC_HTTP_STATUS_CONFLICT) {
         LOG_USER_ERROR("Workflow already exists\n");
         LOG_USER_INFO("  Try: arc workflow list\n");
         arc_http_response_free(response);
         return ARC_EXIT_ERROR;
-    } else if (response->status_code != 200) {
+    } else if (response->status_code != ARC_HTTP_STATUS_OK) {
         LOG_USER_ERROR("Failed to start workflow (HTTP %d)\n", response->status_code);
         if (response->body) {
             LOG_USER_INFO("  %s\n", response->body);
@@ -195,7 +195,7 @@ int arc_workflow_start(int argc, char** argv) {
     if (response->body) {
         const char* id_str = strstr(response->body, "\"workflow_id\":\"");
         if (id_str) {
-            sscanf(id_str, "\"workflow_id\":\"%127[^\"]\"", workflow_id);
+            sscanf(id_str, "\"workflow_id\":\"%ARC_SSCANF_FIELD_MEDIUM[^\"]\"", workflow_id);
         }
     }
 

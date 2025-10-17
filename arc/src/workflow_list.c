@@ -81,12 +81,12 @@ static int list_active_workflows(const char* environment) {
         const char* state_str = strstr(ptr, "\"state\":\"");
         const char* pid_str = strstr(ptr, "\"pid\":");
 
-        if (id_str && sscanf(id_str, "{\"workflow_id\":\"%255[^\"]\"", workflow_id) == 1) {
+        if (id_str && sscanf(id_str, "{\"workflow_id\":\"%ARC_SSCANF_FIELD_LARGE[^\"]\"", workflow_id) == 1) {
             if (script_str) {
-                sscanf(script_str, "\"script\":\"%511[^\"]\"", script);
+                sscanf(script_str, "\"script\":\"%ARC_SSCANF_FIELD_PATH[^\"]\"", script);
             }
             if (state_str) {
-                sscanf(state_str, "\"state\":\"%31[^\"]\"", state);
+                sscanf(state_str, "\"state\":\"%ARC_SSCANF_FIELD_SMALL[^\"]\"", state);
             }
             if (pid_str) {
                 sscanf(pid_str, "\"pid\":%d", &pid);

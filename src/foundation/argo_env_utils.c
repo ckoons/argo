@@ -12,6 +12,7 @@
 #include "argo_env_utils.h"
 #include "argo_env_internal.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 #include "argo_log.h"
 
 /* Get environment variable */
@@ -88,7 +89,7 @@ int argo_getenvint(const char* name, int* value) {
 
     char* endptr;
     errno = 0;
-    long result = strtol(str_value, &endptr, 10);
+    long result = strtol(str_value, &endptr, DECIMAL_BASE);
 
     if (errno == ERANGE || result > INT_MAX || result < INT_MIN) {
         return E_PROTOCOL_FORMAT;

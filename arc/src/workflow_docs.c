@@ -39,7 +39,7 @@ static void display_readme(const char* readme_path) {
         return;
     }
 
-    char line[1024];
+    char line[ARC_LINE_BUFFER];
     while (fgets(line, sizeof(line), fp)) {
         printf("%s", line);
     }
@@ -52,7 +52,7 @@ static void display_metadata(const char* template_name) {
     const char* home = getenv("HOME");
     if (!home) return;
 
-    char metadata_path[512];
+    char metadata_path[ARC_PATH_BUFFER];
     snprintf(metadata_path, sizeof(metadata_path),
             "%s/.argo/workflows/templates/%s/metadata.yaml", home, template_name);
 
@@ -69,7 +69,7 @@ static void display_metadata(const char* template_name) {
     FILE* fp = fopen(metadata_path, "r");
     if (!fp) return;
 
-    char line[1024];
+    char line[ARC_LINE_BUFFER];
     while (fgets(line, sizeof(line), fp)) {
         /* Skip comments and empty lines */
         char* trimmed = line;
@@ -95,7 +95,7 @@ int arc_workflow_docs(int argc, char** argv) {
     const char* template_name = argv[0];
 
     /* Find README */
-    char readme_path[512];
+    char readme_path[ARC_PATH_BUFFER];
     if (find_readme(template_name, readme_path, sizeof(readme_path)) != ARC_EXIT_SUCCESS) {
         return ARC_EXIT_ERROR;
     }

@@ -22,9 +22,11 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "1. MAGIC NUMBERS CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check all component directories (src, arc/src, ci/src)
+# Exclude: comments (// /* *), #defines, errno, copyright year
+# Format: filename:linenum:content, so we filter on content after second colon
 MAGIC_NUMBERS=$(grep -rn '\b[0-9]\{2,\}\b' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
-  grep -v "^\s*//" | grep -v "^\s*\*" | grep -v "line " | \
-  grep -v "errno" | grep -v "2025" | wc -l | tr -d ' ')
+  grep -v ":[[:space:]]*//" | grep -v ":[[:space:]]*\*" | grep -v ":[[:space:]]*/\*" | \
+  grep -v ":[[:space:]]*#" | grep -v "line " | grep -v "errno" | grep -v "2025" | wc -l | tr -d ' ')
 echo "Found $MAGIC_NUMBERS potential magic numbers in production .c files"
 if [ "$MAGIC_NUMBERS" -gt 50 ]; then
   echo "⚠ WARN: Threshold exceeded (max: 50)"

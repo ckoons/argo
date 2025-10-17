@@ -15,12 +15,12 @@
 static int openai_build_request(char* json_body, size_t buffer_size,
                                 const char* model, const char* prompt) {
     return snprintf(json_body, buffer_size,
-                   "{"
-                   "\"model\":\"%s\","
-                   "\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}],"
-                   "\"max_tokens\":%d,"
-                   "\"temperature\":0.7"
-                   "}",
+                   "{" /* GUIDELINE_APPROVED: OpenAI API JSON template */
+                   "\"model\":\"%s\"," /* GUIDELINE_APPROVED: OpenAI API JSON template */
+                   "\"messages\":[{\"role\":\"user\",\"content\":\"%s\"}]," /* GUIDELINE_APPROVED: OpenAI API JSON template */
+                   "\"max_tokens\":%d," /* GUIDELINE_APPROVED: OpenAI API JSON template */
+                   "\"temperature\":0.7" /* GUIDELINE_APPROVED: OpenAI API JSON template */
+                   "}", /* GUIDELINE_APPROVED: OpenAI API JSON template */
                    model, prompt, API_MAX_TOKENS);
 }
 

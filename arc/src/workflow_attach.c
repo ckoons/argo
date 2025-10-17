@@ -61,7 +61,7 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
     }
 
     /* Verify workflow exists */
-    char endpoint[512];
+    char endpoint[ARC_PATH_BUFFER];
     snprintf(endpoint, sizeof(endpoint), "/api/workflow/status/%s", workflow_id);
 
     arc_http_response_t* response = NULL;
@@ -72,11 +72,11 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
         return ARC_EXIT_ERROR;
     }
 
-    if (response->status_code == 404) {
+    if (response->status_code == ARC_HTTP_STATUS_NOT_FOUND) {
         LOG_USER_ERROR("Workflow not found: %s\n", workflow_id);
         arc_http_response_free(response);
         return ARC_EXIT_ERROR;
-    } else if (response->status_code != 200) {
+    } else if (response->status_code != ARC_HTTP_STATUS_OK) {
         LOG_USER_ERROR("Failed to get workflow status (HTTP %d)\n", response->status_code);
         arc_http_response_free(response);
         return ARC_EXIT_ERROR;
@@ -88,7 +88,7 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
     const char* home = getenv("HOME");
     if (!home) home = ".";
 
-    char log_path[512];
+    char log_path[ARC_PATH_BUFFER];
     snprintf(log_path, sizeof(log_path), "%s/.argo/logs/%s.log", home, workflow_id);
 
     /* Open log file */
@@ -110,7 +110,7 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
     printf("----------------------------------------\n");
 
     /* Main loop: tail log file and check for input */
-    char buffer[4096];
+    char buffer[ARC_JSON_BUFFER];
     while (g_running) {
         /* Read from log file */
         ssize_t bytes_read = read(log_fd, buffer, sizeof(buffer) - 1);
@@ -126,12 +126,12 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
         FD_ZERO(&readfds);
         FD_SET(STDIN_FILENO, &readfds);
         tv.tv_sec = 0;
-        tv.tv_usec = 100000;  /* 100ms timeout */
+        tv.tv_usec = ARC_POLLING_INTERVAL_US;  /* 100ms timeout */
 
         int ready = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv);
         if (ready > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
             /* Read line from stdin */
-            char input_line[1024];
+            char input_line[ARC_LINE_BUFFER];
             if (fgets(input_line, sizeof(input_line), stdin)) {
                 /* Escape input for JSON */
                 char* escaped_input = json_escape_string(input_line);
@@ -139,7 +139,7 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
                     LOG_USER_ERROR("Failed to escape input\n");
                 } else {
                     /* Send input to workflow via HTTP */
-                    char json_body[2048];
+                    char json_body[ARC_ATTACH_JSON_BUFFER];
                     snprintf(json_body, sizeof(json_body), "{\"input\":\"%s\"}", escaped_input);
                     free(escaped_input);
 
@@ -148,7 +148,7 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
                     arc_http_response_t* input_resp = NULL;
                     result = arc_http_post(endpoint, json_body, &input_resp);
 
-                    if (result != ARGO_SUCCESS || !input_resp || input_resp->status_code != 200) {
+                    if (result != ARGO_SUCCESS || !input_resp || input_resp->status_code != ARC_HTTP_STATUS_OK) {
                         LOG_USER_WARN("Failed to send input to workflow\n");
                         if (input_resp) arc_http_response_free(input_resp);
                         /* Continue anyway - workflow might have ended */
@@ -165,7 +165,7 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
         }
 
         /* Small sleep to avoid busy loop */
-        usleep(100000);  /* 100ms */
+        usleep(ARC_POLLING_INTERVAL_US);  /* 100ms */
     }
 
     close(log_fd);

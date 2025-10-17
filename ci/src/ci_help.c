@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "ci_commands.h"
+#include "ci_constants.h"
 #include "argo_output.h"
 
 /* General help */
@@ -31,7 +32,7 @@ static void show_general_help(void) {
     printf("  openrouter           OpenRouter (requires OPENROUTER_API_KEY)\n");
     printf("  ollama               Ollama local (requires ollama server)\n\n");
     printf("Prerequisites:\n");
-    printf("  Daemon must be running: argo-daemon --port 9876\n\n");
+    printf("  Daemon must be running: argo-daemon --port %d\n\n", CI_DEFAULT_DAEMON_PORT);
     printf("Note: 'ci query' syntax still works for backwards compatibility.\n");
 }
 

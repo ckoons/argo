@@ -15,6 +15,7 @@
 #include "argo_http_server.h"
 #include "argo_workflow_registry.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 #include "argo_log.h"
 #include "argo_json.h"
 #include "argo_limits.h"
@@ -25,13 +26,13 @@ extern argo_daemon_t* g_api_daemon;
 /* POST /api/workflow/start - Start bash workflow script */
 int api_workflow_start(http_request_t* req, http_response_t* resp) {
     if (!req || !resp || !g_api_daemon) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 
     /* Parse JSON body */
     if (!req->body) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing request body");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, DAEMON_ERR_MISSING_REQUEST_BODY);
         return E_INPUT_NULL;
     }
 
@@ -85,7 +86,7 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
     }
 
     /* Generate workflow ID from template name and instance suffix */
-    char workflow_id[128];
+    char workflow_id[ARGO_BUFFER_NAME];
     result = generate_workflow_id(g_api_daemon->workflow_registry, template_name,
                                   instance_suffix, workflow_id, sizeof(workflow_id));
     if (result != ARGO_SUCCESS) {
@@ -117,7 +118,7 @@ int api_workflow_start(http_request_t* req, http_response_t* resp) {
     }
 
     /* Build success response */
-    char response_json[512];
+    char response_json[ARGO_BUFFER_STANDARD];
     snprintf(response_json, sizeof(response_json),
             "{\"status\":\"success\",\"workflow_id\":\"%s\"}",
             workflow_id);
@@ -132,7 +133,7 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
     (void)req;  /* Unused */
 
     if (!resp || !g_api_daemon || !g_api_daemon->workflow_registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 
@@ -146,7 +147,7 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
     }
 
     /* Build JSON response with safe string operations */
-    size_t json_size = count * 256 + 100;
+    size_t json_size = count * WORKFLOW_LIST_SIZE_PER_ITEM + WORKFLOW_LIST_SIZE_BASE;
     char* json_response = malloc(json_size);
     if (!json_response) {
         free(entries);
@@ -172,7 +173,7 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
         first = 0;
 
         /* Safety check: prevent buffer overflow */
-        if (offset >= json_size - 10) {
+        if (offset >= json_size - WORKFLOW_LIST_SIZE_MARGIN) {
             LOG_ERROR("JSON response buffer too small");
             break;
         }
@@ -191,7 +192,7 @@ int api_workflow_list(http_request_t* req, http_response_t* resp) {
 /* GET /api/workflow/status/{id} - Get workflow status */
 int api_workflow_status(http_request_t* req, http_response_t* resp) {
     if (!req || !resp || !g_api_daemon || !g_api_daemon->workflow_registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 
@@ -199,7 +200,7 @@ int api_workflow_status(http_request_t* req, http_response_t* resp) {
     /* Path format: /api/workflow/status/wf_123 */
     const char* id_start = strrchr(req->path, '/');
     if (!id_start || !*(id_start + 1)) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, DAEMON_ERR_MISSING_WORKFLOW_ID);
         return E_INPUT_NULL;
     }
     const char* workflow_id = id_start + 1;
@@ -207,12 +208,12 @@ int api_workflow_status(http_request_t* req, http_response_t* resp) {
     /* Find workflow in registry */
     const workflow_entry_t* entry = workflow_registry_find(g_api_daemon->workflow_registry, workflow_id);
     if (!entry) {
-        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, DAEMON_ERR_WORKFLOW_NOT_FOUND);
         return E_NOT_FOUND;
     }
 
     /* Build JSON response */
-    char response_json[512];
+    char response_json[ARGO_BUFFER_STANDARD];
     snprintf(response_json, sizeof(response_json),
             "{\"workflow_id\":\"%s\",\"script\":\"%s\",\"state\":\"%s\","
             "\"pid\":%d,\"start_time\":%ld,\"end_time\":%ld,\"exit_code\":%d}",
@@ -231,14 +232,14 @@ int api_workflow_status(http_request_t* req, http_response_t* resp) {
 /* DELETE /api/workflow/abandon/{id} - Abandon (kill) workflow */
 int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
     if (!req || !resp || !g_api_daemon || !g_api_daemon->workflow_registry) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 
     /* Extract workflow ID from path */
     const char* id_start = strrchr(req->path, '/');
     if (!id_start || !*(id_start + 1)) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing workflow ID");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, DAEMON_ERR_MISSING_WORKFLOW_ID);
         return E_INPUT_NULL;
     }
     const char* workflow_id = id_start + 1;
@@ -246,7 +247,7 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
     /* Find workflow in registry */
     const workflow_entry_t* entry = workflow_registry_find(g_api_daemon->workflow_registry, workflow_id);
     if (!entry) {
-        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, "Workflow not found");
+        http_response_set_error(resp, HTTP_STATUS_NOT_FOUND, DAEMON_ERR_WORKFLOW_NOT_FOUND);
         return E_NOT_FOUND;
     }
 
@@ -265,7 +266,7 @@ int api_workflow_abandon(http_request_t* req, http_response_t* resp) {
     }
 
     /* Build success response */
-    char response_json[256];
+    char response_json[ARGO_BUFFER_MEDIUM];
     snprintf(response_json, sizeof(response_json),
             "{\"status\":\"success\",\"workflow_id\":\"%s\",\"action\":\"abandoned\"}",
             workflow_id);

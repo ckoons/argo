@@ -140,7 +140,7 @@ void log_write(log_level_t level, const char* file, int line,
     /* Get timestamp */
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
-    char timestamp[32];
+    char timestamp[ARGO_BUFFER_TINY];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
 
     /* Extract just the filename (not full path) */

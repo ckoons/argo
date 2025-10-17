@@ -40,14 +40,14 @@ int api_http_post_json(const char* base_url, const char* json_body,
     }
 
     /* Add standard headers */
-    http_request_add_header(req, "Content-Type", "application/json");
+    http_request_add_header(req, HTTP_HEADER_CONTENT_TYPE, HTTP_CONTENT_TYPE_JSON);
 
     /* Add authentication header if needed */
     if (auth) {
         if (auth->type == API_AUTH_BEARER) {
             char auth_header[API_AUTH_HEADER_SIZE];
-            snprintf(auth_header, sizeof(auth_header), "Bearer %s", auth->value);
-            http_request_add_header(req, "Authorization", auth_header);
+            snprintf(auth_header, sizeof(auth_header), "Bearer %s", auth->value); /* GUIDELINE_APPROVED: HTTP Bearer auth */
+            http_request_add_header(req, HTTP_HEADER_AUTHORIZATION, auth_header);
         } else if (auth->type == API_AUTH_HEADER) {
             http_request_add_header(req, auth->header_name, auth->value);
         }
@@ -78,34 +78,34 @@ int api_http_post_json(const char* base_url, const char* json_body,
     int status = (*response)->status_code;
     if (status != API_HTTP_OK) {
         int error_code = E_PROTOCOL_HTTP;  /* Default */
-        const char* status_desc = "Unknown";
+        const char* status_desc = HTTP_STATUS_DESC_UNKNOWN;
 
         /* Map HTTP status codes to specific errors */
         switch (status) {
             case HTTP_STATUS_BAD_REQUEST:
                 error_code = E_HTTP_BAD_REQUEST;
-                status_desc = "Bad Request";
+                status_desc = HTTP_STATUS_DESC_BAD_REQUEST;
                 break;
             case HTTP_STATUS_UNAUTHORIZED:
                 error_code = E_HTTP_UNAUTHORIZED;
-                status_desc = "Unauthorized";
+                status_desc = HTTP_STATUS_DESC_UNAUTHORIZED;
                 break;
             case HTTP_STATUS_FORBIDDEN:
                 error_code = E_HTTP_FORBIDDEN;
-                status_desc = "Forbidden";
+                status_desc = HTTP_STATUS_DESC_FORBIDDEN;
                 break;
             case HTTP_STATUS_NOT_FOUND:
                 error_code = E_HTTP_NOT_FOUND;
-                status_desc = "Not Found";
+                status_desc = HTTP_STATUS_DESC_NOT_FOUND;
                 break;
             case HTTP_STATUS_RATE_LIMIT:
                 error_code = E_HTTP_RATE_LIMIT;
-                status_desc = "Rate Limit Exceeded";
+                status_desc = HTTP_STATUS_DESC_RATE_LIMIT;
                 break;
             default:
                 if (status >= HTTP_STATUS_SERVER_ERROR) {
                     error_code = E_HTTP_SERVER_ERROR;
-                    status_desc = "Server Error";
+                    status_desc = HTTP_STATUS_DESC_SERVER_ERROR;
                 }
                 break;
         }

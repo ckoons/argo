@@ -94,6 +94,34 @@
 /* strtol base for decimal number parsing */
 #define DECIMAL_BASE 10
 
+/* Command exit codes */
+#define EXIT_CODE_COMMAND_NOT_FOUND 127
+#define EXIT_CODE_SUCCESS 0
+#define EXIT_CODE_FAILURE 1
+
+/* Port validation */
+#define MIN_VALID_PORT 1
+#define MAX_VALID_PORT 65535
+
+/* Common system constants */
+#define TIMESTAMP_BUFFER_SIZE 32
+#define SEARCH_BUFFER_SIZE 256
+#define PREFIX_BUFFER_SIZE 128
+#define PID_STR_BUFFER_SIZE 32
+#define ERROR_MSG_BUFFER_SIZE 256
+#define RESPONSE_SIZE_MULTIPLIER 2
+#define RESPONSE_SIZE_OVERHEAD 512
+#define WORKFLOW_ID_MAX_LENGTH 63
+#define WORKFLOW_ID_BUFFER_SIZE 128
+#define RESPONSE_JSON_BUFFER_SIZE 512
+#define WORKFLOW_LIST_SIZE_PER_ITEM 256
+#define WORKFLOW_LIST_SIZE_BASE 100
+#define WORKFLOW_LIST_SIZE_MARGIN 10
+
+/* Daemon polling constants */
+#define DAEMON_PORT_FREE_MAX_ATTEMPTS 20
+#define DAEMON_PORT_FREE_DELAY_USEC 100000  /* 100ms */
+
 /* Workflow timeout check interval (every 10 seconds) */
 #define WORKFLOW_TIMEOUT_CHECK_INTERVAL_SECONDS 10
 
@@ -223,6 +251,24 @@
 
 /* File permissions for Argo-created files */
 #define ARGO_FILE_PERMISSIONS 0644
+
+/* File mode strings */
+#define FILE_MODE_READ "r"
+#define FILE_MODE_WRITE "w"
+#define FILE_MODE_APPEND "a"
+#define FILE_MODE_READ_BINARY "rb"
+#define FILE_MODE_WRITE_BINARY "wb"
+
+/* Common environment variables */
+#define ENV_VAR_HOME "HOME"
+#define ENV_VAR_PATH "PATH"
+
+/* Common shell/binary paths */
+#define SHELL_PATH_BASH "/bin/bash"
+#define BINARY_NAME_CLAUDE "claude"
+
+/* Status strings */
+#define STATUS_STR_UNKNOWN "UNKNOWN"
 
 /* ===== Shutdown and Tracking Limits ===== */
 

@@ -246,9 +246,9 @@ static void* handle_connection(void* arg) {
 
     if (result != ARGO_SUCCESS) {
         LOG_ERROR("Failed to parse HTTP request");
-        /* Send 400 Bad Request */
+        /* Send BAD_REQUEST */
         const char* error_resp =
-            "HTTP/1.1 400 Bad Request\r\n"
+            "HTTP/1.1 BAD_REQUEST\r\n"
             "Content-Length: 0\r\n"
             "Connection: close\r\n\r\n";
         write(client_fd, error_resp, strlen(error_resp));
@@ -268,7 +268,7 @@ static void* handle_connection(void* arg) {
         /* Call handler */
         handler(&req, &resp);
     } else {
-        /* 404 Not Found */
+        /* NOT_FOUND */
         resp.status_code = HTTP_STATUS_NOT_FOUND;
         const char* not_found = "{\"status\":\"error\",\"message\":\"Not found\"}";
         resp.body = (char*)not_found;
@@ -283,7 +283,7 @@ static void* handle_connection(void* arg) {
              req.method == HTTP_METHOD_DELETE ? "DELETE" : "UNKNOWN",
              req.path);
     if (resp.status_code != HTTP_STATUS_OK) {
-        LOG_WARN("Non-200 response: %d", resp.status_code);
+        LOG_WARN("non-OK response: %d", resp.status_code);
         if (resp.body) {
             LOG_DEBUG("Response body: %s", resp.body);
         }

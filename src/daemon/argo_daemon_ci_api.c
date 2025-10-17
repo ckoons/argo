@@ -8,9 +8,11 @@
 
 /* Project includes */
 #include "argo_daemon_ci_api.h"
+#include "argo_daemon.h"
 #include "argo_http_server.h"
 #include "argo_json.h"
 #include "argo_error.h"
+#include "argo_limits.h"
 #include "argo_log.h"
 #include "argo_api_providers.h"
 #include "argo_ci.h"
@@ -132,7 +134,7 @@ static int execute_provider_query(ci_provider_t* provider, const char* query_tex
 /* Format CI response as JSON */
 static int format_ci_response(const char* provider_name, const char* ai_response,
                                char** response_json_out) {
-    size_t response_size = strlen(ai_response) * 2 + 512;
+    size_t response_size = strlen(ai_response) * RESPONSE_SIZE_MULTIPLIER + RESPONSE_SIZE_OVERHEAD;
     char* response_json = malloc(response_size);
     if (!response_json) {
         return E_SYSTEM_MEMORY;
@@ -168,12 +170,12 @@ int api_ci_query(http_request_t* req, http_response_t* resp) {
 
     /* Validate request */
     if (!req || !resp) {
-        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, "Internal server error");
+        http_response_set_error(resp, HTTP_STATUS_SERVER_ERROR, DAEMON_ERR_INTERNAL_SERVER);
         return E_SYSTEM_MEMORY;
     }
 
     if (!req->body) {
-        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, "Missing request body");
+        http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, DAEMON_ERR_MISSING_REQUEST_BODY);
         return E_INPUT_NULL;
     }
 
@@ -187,7 +189,7 @@ int api_ci_query(http_request_t* req, http_response_t* resp) {
     /* Create provider */
     provider = create_ci_provider(provider_name, model_name);
     if (!provider) {
-        char error_msg[256];
+        char error_msg[ARGO_BUFFER_MEDIUM];
         snprintf(error_msg, sizeof(error_msg), "Unknown provider: %s", provider_name);
         http_response_set_error(resp, HTTP_STATUS_BAD_REQUEST, error_msg);
         result = E_INVALID_PARAMS;

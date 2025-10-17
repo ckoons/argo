@@ -29,8 +29,38 @@
 #define HTTP_STATUS_RATE_LIMIT 429
 #define HTTP_STATUS_SERVER_ERROR 500
 
+/* HTTP status code validation ranges */
+#define HTTP_STATUS_MIN_VALID 100
+#define HTTP_STATUS_MAX_VALID 600
+
+/* HTTP status descriptions */
+#define HTTP_STATUS_DESC_UNKNOWN "Unknown"
+#define HTTP_STATUS_DESC_BAD_REQUEST "Bad Request"
+#define HTTP_STATUS_DESC_UNAUTHORIZED "Unauthorized"
+#define HTTP_STATUS_DESC_FORBIDDEN "Forbidden"
+#define HTTP_STATUS_DESC_NOT_FOUND "Not Found"
+#define HTTP_STATUS_DESC_RATE_LIMIT "Rate Limit Exceeded"
+#define HTTP_STATUS_DESC_SERVER_ERROR "Server Error"
+
+/* HTTP method strings */
+#define HTTP_METHOD_STR_GET "GET"
+#define HTTP_METHOD_STR_POST "POST"
+#define HTTP_METHOD_STR_PUT "PUT"
+#define HTTP_METHOD_STR_DELETE "DELETE"
+
+/* HTTP header names */
+#define HTTP_HEADER_CONTENT_TYPE "Content-Type"
+#define HTTP_HEADER_AUTHORIZATION "Authorization"
+#define HTTP_HEADER_CONTENT_LENGTH "Content-Length"
+#define HTTP_HEADER_HOST "Host"
+
+/* HTTP content types */
+#define HTTP_CONTENT_TYPE_JSON "application/json"
+#define HTTP_CONTENT_TYPE_TEXT "text/plain"
+
 /* Network addresses */
 #define LOCALHOST_IP "127.0.0.1"
+#define LOCALHOST_ADDR "127.0.0.1"
 
 /* HTTP methods */
 typedef enum {
