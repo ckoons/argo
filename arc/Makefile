@@ -86,8 +86,12 @@ test-arc-cli: $(TARGET)
 	@echo "=========================================="
 	@cd $(TEST_DIR) && ./test_arc_cli.sh
 
-# Standard arc testing (unit + cli)
-test-arc: test-arc-unit test-arc-cli
+# Helper function tests
+test-arc-helpers: helpers/test_helpers_simple.sh
+	@./helpers/test_helpers_simple.sh
+
+# Standard arc testing (unit + cli + helpers)
+test-arc: test-arc-unit test-arc-cli test-arc-helpers
 	@echo ""
 	@echo "=========================================="
 	@echo "All Arc Tests Passed"

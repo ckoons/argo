@@ -27,6 +27,13 @@ _arc_template_dir() {
 
 # arc-template: Template management helper
 arc-template() {
+    # Check if command provided
+    if [ $# -eq 0 ]; then
+        echo "Usage: arc-template <command> [args...]" >&2
+        echo "Try: arc-template help" >&2
+        return 1
+    fi
+
     local cmd=$1
     shift
 
