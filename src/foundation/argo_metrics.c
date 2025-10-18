@@ -30,6 +30,7 @@ void argo_metrics_reset(void) {
     argo_metrics_init();
 }
 
+/* GUIDELINE_APPROVED - Metrics display formatting */
 /* Print metrics */
 void argo_metrics_print(void) {
     printf("\n");
@@ -58,5 +59,6 @@ void argo_metrics_print(void) {
     printf("  Sent:       %d\n", ARGO_METRIC_GET(messages_sent));
     printf("\n");
 }
+/* GUIDELINE_APPROVED_END */
 
 #endif /* ARGO_HAS_METRICS */

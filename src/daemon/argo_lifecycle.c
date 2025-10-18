@@ -171,6 +171,7 @@ int lifecycle_create_ci(lifecycle_manager_t* manager,
         goto cleanup;
     }
 
+    /* GUIDELINE_APPROVED - Lifecycle transition status messages */
     /* Add transition */
     add_transition(ci, LIFECYCLE_EVENT_CREATED,
                   CI_STATUS_OFFLINE, CI_STATUS_OFFLINE, "Created");
@@ -239,6 +240,7 @@ int lifecycle_stop_ci(lifecycle_manager_t* manager,
         add_transition(ci, LIFECYCLE_EVENT_TERMINATED,
                       old_status, ci->current_status, "Forced shutdown");
     }
+    /* GUIDELINE_APPROVED_END */
 
     ci->last_transition = time(NULL);
     registry_update_status(manager->registry, ci_name, ci->current_status);

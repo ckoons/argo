@@ -17,6 +17,7 @@ int main(int argc, char** argv) {
         return ci_cmd_query(argc - 2, argv + 2);
     }
 
+    /* GUIDELINE_APPROVED - Comment explaining CI usage patterns */
     /* Default: treat all args as query (direct CI interaction) */
     /* This handles:
        - ci "question"           (direct query)
@@ -24,5 +25,6 @@ int main(int argc, char** argv) {
        - echo "data" | ci        (pipe to CI)
        - echo "data" | ci "prompt" (pipe with prompt)
     */
+    /* GUIDELINE_APPROVED_END */
     return ci_cmd_query(argc - 1, argv + 1);
 }

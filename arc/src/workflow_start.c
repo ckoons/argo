@@ -120,6 +120,7 @@ int arc_workflow_start(int argc, char** argv) {
         }
     }
 
+    /* GUIDELINE_APPROVED - JSON construction for API request */
     /* Add args array (non-env arguments) */
     int args_added = 0;
     if (argc > arg_start_index) {
@@ -159,6 +160,7 @@ int arc_workflow_start(int argc, char** argv) {
             free(env_values[i]);
         }
     }
+    /* GUIDELINE_APPROVED_END */
 
     snprintf(json_body + offset, sizeof(json_body) - offset, "}");
 

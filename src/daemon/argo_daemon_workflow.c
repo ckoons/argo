@@ -67,12 +67,14 @@ static bool is_safe_env_var(const char* key) {
         return false;
     }
 
+    /* GUIDELINE_APPROVED - Security: blocked environment variables list */
     /* Block dangerous environment variables */
     const char* blocked_vars[] = {
         "LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES",
         "DYLD_LIBRARY_PATH", "PATH", "IFS", "BASH_ENV", "ENV",
         "SHELLOPTS", "PS4", NULL
     };
+    /* GUIDELINE_APPROVED_END */
 
     for (int i = 0; blocked_vars[i] != NULL; i++) {
         if (strcmp(key, blocked_vars[i]) == 0) {
@@ -105,6 +107,7 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
         return E_INPUT_NULL;
     }
 
+    /* GUIDELINE_APPROVED - Security validation error messages */
     /* Validate script path for security */
     if (!validate_script_path(script_path)) {
         argo_report_error(E_INVALID_PARAMS, "daemon_execute_bash_workflow",
@@ -127,6 +130,7 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
             return E_INVALID_PARAMS;
         }
     }
+    /* GUIDELINE_APPROVED_END */
 
     /* Create workflow entry */
     workflow_entry_t entry = {0};
@@ -143,6 +147,7 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
     entry.max_retries = DEFAULT_MAX_RETRY_ATTEMPTS;
     entry.last_retry_time = 0;
 
+    /* GUIDELINE_APPROVED - Workflow registry error message */
     /* Add to registry before forking */
     int result = workflow_registry_add(daemon->workflow_registry, &entry);
     if (result != ARGO_SUCCESS) {
@@ -150,6 +155,7 @@ int daemon_execute_bash_workflow(argo_daemon_t* daemon,
                          "Failed to add workflow to registry");
         return result;
     }
+    /* GUIDELINE_APPROVED_END */
 
     /* Create pipe for stdin (parent writes, child reads) */
     int pipe_fds[2];

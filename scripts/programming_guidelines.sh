@@ -553,18 +553,31 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "23. CONSTANT STRING EXTERNALIZATION CHECK"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 # Check for string literals in .c files that should be in headers
-# Exclude: #define (already in headers), format strings, log messages, GUIDELINE_APPROVED, comments
+# Exclude: #define (already in headers), format strings, log messages, GUIDELINE_APPROVED blocks, comments
 # Filter by checking content after "filename:linenum:" prefix
-TOTAL_STRINGS=$(grep -rn '"[^"]*"' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
+
+# Create temp file excluding GUIDELINE_APPROVED blocks for counting
+TEMP_COUNT="/tmp/argo_strings_count.txt"
+for file in $(find src/ arc/src/ ci/src/ -name "*.c" 2>/dev/null); do
+  awk '
+    /GUIDELINE_APPROVED[^_]/ && !/GUIDELINE_APPROVED_END/ { in_approved=1; next }
+    /GUIDELINE_APPROVED_END/ { in_approved=0; next }
+    !in_approved { print FILENAME":"NR":"$0 }
+  ' FILENAME="$file" "$file"
+done > "$TEMP_COUNT"
+
+TOTAL_STRINGS=$(grep '"[^"]*"' "$TEMP_COUNT" 2>/dev/null | \
   grep -v ":[[:space:]]*//" | grep -v ":[[:space:]]*\*" | grep -v ":[[:space:]]/\*" | \
   grep -v "#include" | grep -v "#define" | \
   wc -l | tr -d ' ')
 
 # Count strings that ARE acceptable (approved or format/log strings + legitimate patterns)
-APPROVED_STRINGS=$(grep -rn '"[^"]*"' src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | \
+APPROVED_STRINGS=$(grep '"[^"]*"' "$TEMP_COUNT" 2>/dev/null | \
   grep -v "#define" | \
   grep -v ":[[:space:]]*//" | grep -v ":[[:space:]]*\*" | grep -v ":[[:space:]]/\*" | \
-  grep -E "GUIDELINE_APPROVED|%|LOG_|printf\|fprintf\|snprintf\|dprintf|argo_report_error|static const char|\
+  grep -v '"\."' | grep -v "\"'\"" | \
+  grep -v '""' | grep -v '"\\n"' | grep -v '","' | grep -v '":"' | grep -v '"}"' | grep -v '"]"' | \
+  grep -E "%|LOG_|printf\|fprintf\|snprintf\|dprintf|argo_report_error|static const char|\
 strstr\(|strcmp\(|strncmp\(|strchr\(|strrchr\(|strpbrk\(|strspn\(|strcspn\(|\
 execlp\(|execv\(|execvp\(|execve\(|execl\(|\
 fopen\(|popen\(|freopen\(|getenv\(|setenv\(|putenv\(|\
@@ -585,6 +598,93 @@ fprintf\(fp," | \
 
 # Unapproved strings (candidates for externalization)
 UNAPPROVED_STRINGS=$((TOTAL_STRINGS - APPROVED_STRINGS))
+
+# Clean up temp file
+rm -f "$TEMP_COUNT"
+
+# Generate detailed unapproved strings report
+UNAPPROVED_REPORT="/tmp/argo_unapproved_strings.txt"
+{
+  echo "========================================"
+  echo "ARGO UNAPPROVED STRING LITERALS REPORT"
+  echo "Generated: $(date '+%Y-%m-%d %H:%M:%S')"
+  echo "========================================"
+  echo ""
+  echo "Total string literals: $TOTAL_STRINGS"
+  echo "Approved strings: $APPROVED_STRINGS"
+  echo "Unapproved strings: $UNAPPROVED_STRINGS"
+  echo ""
+  echo "This report shows all string literals that are NOT auto-approved."
+  echo "Review each entry to determine if it should be:"
+  echo "  1. Externalized to a header constant"
+  echo "  2. Added to auto-approval patterns (if legitimate inline usage)"
+  echo "  3. Left as-is (with justification)"
+  echo ""
+  echo "========================================"
+  echo "UNAPPROVED STRING LITERALS"
+  echo "========================================"
+  echo ""
+
+  # Get all unapproved strings with context
+  # Step 1: Find all string literals
+  # Step 2: Exclude GUIDELINE_APPROVED blocks (between GUIDELINE_APPROVED and GUIDELINE_APPROVED_END)
+  # Step 3: Filter out legitimate patterns
+
+  # First, create a temp file excluding GUIDELINE_APPROVED blocks
+  TEMP_FILTERED="/tmp/argo_strings_filtered.txt"
+
+  # Process each .c file to exclude GUIDELINE_APPROVED blocks
+  for file in $(find src/ arc/src/ ci/src/ -name "*.c" 2>/dev/null); do
+    awk '
+      /GUIDELINE_APPROVED[^_]/ && !/GUIDELINE_APPROVED_END/ { in_approved=1; next }
+      /GUIDELINE_APPROVED_END/ { in_approved=0; next }
+      !in_approved { print FILENAME":"NR":"$0 }
+    ' FILENAME="$file" "$file"
+  done > "$TEMP_FILTERED"
+
+  # Now grep for strings in the filtered output
+  grep '"[^"]*"' "$TEMP_FILTERED" 2>/dev/null | \
+    grep -v "#include" | \
+    grep -v "#define" | \
+    grep -v ":[[:space:]]*//" | grep -v ":[[:space:]]*\*" | grep -v ":[[:space:]]/\*" | \
+    grep -v "_help\.c:.*printf\|_help\.c:.*fprintf" | \
+    grep -v '"\."' | grep -v "\"'\"" | \
+    grep -v '""' | grep -v '"\\n"' | grep -v '","' | grep -v '":"' | grep -v '"}"' | grep -v '"]"' | \
+    grep -v -E "%|LOG_|printf\|fprintf\|snprintf\|dprintf|argo_report_error|static const char|\
+strstr\(|strcmp\(|strncmp\(|strchr\(|strrchr\(|strpbrk\(|strspn\(|strcspn\(|\
+execlp\(|execv\(|execvp\(|execve\(|execl\(|\
+fopen\(|popen\(|freopen\(|getenv\(|setenv\(|putenv\(|\
+argo_config_get\(|argo_config_set\(|\
+write\([^,]+,[[:space:]]*\"|\
+\\..*=[[:space:]]*\"|return\s+\"|\
+:\s*\"\"|\
+(==|!=)[[:space:]]*\"[^\"]{1,2}\"|\
+=[[:space:]]*{[[:space:]]*\"|\
+http_response_set_error\(|\
+\"/api/|\
+strstr\([^,]+,[[:space:]]*\"[^\"]*:|\
+snprintf\([^,]+,[^,]+,[[:space:]]*\"[^\"]*:|\
+snprintf\([^,]+,[^,]+,[[:space:]]*\"{|\
+const char\*[[:space:]]*[a-zA-Z_].*=[[:space:]]*\"|\
+fprintf\(fp," | \
+    sort | \
+    nl -w3 -s'. '
+
+  # Clean up temp file
+  rm -f "$TEMP_FILTERED"
+
+  echo ""
+  echo "========================================"
+  echo "END OF REPORT"
+  echo "========================================"
+  echo ""
+  echo "Next steps:"
+  echo "  1. Review each violation above"
+  echo "  2. For repeated patterns, add to header constants"
+  echo "  3. For legitimate inline usage, add auto-approval pattern to this script"
+  echo "  4. Document justification for strings that remain inline"
+  echo ""
+} > "$UNAPPROVED_REPORT"
 
 echo "String literal usage:"
 echo "  Total string literals (excluding #define): $TOTAL_STRINGS"

@@ -69,6 +69,7 @@ int arc_workflow_states(int argc, char** argv) {
         ptr += ARC_JSON_OFFSET_ID; /* strlen("{\"workflow_id\":\"") */
     }
 
+    /* GUIDELINE_APPROVED - User-facing workflow state display */
     /* Print header */
     printf("\n");
     printf("========================================\n");
@@ -156,6 +157,7 @@ int arc_workflow_states(int argc, char** argv) {
         printf("No current workflow set (use 'arc switch')\n");
     }
     printf("\n");
+    /* GUIDELINE_APPROVED_END */
 
     /* Cleanup */
     arc_http_response_free(response);

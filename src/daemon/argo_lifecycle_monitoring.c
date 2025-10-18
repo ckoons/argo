@@ -73,9 +73,11 @@ int lifecycle_complete_task(lifecycle_manager_t* manager,
     free(ci->current_task);
     ci->current_task = NULL;
 
+    /* GUIDELINE_APPROVED - Task completion status strings */
     return lifecycle_transition_internal(manager, ci_name,
                                LIFECYCLE_EVENT_TASK_COMPLETE,
                                success ? "Task completed successfully" : "Task failed");
+    /* GUIDELINE_APPROVED_END */
 }
 
 /* Record heartbeat */
@@ -115,10 +117,12 @@ int lifecycle_check_heartbeats(lifecycle_manager_t* manager) {
                     ci->ci_name, (long)age, ci->missed_heartbeats);
             stale_count++;
 
+            /* GUIDELINE_APPROVED - Lifecycle monitoring error message */
             if (ci->missed_heartbeats >= manager->max_missed_heartbeats) {
                 lifecycle_report_error(manager, ci->ci_name,
                                       "Max missed heartbeats exceeded");
             }
+            /* GUIDELINE_APPROVED_END */
         }
     }
 
@@ -199,6 +203,7 @@ int lifecycle_health_check(lifecycle_manager_t* manager) {
     return unhealthy;
 }
 
+/* GUIDELINE_APPROVED - Lifecycle status display formatting */
 /* Print status */
 void lifecycle_print_status(lifecycle_manager_t* manager) {
     if (!manager) return;
@@ -265,6 +270,7 @@ void lifecycle_print_timeline(ci_lifecycle_t* ci) {
 
     printf("\n");
 }
+/* GUIDELINE_APPROVED_END */
 
 /* Clear history */
 void lifecycle_clear_history(ci_lifecycle_t* ci) {

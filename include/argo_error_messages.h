@@ -82,6 +82,7 @@
 #define ERR_MSG_WORKFLOW_INVALID_PHASE  "invalid workflow phase"
 #define ERR_MSG_WORKFLOW_ALLOC_FAILED   "failed to allocate workflow"
 #define ERR_MSG_TASK_ALLOC_FAILED       "failed to allocate task"
+#define ERR_MSG_ALLOCATION_FAILED       "allocation failed"
 #define ERR_MSG_TASK_NOT_FOUND          "task not found"
 #define ERR_MSG_CONFLICT_NOT_FOUND      "conflict not found"
 #define ERR_MSG_NO_ACTIVE_MERGE         "no active merge negotiation"

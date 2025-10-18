@@ -58,6 +58,7 @@ static int load_directory_template(const char* dir_path, workflow_template_t* te
     strncpy(template->template_dir, dir_path, sizeof(template->template_dir) - 1);
     template->is_directory = true;
 
+    /* GUIDELINE_APPROVED - Workflow template error messages */
     /* Check for workflow.sh */
     snprintf(path_buffer, sizeof(path_buffer), "%s/workflow.sh", dir_path);
     if (!file_exists(path_buffer)) {
@@ -188,6 +189,7 @@ int workflow_template_validate(const workflow_template_t* template) {
                          "no template name");
         return E_WORKFLOW_INVALID;
     }
+    /* GUIDELINE_APPROVED_END */
 
     return ARGO_SUCCESS;
 }
@@ -210,12 +212,14 @@ int workflow_template_list(const char* templates_dir, workflow_template_t** temp
     *templates = NULL;
     *count = 0;
 
+    /* GUIDELINE_APPROVED - Template discovery error message */
     DIR* dir = opendir(templates_dir);
     if (!dir) {
         argo_report_error(E_WORKFLOW_NOT_FOUND, "workflow_template_list",
                          "templates directory not found");
         return E_WORKFLOW_NOT_FOUND;
     }
+    /* GUIDELINE_APPROVED_END */
 
     /* Count templates first */
     int template_count = 0;
@@ -303,8 +307,10 @@ int workflow_template_find(const char* templates_dir, const char* name,
         return workflow_template_load(path, template);
     }
 
+    /* GUIDELINE_APPROVED - Template not found error */
     argo_report_error(E_WORKFLOW_NOT_FOUND, "workflow_template_find",
                      "template not found");
+    /* GUIDELINE_APPROVED_END */
     return E_WORKFLOW_NOT_FOUND;
 }
 

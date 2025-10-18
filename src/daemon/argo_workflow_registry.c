@@ -9,6 +9,7 @@
 /* Project includes */
 #include "argo_workflow_registry.h"
 #include "argo_error.h"
+#include "argo_error_messages.h"
 #include "argo_log.h"
 #include "argo_json.h"
 #include "argo_limits.h"
@@ -30,7 +31,7 @@ workflow_registry_t* workflow_registry_create(void) {
     workflow_registry_t* reg = calloc(1, sizeof(workflow_registry_t));
     if (!reg) {
         argo_report_error(E_SYSTEM_MEMORY, "workflow_registry_create",
-                         "allocation failed");
+                         ERR_MSG_ALLOCATION_FAILED);
         return NULL;
     }
 
@@ -72,7 +73,7 @@ int workflow_registry_add(workflow_registry_t* reg, const workflow_entry_t* entr
     registry_node_t* node = calloc(1, sizeof(registry_node_t));
     if (!node) {
         argo_report_error(E_SYSTEM_MEMORY, "workflow_registry_add",
-                         "allocation failed");
+                         ERR_MSG_ALLOCATION_FAILED);
         return E_SYSTEM_MEMORY;
     }
 
@@ -195,7 +196,7 @@ int workflow_registry_list(const workflow_registry_t* reg,
     workflow_entry_t* arr = calloc(reg->count, sizeof(workflow_entry_t));
     if (!arr) {
         argo_report_error(E_SYSTEM_MEMORY, "workflow_registry_list",
-                         "allocation failed");
+                         ERR_MSG_ALLOCATION_FAILED);
         return E_SYSTEM_MEMORY;
     }
 
@@ -325,7 +326,7 @@ int workflow_registry_load(workflow_registry_t* reg, const char* path) {
     if (!json) {
         fclose(fp);
         argo_report_error(E_SYSTEM_MEMORY, "workflow_registry_load",
-                         "allocation failed");
+                         ERR_MSG_ALLOCATION_FAILED);
         return E_SYSTEM_MEMORY;
     }
 

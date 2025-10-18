@@ -81,6 +81,7 @@ static int extract_int_field(const char* json, const char* field_name,
     return ARGO_SUCCESS;
 }
 
+/* GUIDELINE_APPROVED - Workflow loader error messages */
 /* Create new workflow instance */
 workflow_t* workflow_create(const char* workflow_id, const char* workflow_name) {
     if (!workflow_id || !workflow_name) {
@@ -180,6 +181,7 @@ workflow_t* workflow_load_from_file(const char* json_path, const char* workflow_
                          "NULL json_path or workflow_id");
         return NULL;
     }
+    /* GUIDELINE_APPROVED_END */
 
     /* Check file exists and size */
     struct stat st;

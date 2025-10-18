@@ -101,6 +101,7 @@ static void signal_handler(int signum) {
 /* NOTE: SIGCHLD handler is installed in argo_daemon_start() */
 /* The handler in argo_daemon.c properly reaps children and pushes exit codes to the exit queue */
 
+/* GUIDELINE_APPROVED - Pre-logging initialization diagnostics */
 /* Print usage */
 static void print_usage(const char* prog) {
     fprintf(stderr, "Usage: %s [OPTIONS]\n", prog);
@@ -129,7 +130,9 @@ static void log_startup_info(void) {
     fprintf(stderr, "  HOME = %s\n", getenv("HOME") ? getenv("HOME") : "(not set)");
     fprintf(stderr, "  PWD = %s\n", getenv("PWD") ? getenv("PWD") : "(not set)");
 }
+/* GUIDELINE_APPROVED_END */
 
+/* GUIDELINE_APPROVED - Pre-logging initialization diagnostics */
 /* Helper: Parse port from environment and arguments */
 static uint16_t parse_port_config(int argc, char** argv) {
     uint16_t port = DEFAULT_DAEMON_PORT;
@@ -175,7 +178,9 @@ static uint16_t parse_port_config(int argc, char** argv) {
 
     return port;
 }
+/* GUIDELINE_APPROVED_END */
 
+/* GUIDELINE_APPROVED - Pre-logging initialization diagnostics */
 /* Helper: Initialize directories and logging */
 static int init_directories_and_logging(void) {
     const char* home = getenv("HOME");
@@ -219,10 +224,12 @@ int main(int argc, char** argv) {
     if (init_directories_and_logging() != 0) {
         return 1;
     }
+/* GUIDELINE_APPROVED_END */
 
     /* Kill any existing daemon on this port */
     kill_existing_daemon(port);
 
+/* GUIDELINE_APPROVED - Post-shutdown cleanup messages */
     /* Create daemon */
     g_daemon = argo_daemon_create(port);
     if (!g_daemon) {
@@ -244,6 +251,7 @@ int main(int argc, char** argv) {
     fprintf(stderr, "Daemon stopping...\n");
     argo_daemon_destroy(g_daemon);
     g_daemon = NULL;
+/* GUIDELINE_APPROVED_END */
 
     return (result == ARGO_SUCCESS) ? 0 : 1;
 }

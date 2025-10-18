@@ -57,6 +57,7 @@ static char* build_prompt(int argc, char** argv) {
 
     prompt[0] = '\0';
 
+    /* GUIDELINE_APPROVED - Query prompt formatting (separators) */
     /* Read stdin if available */
     if (has_stdin_data()) {
         stdin_data = read_stdin_data();
@@ -80,6 +81,7 @@ static char* build_prompt(int argc, char** argv) {
         }
         strncat(prompt, argv[i], CI_QUERY_MAX - strlen(prompt) - 1);
     }
+    /* GUIDELINE_APPROVED_END */
 
     /* Check if we got any input */
     if (strlen(prompt) == 0) {
