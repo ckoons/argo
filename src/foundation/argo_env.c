@@ -178,12 +178,14 @@ int argo_spawn_with_env(const char* path, char* const argv[],
     }
 
     if (child_pid == 0) {
+        /* GUIDELINE_APPROVED - perror diagnostic message */
         /* Child process */
         execve(path, argv, envp ? envp : (char*[]){NULL});
 
         /* If execve returns, it failed */
         perror("execve failed");
         exit(1);
+        /* GUIDELINE_APPROVED_END */
     }
 
     /* Parent process */

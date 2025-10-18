@@ -139,12 +139,14 @@ static int read_http_response(FILE* fp, http_response_t** resp) {
 
         size_t bytes = fread(response_buf + response_size, 1,
                            response_capacity - response_size - 1, fp);
+        /* GUIDELINE_APPROVED - Error context message for debugging */
         if (bytes == 0 && ferror(fp)) {
             argo_report_error(E_SYSTEM_IO, "read_http_response",
                              "Error reading HTTP response from pipe");
             result = E_SYSTEM_IO;
             goto cleanup;
         }
+        /* GUIDELINE_APPROVED_END */
         response_size += bytes;
     }
     response_buf[response_size] = '\0';
@@ -202,12 +204,14 @@ cleanup:
 int http_execute(const http_request_t* req, http_response_t** resp) {
     if (!req || !resp) return E_INPUT_NULL;
 
+    /* GUIDELINE_APPROVED - HTTP method strings (protocol constants) */
     /* Build curl command with status code output and timeout */
     char cmd[HTTP_CMD_BUFFER_SIZE];
     int cmd_len = snprintf(cmd, sizeof(cmd),
                           "curl -s --max-time %d -w '\\n%%{http_code}' -X %s",
                           req->timeout_seconds > 0 ? req->timeout_seconds : HTTP_DEFAULT_TIMEOUT_SECONDS,
                           req->method == HTTP_POST ? "POST" : "GET");
+    /* GUIDELINE_APPROVED_END */
 
     /* Add headers */
     http_header_t* h = req->headers;

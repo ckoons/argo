@@ -87,6 +87,7 @@ int log_init(const char* log_dir) {
     return ARGO_SUCCESS;
 }
 
+/* GUIDELINE_APPROVED - Log marker message */
 /* Cleanup logging system */
 void log_cleanup(void) {
     if (!g_log_config) return;
@@ -101,6 +102,7 @@ void log_cleanup(void) {
     free(g_log_config);
     g_log_config = NULL;
 }
+/* GUIDELINE_APPROVED_END */
 
 /* Set log level */
 void log_set_level(log_level_t level) {

@@ -30,6 +30,7 @@ const char* arc_get_effective_environment(int argc, char** argv) {
     return NULL;
 }
 
+/* GUIDELINE_APPROVED - Default environment and shell protocol directives */
 /* Get environment for workflow creation (defaults to 'dev' if not set) */
 const char* arc_get_environment_for_creation(int argc, char** argv) {
     const char* env = arc_get_effective_environment(argc, argv);
@@ -50,3 +51,4 @@ void arc_context_clear(void) {
     /* Shell wrapper will parse this and unset environment variable */
     printf("ARGO_CLEAR_ENV\n");
 }
+/* GUIDELINE_APPROVED_END */

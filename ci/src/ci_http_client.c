@@ -80,8 +80,10 @@ int ci_http_post(const char* endpoint, const char* json_body, ci_http_response_t
     char url[CI_URL_BUFFER];
     snprintf(url, sizeof(url), "%s%s", ci_get_daemon_url(), endpoint);
 
+    /* GUIDELINE_APPROVED - HTTP header (protocol constant) */
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+    /* GUIDELINE_APPROVED_END */
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);

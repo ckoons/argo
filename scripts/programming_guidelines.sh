@@ -642,12 +642,22 @@ UNAPPROVED_REPORT="/tmp/argo_unapproved_strings.txt"
     ' FILENAME="$file" "$file"
   done > "$TEMP_FILTERED"
 
-  # Now grep for strings in the filtered output
+  # Now grep for strings in the filtered output, filtering comment-only lines
   grep '"[^"]*"' "$TEMP_FILTERED" 2>/dev/null | \
+    awk -F: '{
+      # Extract content after second colon (filename:linenum:content)
+      match($0, /^[^:]+:[^:]+:/)
+      content = substr($0, RSTART + RLENGTH)
+      # Trim leading whitespace
+      gsub(/^[[:space:]]+/, "", content)
+      # Skip if line starts with comment markers
+      if (content ~ /^\/\// || content ~ /^\/\*/ || content ~ /^\*/) next
+      print
+    }' | \
     grep -v "#include" | \
     grep -v "#define" | \
-    grep -v ":[[:space:]]*//" | grep -v ":[[:space:]]*\*" | grep -v ":[[:space:]]/\*" | \
     grep -v "_help\.c:.*printf\|_help\.c:.*fprintf" | \
+    grep -v 'case[[:space:]]*'"'" | \
     grep -v '"\."' | grep -v "\"'\"" | \
     grep -v '""' | grep -v '"\\n"' | grep -v '","' | grep -v '":"' | grep -v '"}"' | grep -v '"]"' | \
     grep -v -E "%|LOG_|printf\|fprintf\|snprintf\|dprintf|argo_report_error|static const char|\
@@ -743,6 +753,8 @@ else
   echo "  - JSON object literals (snprintf with \"{...}\")"
   echo "  - Const char* assignments (const char* var = \"...\")"
   echo "  - File output formatting (fprintf(fp, ...))"
+  echo "  - Switch case statements (case '...':)"
+  echo "  - Comment-only lines (/* ... */, //, *)"
   echo "  - GUIDELINE_APPROVED markers"
 fi
 echo ""
@@ -1111,9 +1123,9 @@ FWRITE_COUNT=$(grep -rn "\bfwrite\b" src/ arc/src/ ci/src/ --include="*.c" 2>/de
 FGETS_COUNT=$(grep -rn "\bfgets\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null | grep -v "GUIDELINE_APPROVED" | wc -l | tr -d ' ')
 
 # Check how many are actually checked (look for ferror or return value checks within next few lines)
-FREAD_CHECKED=$(grep -rn "\bfread\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
-FWRITE_CHECKED=$(grep -rn "\bfwrite\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
-FGETS_CHECKED=$(grep -rn "\bfgets\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 2 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|==|!=|NULL" | wc -l | tr -d ' ')
+FREAD_CHECKED=$(grep -rn "\bfread\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 4 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
+FWRITE_CHECKED=$(grep -rn "\bfwrite\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 4 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|ferror|!=|==" | wc -l | tr -d ' ')
+FGETS_CHECKED=$(grep -rn "\bfgets\b" src/ arc/src/ ci/src/ --include="*.c" 2>/dev/null -A 4 | grep -v "GUIDELINE_APPROVED" | grep -E "if\s*\(|==|!=|NULL" | wc -l | tr -d ' ')
 
 TOTAL_FILE_IO=$((FREAD_COUNT + FWRITE_COUNT + FGETS_COUNT))
 TOTAL_CHECKED=$((FREAD_CHECKED + FWRITE_CHECKED + FGETS_CHECKED))

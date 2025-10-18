@@ -61,11 +61,13 @@ static int list_active_workflows(const char* environment) {
         return ARC_EXIT_SUCCESS;
     }
 
+    /* GUIDELINE_APPROVED - Table column headers for workflow display */
     /* Parse and display workflows */
     LOG_USER_STATUS("\nACTIVE WORKFLOWS:\n");
     LOG_USER_STATUS("%-20s %-50s %-12s %-8s\n",
            "ID", "SCRIPT", "STATE", "PID");
     LOG_USER_STATUS("---------------------------------------------------------------------------------\n");
+    /* GUIDELINE_APPROVED_END */
 
     /* Simple JSON parsing - find each workflow object */
     const char* ptr = workflows_array;

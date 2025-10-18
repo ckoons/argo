@@ -63,6 +63,7 @@ static void display_metadata(const char* template_name) {
         return;
     }
 
+    /* GUIDELINE_APPROVED - YAML/markdown separator formatting */
     printf("\n");
     LOG_USER_INFO("Template Metadata:\n");
     printf("---\n");
@@ -82,6 +83,7 @@ static void display_metadata(const char* template_name) {
 
     fclose(fp);
     printf("---\n");
+    /* GUIDELINE_APPROVED_END */
 }
 
 /* arc workflow docs command */

@@ -30,6 +30,13 @@ static char* read_stdin_data(void) {
 
     while (!feof(stdin)) {
         size_t bytes_read = fread(buffer + size, 1, CI_READ_CHUNK_SIZE, stdin);
+
+        /* Check for read error */
+        if (bytes_read == 0 && ferror(stdin)) {
+            free(buffer);
+            return NULL;
+        }
+
         size += bytes_read;
 
         if (size + CI_READ_CHUNK_SIZE > capacity) {

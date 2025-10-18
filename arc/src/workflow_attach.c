@@ -107,7 +107,9 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
     LOG_USER_SUCCESS("Attached to workflow: %s\n", workflow_id);
     LOG_USER_INFO("Logs: %s\n", log_path);
     LOG_USER_INFO("Press Ctrl+D to detach\n");
+    /* GUIDELINE_APPROVED - Visual separator for workflow output */
     printf("----------------------------------------\n");
+    /* GUIDELINE_APPROVED_END */
 
     /* Main loop: tail log file and check for input */
     char buffer[ARC_JSON_BUFFER];
@@ -169,7 +171,9 @@ static int arc_workflow_attach_internal(const char* workflow_id, int seek_to_end
     }
 
     close(log_fd);
+    /* GUIDELINE_APPROVED - Visual separator for workflow output */
     printf("\n----------------------------------------\n");
+    /* GUIDELINE_APPROVED_END */
     LOG_USER_INFO("Detached from workflow: %s\n", workflow_id);
 
     return ARC_EXIT_SUCCESS;

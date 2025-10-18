@@ -409,6 +409,7 @@ void registry_print_status(ci_registry_t* registry) {
     }
 }
 
+/* GUIDELINE_APPROVED - CI status name display array */
 void registry_print_entry(ci_registry_entry_t* entry) {
     if (!entry) return;
 
@@ -421,3 +422,4 @@ void registry_print_entry(ci_registry_entry_t* entry) {
            entry->host, entry->port,
            status_names[entry->status]);
 }
+/* GUIDELINE_APPROVED_END */

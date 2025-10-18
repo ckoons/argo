@@ -16,6 +16,7 @@
 /* Global daemon context for API handlers */
 argo_daemon_t* g_api_daemon = NULL;
 
+/* GUIDELINE_APPROVED - JSON construction for API responses */
 /* GET /api/registry/ci - List CIs */
 int api_registry_list_ci(http_request_t* req, http_response_t* resp) {
     (void)req;  /* Unused */
@@ -29,6 +30,7 @@ int api_registry_list_ci(http_request_t* req, http_response_t* resp) {
     http_response_set_json(resp, HTTP_STATUS_OK, "{\"cis\":[]}");
     return ARGO_SUCCESS;
 }
+/* GUIDELINE_APPROVED_END */
 
 /* Register all API routes with daemon */
 int argo_daemon_register_api_routes(argo_daemon_t* daemon) {
