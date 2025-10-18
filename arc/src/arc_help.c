@@ -17,6 +17,7 @@ static void show_general_help(void) {
     printf("  list                                    List active workflows\n");
     printf("  templates                               List available templates\n");
     printf("  status <workflow_id>                    Show workflow status\n");
+    printf("  states                                  Show detailed status of all workflows\n");
     printf("  abandon <workflow_id>                   Stop and remove workflow\n");
     printf("  pause <workflow_id>                     Pause workflow execution\n");
     printf("  resume <workflow_id>                    Resume paused workflow\n");
@@ -28,12 +29,18 @@ static void show_general_help(void) {
     printf("  User templates:   ~/.argo/workflows/templates/\n\n");
     printf("Prerequisites:\n");
     printf("  Daemon must be running: argo-daemon --port ARC_DEFAULT_DAEMON_PORT\n\n");
+    printf("Template Management:\n");
+    printf("  To create templates:   arc start create_template <name>\n");
+    printf("  To remove templates:   rm -rf workflows/templates/<name>\n");
+    printf("  To rename templates:   mv workflows/templates/<old> <new>\n");
+    printf("  Helper functions:      source ~/.local/share/arc/helpers/arc-helpers.sh\n\n");
     printf("Examples:\n");
     printf("  arc templates                      # List available templates\n");
-    printf("  arc start create_workflow          # Start with auto-naming (create_workflow_01)\n");
-    printf("  arc start create_workflow feature  # Start with instance name (create_workflow_feature)\n");
+    printf("  arc start create_template my_flow  # Create new template (guided)\n");
+    printf("  arc start my_flow test             # Start with instance name (my_flow_test)\n");
     printf("  arc list                           # Show running workflows\n");
-    printf("  arc status create_workflow_01      # Check workflow status\n\n");
+    printf("  arc states                         # Show detailed status of all\n");
+    printf("  arc status my_flow_test            # Check workflow status\n\n");
     printf("For command details: arc help <command>\n");
 }
 
@@ -59,8 +66,8 @@ static void show_command_help(const char* command) {
         printf("    tests/          - Test scripts\n");
         printf("    config/         - Configuration files\n\n");
         printf("Examples:\n");
-        printf("  arc start create_workflow                    # Auto: create_workflow_01\n");
-        printf("  arc start create_workflow feature            # Named: create_workflow_feature\n");
+        printf("  arc start create_template my_flow            # Create new template (guided)\n");
+        printf("  arc start my_flow feature                    # Named: my_flow_feature\n");
         printf("  arc start my_build arg1 arg2                 # With args\n");
         printf("  arc start deploy prod VERSION=1.2.3         # Instance + env vars\n\n");
         printf("See also: arc templates, arc docs <template>\n");
@@ -107,6 +114,26 @@ static void show_command_help(const char* command) {
         printf("  arc status wf_12345_67890\n");
         printf("  arc attach wf_12345_67890  # View logs\n");
     }
+    else if (strcmp(command, "states") == 0) {
+        printf("arc states\n\n");
+        printf("Show detailed status of all active workflows.\n\n");
+        printf("Shows comprehensive information for every workflow:\n");
+        printf("  - Workflow ID (with * marking current workflow)\n");
+        printf("  - Template and instance names\n");
+        printf("  - Branch and environment\n");
+        printf("  - Status (running, paused, completed, failed, abandoned)\n");
+        printf("  - Process status (RUNNING or STOPPED)\n");
+        printf("  - Process ID\n");
+        printf("  - Log file location\n\n");
+        printf("This is more detailed than 'arc list', showing:\n");
+        printf("  - Process state (live check via kill -0)\n");
+        printf("  - Template/instance breakdown\n");
+        printf("  - Log file paths for debugging\n\n");
+        printf("Examples:\n");
+        printf("  arc states                    # Show all workflow states\n");
+        printf("  arc list                      # Simpler workflow list\n");
+        printf("  arc status <workflow_id>      # Single workflow details\n");
+    }
     else if (strcmp(command, "pause") == 0) {
         printf("arc pause <workflow_id>\n\n");
         printf("Pause a running workflow.\n\n");
@@ -149,7 +176,7 @@ static void show_command_help(const char* command) {
         printf("Arguments:\n");
         printf("  template  - Template name\n\n");
         printf("Examples:\n");
-        printf("  arc docs create_workflow\n");
+        printf("  arc docs create_template\n");
         printf("  arc templates  # List available templates\n");
     }
     else if (strcmp(command, "test") == 0) {
@@ -159,7 +186,7 @@ static void show_command_help(const char* command) {
         printf("Arguments:\n");
         printf("  template  - Template name\n\n");
         printf("Examples:\n");
-        printf("  arc test create_workflow\n");
+        printf("  arc test create_template\n");
     }
     else {
         LOG_USER_ERROR("Unknown command: %s\n", command);

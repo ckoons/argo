@@ -20,6 +20,9 @@ install-term:
 install-completion:
 	@$(MAKE) -C arc install-completion
 
+install-helpers:
+	@$(MAKE) -C arc install-helpers
+
 restart-daemon:
 	@echo "Restarting argo-daemon..."
 	@pkill -TERM argo-daemon 2>/dev/null || true
@@ -28,7 +31,7 @@ restart-daemon:
 	@sleep 1
 	@echo "Daemon restarted"
 
-install-all: install install-arc install-ci install-term install-completion restart-daemon
+install-all: install install-arc install-ci install-term install-completion install-helpers restart-daemon
 	@if ! echo $$PATH | grep -q "$(HOME)/.local/bin"; then \
 		echo ""; \
 		echo "⚠️  $(HOME)/.local/bin is not in your PATH"; \
@@ -54,4 +57,7 @@ uninstall-ci:
 uninstall-term:
 	$(MAKE) -C ui/argo-term uninstall PREFIX=$(PREFIX)
 
-uninstall-all: uninstall uninstall-arc uninstall-ci uninstall-term
+uninstall-helpers:
+	@$(MAKE) -C arc uninstall-helpers
+
+uninstall-all: uninstall uninstall-arc uninstall-ci uninstall-term uninstall-helpers

@@ -36,7 +36,7 @@ TEST_TARGETS = $(patsubst $(TEST_DIR)/%.c,bin/tests/test_%,$(TEST_SOURCES))
 # This ensures arc ALWAYS builds to the main project bin/ directory
 TARGET = ../bin/arc
 
-.PHONY: all clean test test-arc-unit test-arc-cli test-arc test-arc-workflow test-arc-background test-arc-full test-arc-all directories count install uninstall
+.PHONY: all clean test test-arc-unit test-arc-cli test-arc test-arc-workflow test-arc-background test-arc-full test-arc-all directories count install install-completion install-helpers uninstall uninstall-helpers
 
 # Default target
 all: directories $(TARGET)
@@ -184,11 +184,48 @@ install-completion:
 		echo "    - Fish: completions/arc.fish"; \
 	fi
 
+# Install helper functions
+install-helpers:
+	@echo "Installing helper functions..."
+	@mkdir -p $(HOME)/.local/share/arc/helpers
+	@install -m 0644 helpers/arc-helpers.sh $(HOME)/.local/share/arc/helpers/arc-helpers.sh
+	@# Add to shell RC file if not already present
+	@if [ "$$SHELL" = "/bin/bash" ] || [ "$$SHELL" = "/usr/bin/bash" ]; then \
+		if ! grep -q "arc/helpers/arc-helpers.sh" $(HOME)/.bashrc 2>/dev/null; then \
+			echo "" >> $(HOME)/.bashrc; \
+			echo "# Arc helper functions" >> $(HOME)/.bashrc; \
+			echo "[ -f $(HOME)/.local/share/arc/helpers/arc-helpers.sh ] && source $(HOME)/.local/share/arc/helpers/arc-helpers.sh" >> $(HOME)/.bashrc; \
+			echo "✓ Added arc helpers to ~/.bashrc"; \
+			echo "  Reload shell: exec bash"; \
+		else \
+			echo "✓ Arc helpers already in ~/.bashrc"; \
+		fi; \
+	elif [ "$$SHELL" = "/bin/zsh" ] || [ "$$SHELL" = "/usr/bin/zsh" ]; then \
+		if ! grep -q "arc/helpers/arc-helpers.sh" $(HOME)/.zshrc 2>/dev/null; then \
+			echo "" >> $(HOME)/.zshrc; \
+			echo "# Arc helper functions" >> $(HOME)/.zshrc; \
+			echo "[ -f $(HOME)/.local/share/arc/helpers/arc-helpers.sh ] && source $(HOME)/.local/share/arc/helpers/arc-helpers.sh" >> $(HOME)/.zshrc; \
+			echo "✓ Added arc helpers to ~/.zshrc"; \
+			echo "  Reload shell: exec zsh"; \
+		else \
+			echo "✓ Arc helpers already in ~/.zshrc"; \
+		fi; \
+	else \
+		echo "⚠ Shell not detected: $$SHELL"; \
+		echo "  Helpers installed to: ~/.local/share/arc/helpers/arc-helpers.sh"; \
+		echo "  Manually add to your shell RC file:"; \
+		echo "    source ~/.local/share/arc/helpers/arc-helpers.sh"; \
+	fi
+	@echo "✓ Helper functions installed"
+
 uninstall:
 	rm -f $(PREFIX)/bin/arc
 	rm -f $(HOME)/.local/share/bash-completion/completions/arc
 	rm -f $(HOME)/.zsh/completions/_arc
 	rm -f $(HOME)/.config/fish/completions/arc.fish
+
+uninstall-helpers:
+	rm -rf $(HOME)/.local/share/arc/helpers
 
 # Debug
 debug:
