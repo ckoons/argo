@@ -1,0 +1,32 @@
+name: build_program
+description: Build a program from design documents with AI code generation
+version: 1.0.0
+author: Casey Koons
+created: 2025-10-19
+
+parameters:
+  - name: program_name
+    description: Name of the design to build (from design_program)
+    required: false
+  - name: build_location
+    description: Where to build the program (default ~/.argo/tools/{name})
+    required: false
+
+requirements:
+  - bash
+  - jq
+  - ci (Argo CI tool)
+
+environments:
+  - dev
+  - prod
+
+inputs:
+  - ~/.argo/designs/{program_name}/design.json
+  - ~/.argo/designs/{program_name}/requirements.md
+  - ~/.argo/designs/{program_name}/architecture.md
+
+outputs:
+  - ~/.argo/tools/{program_name}/{program_name}
+  - ~/.argo/tools/{program_name}/tests/
+  - ~/.argo/tools/{program_name}/README.md

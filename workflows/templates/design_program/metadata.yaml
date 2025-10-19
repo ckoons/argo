@@ -1,0 +1,24 @@
+name: design_program
+description: Interactive program design workflow with AI assistance
+version: 1.0.0
+author: Casey Koons
+created: 2025-10-19
+
+parameters:
+  - name: program_name
+    description: Name of the program to design (optional, will prompt if not provided)
+    required: false
+
+requirements:
+  - bash
+  - jq
+  - ci (Argo CI tool)
+
+environments:
+  - dev
+  - prod
+
+outputs:
+  - ~/.argo/designs/{program_name}/requirements.md
+  - ~/.argo/designs/{program_name}/architecture.md
+  - ~/.argo/designs/{program_name}/design.json
