@@ -27,10 +27,13 @@ log() {
 ask() {
     local question="$1"
     local varname="$2"
+    local response
 
     echo "$question"
     read -r response
-    eval "$varname=\"$response\""
+
+    # Use printf with %s to safely assign (avoids eval quoting issues)
+    printf -v "$varname" '%s' "$response"
 }
 
 # User onboarding - explain the process
@@ -46,7 +49,8 @@ user_onboarding() {
     echo "  2. Design dialog - We'll refine the approach together"
     echo "  3. Build phase - I'll create the template"
     echo ""
-    read -p "Press Enter to continue..."
+    echo "Press Enter to start..."
+    read -r
     echo ""
 }
 
@@ -236,6 +240,8 @@ log "Starting workflow..."
 log "Workflow complete!"
 WORKFLOW_EOF
     else
+        # Strip markdown code blocks if present
+        WORKFLOW_SCRIPT=$(echo "$WORKFLOW_SCRIPT" | sed '/^```/d')
         echo "$WORKFLOW_SCRIPT" > "$TEMPLATE_DIR/workflow.sh"
     fi
 
@@ -337,6 +343,8 @@ echo "Test passed!"
 exit 0
 TEST_EOF
     else
+        # Strip markdown code blocks if present
+        TEST_SCRIPT=$(echo "$TEST_SCRIPT" | sed '/^```/d')
         echo "$TEST_SCRIPT" > "$TEMPLATE_DIR/tests/test_basic.sh"
     fi
 
