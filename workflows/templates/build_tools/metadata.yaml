@@ -1,0 +1,32 @@
+name: build_tools
+description: Build single-file tools from design documents with AI code generation
+version: 1.0.0
+author: Casey Koons
+created: 2025-10-21
+
+parameters:
+  - name: tool_name
+    description: Name of the design to build (from design_program)
+    required: false
+  - name: build_location
+    description: Where to build the tool (default ~/.argo/tools/{name})
+    required: false
+
+requirements:
+  - bash
+  - jq
+  - ci (Argo CI tool)
+
+environments:
+  - dev
+  - prod
+
+inputs:
+  - ~/.argo/designs/{tool_name}/design.json
+  - ~/.argo/designs/{tool_name}/requirements.md
+  - ~/.argo/designs/{tool_name}/architecture.md
+
+outputs:
+  - ~/.argo/tools/{tool_name}/{tool_name}
+  - ~/.argo/tools/{tool_name}/tests/
+  - ~/.argo/tools/{tool_name}/README.md
