@@ -8,15 +8,17 @@
 
 set -e
 
+# Load color library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../lib/arc-colors.sh"
+
+# Set workflow name for logging
+export WORKFLOW_NAME="design_program"
+
 # Directories
 DESIGNS_DIR="${HOME}/.argo/designs"
 PROGRAM_NAME=""
 DESIGN_DIR=""
-
-# Logging
-log() {
-    echo "[design_program] $*"
-}
 
 # Ask user a question and get response
 ask() {
@@ -31,12 +33,35 @@ ask() {
     printf -v "$varname" '%s' "$response"
 }
 
+# Show available designs (colorized)
+show_available_designs() {
+    if [[ -d "$DESIGNS_DIR" ]] && [[ -n "$(ls -A "$DESIGNS_DIR" 2>/dev/null)" ]]; then
+        echo ""
+        list_header "Available designs:"
+        for design_dir in "$DESIGNS_DIR"/*; do
+            if [[ -d "$design_dir" ]]; then
+                local design_name=$(basename "$design_dir")
+                if [[ -f "$design_dir/design.json" ]]; then
+                    local purpose=$(jq -r '.purpose' "$design_dir/design.json" 2>/dev/null | head -c 50)
+                    list_item "$design_name" "$purpose..."
+                else
+                    list_pending "$design_name" "(incomplete)"
+                fi
+            fi
+        done
+        echo ""
+    fi
+}
+
 # Phase 1: Program Identity
 gather_program_identity() {
-    log "Phase 1: Program Identity"
-    echo ""
+    log_phase "Phase 1: Program Identity"
 
-    ask "What should we call this program?" PROGRAM_NAME
+    # Show existing designs if any
+    show_available_designs
+
+    prompt "What should we call this program?"
+    read -r PROGRAM_NAME
 
     # Sanitize name (lowercase, underscores)
     PROGRAM_NAME=$(echo "$PROGRAM_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr -cd '[:alnum:]_')
@@ -45,8 +70,9 @@ gather_program_identity() {
 
     # Check for existing design
     if [[ -d "$DESIGN_DIR" ]]; then
-        log "Design already exists: $PROGRAM_NAME"
-        ask "What would you like to do? (load/overwrite/rename)" ACTION
+        warning "Design already exists: $(path $PROGRAM_NAME)"
+        prompt "What would you like to do? (load/overwrite/rename)"
+        read -r ACTION
 
         case "$ACTION" in
             load)
@@ -55,7 +81,7 @@ gather_program_identity() {
                 return 0
                 ;;
             overwrite)
-                log "Removing existing design..."
+                warning "Removing existing design..."
                 rm -rf "$DESIGN_DIR"
                 ;;
             rename)
@@ -63,47 +89,166 @@ gather_program_identity() {
                 return 0
                 ;;
             *)
-                log "Invalid choice. Aborting."
+                error "Invalid choice. Aborting."
                 exit 1
                 ;;
         esac
     fi
 
     mkdir -p "$DESIGN_DIR"
-    log "Creating design: $PROGRAM_NAME"
+    success "Creating design: $(path $PROGRAM_NAME)"
 }
 
 # Load existing design and show summary
 load_existing_design() {
     if [[ -f "$DESIGN_DIR/design.json" ]]; then
+        box_header "Existing Design: $PROGRAM_NAME" "📋"
+        cat "$DESIGN_DIR/requirements.md" | colorize_markdown
+        box_footer
+
+        prompt "What would you like to do?"
+        echo -e "  ${YELLOW}1.${NC} ${WHITE}Modify this design${NC} ${GRAY}(update requirements, refine architecture)${NC}"
+        echo -e "  ${YELLOW}2.${NC} ${WHITE}Use as-is${NC} ${GRAY}(ready to build)${NC}"
+        echo -e "  ${YELLOW}3.${NC} ${WHITE}Start fresh${NC} ${GRAY}(discard and recreate)${NC}"
         echo ""
-        echo "Existing design:"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        cat "$DESIGN_DIR/requirements.md"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo ""
-        log "Design ready for build_program"
-        log "Run: arc start build_program $PROGRAM_NAME"
-        exit 0
+        prompt "Enter choice (1/2/3):"
+        read -r CHOICE
+
+        case "$CHOICE" in
+            1)
+                info "Loading design for modification..."
+                modify_existing_design
+                ;;
+            2)
+                success "Design ready for build_program"
+                show_command "Next step" "arc start build_program $PROGRAM_NAME"
+                exit 0
+                ;;
+            3)
+                warning "Discarding existing design..."
+                rm -rf "$DESIGN_DIR"
+                mkdir -p "$DESIGN_DIR"
+                success "Ready to create fresh design"
+                ;;
+            *)
+                error "Invalid choice. Exiting."
+                exit 1
+                ;;
+        esac
     else
-        log "Warning: Design directory exists but incomplete. Continuing..."
+        warning "Design directory exists but incomplete. Continuing..."
+    fi
+}
+
+# Modify existing design
+modify_existing_design() {
+    # Load existing values from design.json
+    PURPOSE=$(jq -r '.purpose' "$DESIGN_DIR/design.json")
+    USERS=$(jq -r '.users' "$DESIGN_DIR/design.json")
+    LANGUAGE=$(jq -r '.language' "$DESIGN_DIR/design.json")
+    FEATURES=$(jq -r '.features | join(", ")' "$DESIGN_DIR/design.json")
+    SUCCESS_CRITERIA=$(jq -r '.success_criteria' "$DESIGN_DIR/design.json")
+    CONSTRAINTS=$(jq -r '.constraints' "$DESIGN_DIR/design.json")
+
+    log_phase "Modify Design"
+    info "Current values shown in ${GRAY}gray${NC}. Press Enter to keep, or type new value."
+
+    # Re-gather requirements with current values as defaults
+    question "1" "What problem does this program solve?"
+    echo -e "  ${GRAY}Current: $PURPOSE${NC}"
+    read -r NEW_PURPOSE
+    PURPOSE="${NEW_PURPOSE:-$PURPOSE}"
+
+    question "2" "Who will use this program? (you/team/public)"
+    echo -e "  ${GRAY}Current: $USERS${NC}"
+    read -r NEW_USERS
+    USERS="${NEW_USERS:-$USERS}"
+
+    question "3" "What language should we use? (python/bash/c/auto)"
+    echo -e "  ${GRAY}Current: $LANGUAGE${NC}"
+    read -r NEW_LANGUAGE
+    LANGUAGE="${NEW_LANGUAGE:-$LANGUAGE}"
+
+    question "4" "What are the key features? (comma-separated)"
+    echo -e "  ${GRAY}Current: $FEATURES${NC}"
+    read -r NEW_FEATURES
+    FEATURES="${NEW_FEATURES:-$FEATURES}"
+
+    question "5" "How will you know it works? (success criteria)"
+    echo -e "  ${GRAY}Current: $SUCCESS_CRITERIA${NC}"
+    read -r NEW_SUCCESS_CRITERIA
+    SUCCESS_CRITERIA="${NEW_SUCCESS_CRITERIA:-$SUCCESS_CRITERIA}"
+
+    echo ""
+    info "Any dependencies or constraints? (Press Enter to keep current)"
+    echo -e "  ${GRAY}Current: $CONSTRAINTS${NC}"
+    read -r NEW_CONSTRAINTS
+    CONSTRAINTS="${NEW_CONSTRAINTS:-$CONSTRAINTS}"
+
+    # Save updated requirements
+    cat > "$DESIGN_DIR/requirements.md" <<EOF
+# Requirements: $PROGRAM_NAME
+
+## Purpose
+$PURPOSE
+
+## Target Users
+$USERS
+
+## Key Features
+$(echo "$FEATURES" | tr ',' '\n' | sed 's/^[[:space:]]*/- /')
+
+## Success Criteria
+$SUCCESS_CRITERIA
+
+## Language
+$LANGUAGE
+
+## Constraints
+${CONSTRAINTS:-None specified}
+
+---
+Created: $(jq -r '.created' "$DESIGN_DIR/design.json")
+Modified: $(date)
+EOF
+
+    success "Requirements updated!"
+
+    # Ask if they want to regenerate architecture
+    echo ""
+    prompt "Regenerate architecture based on updated requirements? (yes/no)"
+    read -r REGEN
+
+    if [[ "$REGEN" == "yes" ]]; then
+        design_dialog
+    else
+        info "Keeping existing architecture"
+        finalize_design
     fi
 }
 
 # Phase 2: Requirements Gathering
 gather_requirements() {
-    log "Phase 2: Requirements Gathering"
-    echo ""
-    echo "Let's define what this program should do..."
-    echo ""
+    log_phase "Phase 2: Requirements Gathering"
+    info "Let's define what this program should do..."
 
-    ask "1. What problem does this program solve?" PURPOSE
-    ask "2. Who will use this program? (you/team/public)" USERS
-    ask "3. What language should we use? (python/bash/c/auto)" LANGUAGE
-    ask "4. What are the key features? (comma-separated)" FEATURES
-    ask "5. How will you know it works? (success criteria)" SUCCESS_CRITERIA
+    question "1" "What problem does this program solve?"
+    read -r PURPOSE
+
+    question "2" "Who will use this program? (you/team/public)"
+    read -r USERS
+
+    question "3" "What language should we use? (python/bash/c/auto)"
+    read -r LANGUAGE
+
+    question "4" "What are the key features? (comma-separated)"
+    read -r FEATURES
+
+    question "5" "How will you know it works? (success criteria)"
+    read -r SUCCESS_CRITERIA
+
     echo ""
-    echo "6. Any dependencies or constraints? (Press Enter to skip)"
+    info "Any dependencies or constraints? (Press Enter to skip)"
     read -r CONSTRAINTS
 
     # Save to requirements.md
@@ -132,15 +277,13 @@ ${CONSTRAINTS:-None specified}
 Created: $(date)
 EOF
 
-    log "Requirements captured!"
+    success "Requirements captured!"
 }
 
 # Phase 3: AI Design Dialog
 design_dialog() {
-    log "Phase 3: Design Dialog"
-    echo ""
-    echo "Analyzing requirements and designing architecture..."
-    echo ""
+    log_phase "Phase 3: Design Dialog"
+    info "Analyzing requirements and designing architecture..."
 
     REQUIREMENTS=$(cat "$DESIGN_DIR/requirements.md")
 
@@ -172,8 +315,8 @@ EOF
 )
 
     if [ $? -ne 0 ] || [ -z "$ARCHITECTURE" ]; then
-        log "Error: AI design analysis failed"
-        log "Continuing with manual design..."
+        error "AI design analysis failed"
+        warning "Continuing with manual design..."
         ARCHITECTURE="AI unavailable - manual design required"
     fi
 
@@ -181,30 +324,29 @@ EOF
     echo "$ARCHITECTURE" > "$DESIGN_DIR/architecture.md"
 
     # Display to user
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Proposed Architecture:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    cat "$DESIGN_DIR/architecture.md"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
+    box_header "AI-Proposed Architecture" "${ROBOT}"
+    cat "$DESIGN_DIR/architecture.md" | colorize_markdown
+    box_footer
 
-    ask "Does this design work? (yes/no/refine)" APPROVAL
+    prompt "Does this design work? (yes/no/refine)"
+    read -r APPROVAL
 
     case "$APPROVAL" in
         yes)
             finalize_design
             ;;
         no)
-            log "Let's redesign..."
+            info "Let's redesign..."
             gather_requirements
             design_dialog
             ;;
         refine)
-            ask "What would you like to change?" REFINEMENT
+            prompt "What would you like to change?"
+            read -r REFINEMENT
             refine_design "$REFINEMENT"
             ;;
         *)
-            log "Invalid choice. Treating as 'yes'..."
+            warning "Invalid choice. Treating as 'yes'..."
             finalize_design
             ;;
     esac
@@ -214,7 +356,7 @@ EOF
 refine_design() {
     local refinement="$1"
 
-    log "Refining design based on your feedback..."
+    info "Refining design based on your feedback..."
 
     UPDATED_ARCHITECTURE=$(ci <<EOF
 The user wants to refine the design with this feedback:
@@ -234,29 +376,28 @@ EOF
     if [ $? -eq 0 ] && [ -n "$UPDATED_ARCHITECTURE" ]; then
         echo "$UPDATED_ARCHITECTURE" > "$DESIGN_DIR/architecture.md"
     else
-        log "Warning: AI refinement failed, keeping original design"
+        warning "AI refinement failed, keeping original design"
     fi
 
     # Show updated design
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Updated Architecture:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    cat "$DESIGN_DIR/architecture.md"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
+    box_header "Updated Architecture" "${ROBOT}"
+    cat "$DESIGN_DIR/architecture.md" | colorize_markdown
+    box_footer
 
-    ask "Does this work now? (yes/refine)" APPROVAL
+    prompt "Does this work now? (yes/refine)"
+    read -r APPROVAL
     if [[ "$APPROVAL" == "yes" ]]; then
         finalize_design
     else
-        ask "What else to change?" REFINEMENT
+        prompt "What else to change?"
+        read -r REFINEMENT
         refine_design "$REFINEMENT"
     fi
 }
 
 # Finalize design
 finalize_design() {
-    log "Finalizing design..."
+    info "Finalizing design..."
 
     # Create design.json (structured for build_program)
     cat > "$DESIGN_DIR/design.json" <<EOF
@@ -274,37 +415,35 @@ finalize_design() {
 }
 EOF
 
-    log "Design complete!"
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Design Summary"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Program: $PROGRAM_NAME"
-    echo "Language: $LANGUAGE"
-    echo "Location: $DESIGN_DIR"
-    echo ""
-    echo "Files created:"
-    echo "  ✓ requirements.md   (what you want)"
-    echo "  ✓ architecture.md   (how to build it)"
-    echo "  ✓ design.json       (structured design)"
-    echo ""
-    echo "Next steps:"
-    echo "  1. Review design: cat $DESIGN_DIR/architecture.md"
-    echo "  2. Build program: arc start build_program $PROGRAM_NAME"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
+    banner_summary "Design Complete!"
+
+    echo -e "${BOLD}${WHITE}Program:${NC} $(path $PROGRAM_NAME)"
+    echo -e "${BOLD}${WHITE}Language:${NC} $(arg $LANGUAGE)"
+    echo -e "${BOLD}${WHITE}Location:${NC} $(path $DESIGN_DIR)"
+
+    list_header "Files created:"
+    list_item "requirements.md" "what you want"
+    list_item "architecture.md" "how to build it"
+    list_item "design.json" "structured design"
+
+    next_steps "Next steps" \
+        "Review design: $(cmd cat) $(path $DESIGN_DIR/architecture.md)" \
+        "Build program: $(cmd arc start build_program) $(arg $PROGRAM_NAME)"
 }
 
 # Main execution
 main() {
-    log "Welcome to Program Designer!"
+    banner_welcome "Welcome to Program Designer!" \
+                   "AI-assisted program design through interactive dialog"
+
+    info "This workflow will:"
+    list_pending "Gather your requirements"
+    list_pending "AI proposes architecture"
+    list_pending "Create design documents"
+
     echo ""
-    echo "This workflow will help you design a program through dialog with AI."
-    echo "We'll gather requirements, propose an architecture, and create design docs."
-    echo ""
-    echo "Press Enter to start..."
+    info "Press Enter to start..."
     read -r
-    echo ""
 
     # Ensure designs directory exists
     mkdir -p "$DESIGNS_DIR"
@@ -314,7 +453,7 @@ main() {
     gather_requirements
     design_dialog
 
-    log "Design workflow complete!"
+    success "Design workflow complete!"
 }
 
 # Run main

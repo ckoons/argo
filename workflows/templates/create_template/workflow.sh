@@ -9,6 +9,13 @@
 
 set -e
 
+# Load color library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../lib/arc-colors.sh"
+
+# Set workflow name for logging
+export WORKFLOW_NAME="create_template"
+
 # Template directory
 TEMPLATES_DIR="${HOME}/.argo/workflows/templates"
 
@@ -17,11 +24,6 @@ WORKFLOW_STATE="${HOME}/.argo/workflows/state/${WORKFLOW_ID:-create_template}/st
 
 # Ensure state directory exists
 mkdir -p "$(dirname "$WORKFLOW_STATE")"
-
-# Logging function
-log() {
-    echo "[create_template] $*"
-}
 
 # Ask user a question and get response
 ask() {
@@ -38,39 +40,39 @@ ask() {
 
 # User onboarding - explain the process
 user_onboarding() {
-    log "Welcome to the Argo Workflow Creator!"
+    banner_welcome "Welcome to Workflow Creator!" \
+                   "AI-assisted workflow template creation"
+
+    info "This process has three phases:"
+    list_pending "Requirements gathering - Tell me what you want"
+    list_pending "Design dialog - We'll refine the approach together"
+    list_pending "Build phase - I'll create the template"
+
     echo ""
-    echo "I'll help you create a new workflow template by asking a few questions."
-    echo "We'll work together to define what you want, how to test it, and"
-    echo "what success looks like."
-    echo ""
-    echo "This process has three phases:"
-    echo "  1. Requirements gathering - Tell me what you want"
-    echo "  2. Design dialog - We'll refine the approach together"
-    echo "  3. Build phase - I'll create the template"
-    echo ""
-    echo "Press Enter to start..."
+    info "Press Enter to start..."
     read -r
     echo ""
 }
 
 # Gather requirements from user
 gather_requirements() {
-    log "Phase 1: Requirements Gathering"
-    echo ""
+    log_phase "Phase 1: Requirements Gathering"
 
     # Question 1: What do you want?
-    ask "1. What do you want this workflow to do?" WORKFLOW_PURPOSE
+    question "1" "What do you want this workflow to do?"
+    read -r WORKFLOW_PURPOSE
 
     # Question 2: How will you test it?
-    ask "2. How will you test if this workflow works correctly?" TEST_METHOD
+    question "2" "How will you test if this workflow works correctly?"
+    read -r TEST_METHOD
 
     # Question 3: What is success?
-    ask "3. What does success look like? (What should the workflow produce?)" SUCCESS_CRITERIA
+    question "3" "What does success look like? (What should the workflow produce?)"
+    read -r SUCCESS_CRITERIA
 
     # Optional: Additional context
     echo ""
-    echo "4. Any additional context or requirements? (Press Enter to skip)"
+    info "Any additional context or requirements? (Press Enter to skip)"
     read -r ADDITIONAL_CONTEXT
 
     # Save requirements to state
@@ -88,14 +90,13 @@ gather_requirements() {
         "$(printf '%s' "$ADDITIONAL_CONTEXT" | jq -Rs .)" \
         > "$WORKFLOW_STATE"
 
-    log "Requirements captured!"
+    success "Requirements captured!"
 }
 
 # Design dialog - refine with AI
 design_dialog() {
-    log "Phase 2: Design Dialog"
-    echo ""
-    echo "Analyzing your requirements with AI..."
+    log_phase "Phase 2: Design Dialog"
+    info "Analyzing your requirements with AI..."
     echo ""
 
     # Call ci to analyze requirements and propose design
@@ -120,26 +121,24 @@ EOF
 )
 
     if [ $? -ne 0 ]; then
-        log "Warning: AI analysis failed, proceeding with manual review"
+        warning "AI analysis failed, proceeding with manual review"
         DESIGN_PROPOSAL="AI unavailable - manual design review required"
     fi
 
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "AI Design Proposal:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "$DESIGN_PROPOSAL"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
+    box_header "AI Design Proposal" "${ROBOT}"
+    echo "$DESIGN_PROPOSAL" | colorize_markdown
+    box_footer
 
-    ask "Does this approach work for you? (yes/no/refine)" CONFIRM
+    prompt "Does this approach work for you? (yes/no/refine)"
+    read -r CONFIRM
 
     if [[ "$CONFIRM" == "no" ]]; then
-        log "Let's start over with different requirements..."
+        info "Let's start over with different requirements..."
         gather_requirements
         design_dialog
         return
     elif [[ "$CONFIRM" == "refine" ]]; then
-        log "Let's refine the requirements..."
+        info "Let's refine the requirements..."
         gather_requirements
         design_dialog
         return
@@ -163,13 +162,13 @@ EOF
 
 # Build the workflow template
 build_workflow() {
-    log "Phase 3: Build Phase"
-    echo ""
-    echo "Using AI to generate template implementation..."
+    log_phase "Phase 3: Build Phase"
+    info "Using AI to generate template implementation..."
     echo ""
 
     # Get template name
-    ask "What should we name this workflow template?" TEMPLATE_NAME
+    prompt "What should we name this workflow template?"
+    read -r TEMPLATE_NAME
 
     # Sanitize template name (lowercase, underscores)
     TEMPLATE_NAME=$(echo "$TEMPLATE_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '_' | tr -cd '[:alnum:]_')
@@ -177,16 +176,17 @@ build_workflow() {
     TEMPLATE_DIR="$TEMPLATES_DIR/$TEMPLATE_NAME"
 
     if [[ -d "$TEMPLATE_DIR" ]]; then
-        log "Template '$TEMPLATE_NAME' already exists!"
-        ask "Overwrite? (yes/no)" OVERWRITE
+        warning "Template '$(arg $TEMPLATE_NAME)' already exists!"
+        prompt "Overwrite? (yes/no)"
+        read -r OVERWRITE
         if [[ "$OVERWRITE" != "yes" ]]; then
-            log "Aborting."
+            error "Aborting."
             exit 1
         fi
         rm -rf "$TEMPLATE_DIR"
     fi
 
-    log "Creating template directory: $TEMPLATE_DIR"
+    success "Creating template: $(path $TEMPLATE_NAME)"
 
     # Create directory structure
     mkdir -p "$TEMPLATE_DIR"
@@ -194,7 +194,7 @@ build_workflow() {
     mkdir -p "$TEMPLATE_DIR/config"
 
     # Generate workflow.sh using AI
-    log "Generating workflow.sh with AI..."
+    step "1/4" "Generating workflow.sh with AI..."
     WORKFLOW_SCRIPT=$(ci <<EOF
 Generate a bash workflow script for this template:
 
@@ -216,7 +216,7 @@ EOF
 )
 
     if [ $? -ne 0 ] || [ -z "$WORKFLOW_SCRIPT" ]; then
-        log "Warning: AI generation failed, using template..."
+        warning "AI generation failed, using template..."
         cat > "$TEMPLATE_DIR/workflow.sh" <<WORKFLOW_EOF
 #!/bin/bash
 # © 2025 Casey Koons All rights reserved
@@ -246,9 +246,10 @@ WORKFLOW_EOF
     fi
 
     chmod +x "$TEMPLATE_DIR/workflow.sh"
+    success "Created $(path workflow.sh)"
 
     # Create metadata.yaml
-    log "Creating metadata.yaml..."
+    step "2/4" "Creating metadata.yaml..."
     cat > "$TEMPLATE_DIR/metadata.yaml" <<METADATA_EOF
 name: $TEMPLATE_NAME
 description: $WORKFLOW_PURPOSE
@@ -266,9 +267,10 @@ environments:
   - test
   - prod
 METADATA_EOF
+    success "Created $(path metadata.yaml)"
 
     # Create README.md
-    log "Creating README.md..."
+    step "3/4" "Creating README.md..."
     cat > "$TEMPLATE_DIR/README.md" <<README_EOF
 # $TEMPLATE_NAME
 
@@ -301,9 +303,10 @@ Created by $(whoami) on $(date)
 ---
 Generated by create_template meta-workflow
 README_EOF
+    success "Created $(path README.md)"
 
     # Generate test file using AI
-    log "Generating tests/test_basic.sh with AI..."
+    step "4/4" "Generating tests/test_basic.sh with AI..."
     TEST_SCRIPT=$(ci <<EOF
 Generate a bash test script for this workflow template:
 
@@ -325,7 +328,7 @@ EOF
 )
 
     if [ $? -ne 0 ] || [ -z "$TEST_SCRIPT" ]; then
-        log "Warning: AI test generation failed, using template..."
+        warning "AI test generation failed, using template..."
         cat > "$TEMPLATE_DIR/tests/test_basic.sh" <<TEST_EOF
 #!/bin/bash
 # © 2025 Casey Koons All rights reserved
@@ -349,24 +352,33 @@ TEST_EOF
     fi
 
     chmod +x "$TEMPLATE_DIR/tests/test_basic.sh"
+    success "Created $(path tests/test_basic.sh)"
 
     # Create config file
-    log "Creating config/defaults.env..."
+    info "Creating config/defaults.env..."
     cat > "$TEMPLATE_DIR/config/defaults.env" <<CONFIG_EOF
 # Default configuration for $TEMPLATE_NAME
 
 # Add configuration variables here
 CONFIG_EOF
 
-    log "Template created successfully!"
-    echo ""
-    echo "Template location: $TEMPLATE_DIR"
-    echo ""
-    echo "Next steps:"
-    echo "  1. Edit $TEMPLATE_DIR/workflow.sh to implement logic"
-    echo "  2. Edit $TEMPLATE_DIR/tests/test_basic.sh to implement tests"
-    echo "  3. Test with: arc workflow test $TEMPLATE_NAME"
-    echo "  4. Use with: arc workflow start $TEMPLATE_NAME instance_name"
+    banner_summary "Template Created Successfully!"
+
+    echo -e "${BOLD}${WHITE}Template:${NC} $(path $TEMPLATE_NAME)"
+    echo -e "${BOLD}${WHITE}Location:${NC} $(path $TEMPLATE_DIR)"
+
+    list_header "Files created:"
+    list_item "workflow.sh" "main workflow script"
+    list_item "metadata.yaml" "template metadata"
+    list_item "README.md" "documentation"
+    list_item "tests/test_basic.sh" "test suite"
+    list_item "config/defaults.env" "configuration"
+
+    next_steps "Next steps" \
+        "Edit: $(cmd vim) $(path $TEMPLATE_DIR/workflow.sh)" \
+        "Test: $(cmd arc workflow test) $(arg $TEMPLATE_NAME)" \
+        "Use: $(cmd arc workflow start) $(arg $TEMPLATE_NAME) $(arg instance_name)"
+
     echo ""
 
     # Update state

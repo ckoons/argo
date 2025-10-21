@@ -1,4 +1,4 @@
-name: create_workflow
+name: create_template
 description: Meta-workflow that creates new workflow templates through interactive dialog
 version: 1.0.0
 author: Casey Koons

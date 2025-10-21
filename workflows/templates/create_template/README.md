@@ -1,4 +1,4 @@
-# create_workflow
+# create_template
 
 ## Description
 
@@ -26,7 +26,7 @@ Test by running the workflow and verifying:
 
 ```bash
 # Interactive mode
-arc workflow start create_workflow my_new_template
+arc workflow start create_template my_new_template
 
 # The workflow will guide you through:
 # 1. User onboarding (explains the process)

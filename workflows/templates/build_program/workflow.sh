@@ -8,6 +8,13 @@
 
 set -e
 
+# Load color library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../lib/arc-colors.sh"
+
+# Set workflow name for logging
+export WORKFLOW_NAME="build_program"
+
 # Directories
 DESIGNS_DIR="${HOME}/.argo/designs"
 TOOLS_DIR="${HOME}/.argo/tools"
@@ -15,11 +22,6 @@ PROGRAM_NAME=""
 DESIGN_DIR=""
 BUILD_DIR=""
 LANGUAGE=""
-
-# Logging
-log() {
-    echo "[build_program] $*"
-}
 
 # Ask user a question and get response
 ask() {
@@ -39,26 +41,37 @@ load_design() {
     if [[ -n "$1" ]]; then
         PROGRAM_NAME="$1"
     else
-        ask "Which program design should I build?" PROGRAM_NAME
+        prompt "Which program design should I build?"
+        read -r PROGRAM_NAME
     fi
 
     DESIGN_DIR="$DESIGNS_DIR/$PROGRAM_NAME"
 
     if [[ ! -f "$DESIGN_DIR/design.json" ]]; then
-        log "Error: Design not found: $DESIGN_DIR/design.json"
-        log ""
-        log "Available designs:"
-        if [[ -d "$DESIGNS_DIR" ]]; then
-            ls -1 "$DESIGNS_DIR" 2>/dev/null || echo "  (none)"
+        error "Design not found: $(path $DESIGN_DIR/design.json)"
+        echo ""
+        list_header "Available designs:"
+        if [[ -d "$DESIGNS_DIR" ]] && [[ -n "$(ls -A "$DESIGNS_DIR" 2>/dev/null)" ]]; then
+            for design_dir in "$DESIGNS_DIR"/*; do
+                if [[ -d "$design_dir" ]]; then
+                    local design_name=$(basename "$design_dir")
+                    if [[ -f "$design_dir/design.json" ]]; then
+                        local purpose=$(jq -r '.purpose' "$design_dir/design.json" 2>/dev/null | head -c 50)
+                        list_item "$design_name" "$purpose..."
+                    else
+                        list_pending "$design_name" "(incomplete)"
+                    fi
+                fi
+            done
         else
-            echo "  (none - run 'arc start design_program' to create one)"
+            info "(none - run $(cmd 'arc start design_program') to create one)"
         fi
-        log ""
-        log "Run: arc start design_program"
+        echo ""
+        show_command "Create a design first" "arc start design_program"
         exit 1
     fi
 
-    log "Loading design: $PROGRAM_NAME"
+    success "Loading design: $(path $PROGRAM_NAME)"
 
     # Parse design.json
     LANGUAGE=$(jq -r '.language' "$DESIGN_DIR/design.json")
@@ -67,20 +80,25 @@ load_design() {
     # Auto-detect language if set to "auto"
     if [[ "$LANGUAGE" == "auto" ]]; then
         LANGUAGE="bash"  # Default
-        log "Language set to auto - defaulting to bash"
+        info "Language set to auto - defaulting to $(arg bash)"
     fi
 
-    log "Language: $LANGUAGE"
+    echo -e "${BOLD}${WHITE}Language:${NC} $(arg $LANGUAGE)"
+    echo -e "${BOLD}${WHITE}Purpose:${NC} $PURPOSE"
 }
 
 # Phase 2: Determine Build Location
 determine_build_location() {
+    log_phase "Phase 2: Build Location"
+
     # Check if user specified location as second argument
     if [[ -n "$2" ]]; then
         BUILD_DIR="${2/#\~/$HOME}"
     else
         DEFAULT_PATH="$TOOLS_DIR/$PROGRAM_NAME"
-        ask "Where should I build this? [$DEFAULT_PATH]:" USER_PATH
+        echo -e "${GRAY}Default: $(path $DEFAULT_PATH)${NC}"
+        prompt "Where should I build this? (Press Enter for default):"
+        read -r USER_PATH
 
         if [[ -n "$USER_PATH" ]]; then
             # Expand tilde
@@ -93,22 +111,24 @@ determine_build_location() {
 
     # Verify/create directory
     if [[ -d "$BUILD_DIR" ]]; then
-        ask "Directory exists: $BUILD_DIR. Overwrite? (yes/no)" OVERWRITE
+        warning "Directory exists: $(path $BUILD_DIR)"
+        prompt "Overwrite? (yes/no)"
+        read -r OVERWRITE
         if [[ "$OVERWRITE" != "yes" ]]; then
-            log "Aborting."
+            error "Aborting."
             exit 1
         fi
         rm -rf "$BUILD_DIR"
     fi
 
     mkdir -p "$BUILD_DIR"
-    log "Building in: $BUILD_DIR"
+    success "Building in: $(path $BUILD_DIR)"
 }
 
 # Phase 3: Pre-Build Questions
 ask_clarifying_questions() {
-    log "Analyzing design..."
-    echo ""
+    log_phase "Phase 3: Pre-Build Analysis"
+    info "Analyzing design for completeness..."
 
     REQUIREMENTS=$(cat "$DESIGN_DIR/requirements.md")
     ARCHITECTURE=$(cat "$DESIGN_DIR/architecture.md")
@@ -135,16 +155,15 @@ EOF
 )
 
     if [[ "$QUESTIONS" == *"ready to build"* ]] || [[ "$QUESTIONS" == *"Ready to build"* ]]; then
-        log "Design is complete. Ready to build!"
+        success "Design is complete. Ready to build!"
         ANSWERS=""
     else
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "AI has questions before building:"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        box_header "Pre-Build Questions" "${ROBOT}"
         echo "$QUESTIONS"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo ""
-        ask "Provide answers (or 'skip' to proceed anyway):" ANSWERS
+        box_footer
+
+        prompt "Provide answers (or 'skip' to proceed anyway):"
+        read -r ANSWERS
 
         if [[ "$ANSWERS" != "skip" ]]; then
             # Save Q&A to design
@@ -160,15 +179,14 @@ EOF
 
 # Phase 4: Build Program
 build_program() {
-    log "Generating program code..."
-    echo ""
+    log_phase "Phase 4: Code Generation"
 
     REQUIREMENTS=$(cat "$DESIGN_DIR/requirements.md")
     ARCHITECTURE=$(cat "$DESIGN_DIR/architecture.md")
     ANSWERS_CONTEXT="${ANSWERS:-No additional clarifications}"
 
     # Step 1: Generate main program file
-    log "Step 1/4: Generating source code..."
+    step "1/4" "Generating source code..."
 
     PROGRAM_CODE=$(ci <<EOF
 Build the complete program based on this design:
@@ -198,7 +216,7 @@ EOF
 )
 
     if [ $? -ne 0 ] || [ -z "$PROGRAM_CODE" ]; then
-        log "Error: Code generation failed"
+        error "Code generation failed"
         exit 1
     fi
 
@@ -220,10 +238,10 @@ EOF
     # Create symlink without extension for convenience
     ln -sf "$PROGRAM_NAME.$EXT" "$BUILD_DIR/$PROGRAM_NAME"
 
-    log "✓ Created $PROGRAM_NAME.$EXT"
+    success "Created $(path $PROGRAM_NAME.$EXT)"
 
     # Step 2: Generate tests
-    log "Step 2/4: Generating test suite..."
+    step "2/4" "Generating test suite..."
 
     TEST_CODE=$(ci <<EOF
 Generate a comprehensive test suite for this program:
@@ -251,7 +269,7 @@ EOF
 )
 
     if [ $? -ne 0 ] || [ -z "$TEST_CODE" ]; then
-        log "Warning: Test generation failed, creating placeholder..."
+        warning "Test generation failed, creating placeholder..."
         TEST_CODE="#!/bin/bash\necho 'TODO: Add tests'\nexit 0"
     fi
 
@@ -262,10 +280,10 @@ EOF
     echo "$TEST_CODE" > "$BUILD_DIR/tests/test_$PROGRAM_NAME.$EXT"
     chmod +x "$BUILD_DIR/tests/test_$PROGRAM_NAME.$EXT"
 
-    log "✓ Created tests/test_$PROGRAM_NAME.$EXT"
+    success "Created $(path tests/test_$PROGRAM_NAME.$EXT)"
 
     # Step 3: Generate README
-    log "Step 3/4: Generating documentation..."
+    step "3/4" "Generating documentation..."
 
     cat > "$BUILD_DIR/README.md" <<EOF
 # $PROGRAM_NAME
@@ -313,10 +331,10 @@ For detailed architecture and design decisions, see:
 Built by build_program on $(date)
 EOF
 
-    log "✓ Created README.md"
+    success "Created $(path README.md)"
 
     # Step 4: Language-specific build files
-    log "Step 4/4: Creating build configuration..."
+    step "4/4" "Creating build configuration..."
 
     case "$LANGUAGE" in
         c)
@@ -338,83 +356,90 @@ test: $PROGRAM_NAME
 
 .PHONY: all clean test
 MAKEFILE_EOF
-            log "✓ Created Makefile"
+            success "Created $(path Makefile)"
             ;;
         python)
             # Could add setup.py, requirements.txt, etc.
             echo "# Python dependencies" > "$BUILD_DIR/requirements.txt"
-            log "✓ Created requirements.txt"
+            success "Created $(path requirements.txt)"
             ;;
     esac
 
-    log "Build complete!"
+    success "Code generation complete!"
 }
 
 # Phase 5: Test Program
 test_program() {
-    log "Running tests..."
-    echo ""
+    log_phase "Phase 5: Testing"
+    info "Running generated tests..."
 
     cd "$BUILD_DIR/tests" || return 1
 
     if ./test_$PROGRAM_NAME.$EXT 2>&1; then
         echo ""
-        log "✓ Tests passed!"
+        success "Tests passed!"
         return 0
     else
         echo ""
-        log "⚠ Tests failed or incomplete"
-        log "Review tests at: $BUILD_DIR/tests/test_$PROGRAM_NAME.$EXT"
+        warning "Tests failed or incomplete"
+        info "Review tests at: $(path $BUILD_DIR/tests/test_$PROGRAM_NAME.$EXT)"
         return 1
     fi
 }
 
 # Phase 6: Installation Offer
 offer_installation() {
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Program Built Successfully!"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Program: $PROGRAM_NAME"
-    echo "Location: $BUILD_DIR"
-    echo "Language: $LANGUAGE"
-    echo ""
-    echo "Files created:"
-    ls -lh "$BUILD_DIR" | tail -n +2 | grep -v '^d' | awk '{print "  " $9 " (" $5 ")"}'
-    echo ""
-    echo "Directories:"
-    ls -lh "$BUILD_DIR" | tail -n +2 | grep '^d' | awk '{print "  " $9 "/"}'
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "Usage options:"
-    echo "  1. Direct execution:"
-    echo "     $BUILD_DIR/$PROGRAM_NAME"
-    echo ""
-    echo "  2. Install to PATH:"
-    echo "     ln -s $BUILD_DIR/$PROGRAM_NAME ~/.local/bin/$PROGRAM_NAME"
-    echo ""
-    echo "  3. Run tests:"
-    echo "     $BUILD_DIR/tests/test_$PROGRAM_NAME.$EXT"
-    echo ""
+    banner_summary "Program Built Successfully!"
 
-    ask "Install to ~/.local/bin now? (yes/no)" INSTALL
+    echo -e "${BOLD}${WHITE}Program:${NC} $(path $PROGRAM_NAME)"
+    echo -e "${BOLD}${WHITE}Location:${NC} $(path $BUILD_DIR)"
+    echo -e "${BOLD}${WHITE}Language:${NC} $(arg $LANGUAGE)"
+
+    list_header "Files created:"
+    ls -lh "$BUILD_DIR" | tail -n +2 | grep -v '^d' | while read -r line; do
+        filename=$(echo "$line" | awk '{print $9}')
+        filesize=$(echo "$line" | awk '{print $5}')
+        list_item "$filename" "$filesize"
+    done
+
+    echo ""
+    list_header "Directories:"
+    ls -lh "$BUILD_DIR" | tail -n +2 | grep '^d' | while read -r line; do
+        dirname=$(echo "$line" | awk '{print $9}')
+        list_item "$dirname/"
+    done
+
+    next_steps "Usage options" \
+        "Direct: $(cmd $BUILD_DIR/$PROGRAM_NAME)" \
+        "Install: $(cmd ln -s) $(path $BUILD_DIR/$PROGRAM_NAME) $(path ~/.local/bin/$PROGRAM_NAME)" \
+        "Test: $(cmd $BUILD_DIR/tests/test_$PROGRAM_NAME.$EXT)"
+
+    prompt "Install to ~/.local/bin now? (yes/no)"
+    read -r INSTALL
 
     if [[ "$INSTALL" == "yes" ]]; then
         ln -sf "$BUILD_DIR/$PROGRAM_NAME" "$HOME/.local/bin/$PROGRAM_NAME"
-        log "✓ Installed: ~/.local/bin/$PROGRAM_NAME"
+        success "Installed: $(path ~/.local/bin/$PROGRAM_NAME)"
         echo ""
-        echo "Ready to use anywhere: $PROGRAM_NAME"
+        echo -e "Ready to use anywhere: $(cmd $PROGRAM_NAME)"
     else
-        log "Skipped installation. You can install later with:"
-        log "  ln -s $BUILD_DIR/$PROGRAM_NAME ~/.local/bin/$PROGRAM_NAME"
+        info "Skipped installation. You can install later with:"
+        show_command "" "ln -s $BUILD_DIR/$PROGRAM_NAME ~/.local/bin/$PROGRAM_NAME"
     fi
 }
 
 # Main execution
 main() {
-    log "Welcome to Program Builder!"
-    echo ""
-    echo "This workflow builds programs from design documents created by design_program."
+    banner_welcome "Welcome to Program Builder!" \
+                   "AI-powered code generation from design documents"
+
+    info "This workflow will:"
+    list_pending "Load your design"
+    list_pending "Ask clarifying questions"
+    list_pending "Generate complete source code"
+    list_pending "Create comprehensive tests"
+    list_pending "Build documentation"
+
     echo ""
 
     # Load design (pass workflow arguments)
@@ -430,12 +455,12 @@ main() {
     build_program
 
     # Test it
-    test_program || log "Continue with manual testing"
+    test_program || warning "Continue with manual testing"
 
     # Offer installation
     offer_installation
 
-    log "Build complete!"
+    success "Build workflow complete!"
 }
 
 # Run main with all arguments

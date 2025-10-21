@@ -1,10 +1,10 @@
 #!/bin/bash
 # © 2025 Casey Koons All rights reserved
-# Basic test for create_workflow
+# Basic test for create_template
 
 set -e
 
-echo "Running basic test for create_workflow..."
+echo "Running basic test for create_template..."
 
 # Determine the workflow directory (parent of tests/)
 WORKFLOW_DIR="$(cd "$(dirname "$0")/.." && pwd)"
