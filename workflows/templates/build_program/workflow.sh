@@ -5,12 +5,31 @@
 #
 # This workflow reads a design created by design_program and generates
 # complete working code with tests and documentation.
+#
+# Supports parallel builder orchestration for complex projects.
 
 set -e
 
-# Load color library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../lib/arc-colors.sh"
+# Get workflow root directory
+WORKFLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMPLATES_DIR="$(dirname "$WORKFLOW_DIR")"
+ARGO_ROOT="$(dirname "$TEMPLATES_DIR")"
+LIB_DIR="$ARGO_ROOT/lib"
+
+# Load required libraries
+source "$LIB_DIR/arc-colors.sh"
+source "$LIB_DIR/state-manager.sh"
+source "$LIB_DIR/git-helpers.sh"
+
+# Load configuration
+if [[ -f "${HOME}/.argo/config" ]]; then
+    source "${HOME}/.argo/config"
+fi
+
+# Set defaults if not in config
+ARGO_MAX_BUILDERS="${ARGO_MAX_BUILDERS:-5}"
+ARGO_MAX_TEST_ATTEMPTS="${ARGO_MAX_TEST_ATTEMPTS:-5}"
+ARGO_MIN_FEATURES_FOR_PARALLEL="${ARGO_MIN_FEATURES_FOR_PARALLEL:-3}"
 
 # Set workflow name for logging
 export WORKFLOW_NAME="build_program"
@@ -22,6 +41,57 @@ PROGRAM_NAME=""
 DESIGN_DIR=""
 BUILD_DIR=""
 LANGUAGE=""
+
+# Session state
+SESSION_ID=""
+PROJECT_TYPE=""
+PROJECT_DIR=""
+IS_GIT_REPO="no"
+IS_GITHUB_PROJECT="no"
+MAIN_BRANCH=""
+FEATURE_BRANCH=""
+
+# Parallel build state
+PARALLEL_BUILD=false
+BUILDER_COUNT=0
+declare -a BUILDER_IDS
+declare -a BUILDER_PIDS
+
+# Load session context if available
+load_session_context() {
+    # Check for last session file
+    local last_session_file="${HOME}/.argo/.last_session"
+
+    if [[ -f "$last_session_file" ]]; then
+        SESSION_ID=$(cat "$last_session_file")
+
+        if [[ -n "$SESSION_ID" ]] && session_exists "$SESSION_ID"; then
+            info "Loading session: $(label $SESSION_ID)"
+
+            # Load context
+            PROJECT_TYPE=$(get_context_field "$SESSION_ID" "project_type")
+            PROJECT_DIR=$(get_context_field "$SESSION_ID" "project_dir")
+            PROGRAM_NAME=$(get_context_field "$SESSION_ID" "project_name")
+            IS_GIT_REPO=$(get_context_field "$SESSION_ID" "is_git_repo")
+            IS_GITHUB_PROJECT=$(get_context_field "$SESSION_ID" "is_github_project")
+            MAIN_BRANCH=$(get_context_field "$SESSION_ID" "main_branch")
+
+            success "Session loaded"
+            list_item "Project type:" "$(label $PROJECT_TYPE)"
+            list_item "Project name:" "$PROGRAM_NAME"
+            list_item "Directory:" "$(path $PROJECT_DIR)"
+            echo ""
+
+            # Update session phase
+            update_phase "$SESSION_ID" "build"
+
+            return 0
+        fi
+    fi
+
+    # No session found
+    return 1
+}
 
 # Ask user a question and get response
 ask() {
