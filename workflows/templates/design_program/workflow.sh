@@ -8,9 +8,15 @@
 
 set -e
 
-# Load color library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../../lib/arc-colors.sh"
+# Get workflow root directory
+WORKFLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TEMPLATES_DIR="$(dirname "$WORKFLOW_DIR")"
+ARGO_ROOT="$(dirname "$TEMPLATES_DIR")"
+LIB_DIR="$ARGO_ROOT/lib"
+
+# Load required libraries
+source "$LIB_DIR/arc-colors.sh"
+source "$LIB_DIR/state-manager.sh"
 
 # Set workflow name for logging
 export WORKFLOW_NAME="design_program"
@@ -19,6 +25,50 @@ export WORKFLOW_NAME="design_program"
 DESIGNS_DIR="${HOME}/.argo/designs"
 PROGRAM_NAME=""
 DESIGN_DIR=""
+
+# Session state
+SESSION_ID=""
+PROJECT_TYPE=""
+PROJECT_DIR=""
+IS_GIT_REPO="no"
+
+# Load session context if available
+load_session_context() {
+    # Check for last session file
+    local last_session_file="${HOME}/.argo/.last_session"
+
+    if [[ -f "$last_session_file" ]]; then
+        SESSION_ID=$(cat "$last_session_file")
+
+        if [[ -n "$SESSION_ID" ]] && session_exists "$SESSION_ID"; then
+            info "Loading session: $(label $SESSION_ID)"
+
+            # Load context
+            PROJECT_TYPE=$(get_context_field "$SESSION_ID" "project_type")
+            PROJECT_DIR=$(get_context_field "$SESSION_ID" "project_dir")
+            PROGRAM_NAME=$(get_context_field "$SESSION_ID" "project_name")
+            IS_GIT_REPO=$(get_context_field "$SESSION_ID" "is_git_repo")
+
+            success "Session loaded"
+            list_item "Project type:" "$(label $PROJECT_TYPE)"
+            list_item "Project name:" "$PROGRAM_NAME"
+            list_item "Directory:" "$(path $PROJECT_DIR)"
+            echo ""
+
+            # Set design directory
+            DESIGN_DIR="$DESIGNS_DIR/$PROGRAM_NAME"
+            mkdir -p "$DESIGN_DIR"
+
+            # Update session phase
+            update_phase "$SESSION_ID" "design"
+
+            return 0
+        fi
+    fi
+
+    # No session found
+    return 1
+}
 
 # Ask user a question and get response
 ask() {
@@ -287,10 +337,22 @@ design_dialog() {
 
     REQUIREMENTS=$(cat "$DESIGN_DIR/requirements.md")
 
+    # Include project type context if available
+    local project_context=""
+    if [[ -n "$PROJECT_TYPE" ]]; then
+        project_context="
+**Project Type**: $PROJECT_TYPE
+- tool: Single-file utility, no parallelization
+- program: Multi-file application, optional parallelization
+- project: GitHub-integrated, full parallel builders
+"
+    fi
+
     ARCHITECTURE=$(ci <<EOF
 You are an expert software architect. Based on these requirements, design a program:
 
 $REQUIREMENTS
+$project_context
 
 Provide a detailed design covering:
 
@@ -333,6 +395,8 @@ EOF
 
     case "$APPROVAL" in
         yes)
+            # Generate test suite before finalizing
+            generate_test_suite
             finalize_design
             ;;
         no)
@@ -347,6 +411,7 @@ EOF
             ;;
         *)
             warning "Invalid choice. Treating as 'yes'..."
+            generate_test_suite
             finalize_design
             ;;
     esac
@@ -387,6 +452,7 @@ EOF
     prompt "Does this work now? (yes/refine)"
     read -r APPROVAL
     if [[ "$APPROVAL" == "yes" ]]; then
+        generate_test_suite
         finalize_design
     else
         prompt "What else to change?"
@@ -395,9 +461,99 @@ EOF
     fi
 }
 
+# Generate test suite (Phase 4: Test Suite Generation)
+generate_test_suite() {
+    log_phase "Phase 4: Test Suite Generation"
+    info "Generating comprehensive test suite based on architecture..."
+
+    local requirements=$(cat "$DESIGN_DIR/requirements.md")
+    local architecture=$(cat "$DESIGN_DIR/architecture.md")
+
+    TEST_SUITE=$(ci <<EOF
+You are a test engineer. Based on these requirements and architecture, generate a comprehensive test suite:
+
+**Requirements:**
+$requirements
+
+**Architecture:**
+$architecture
+
+Generate a test specification covering:
+
+1. **Unit Tests**: Tests for individual functions/components
+   - Test name, component being tested, test scenario, expected result
+
+2. **Integration Tests**: Tests for component interactions
+   - Test name, components involved, test scenario, expected result
+
+3. **End-to-End Tests**: Tests for full program behavior
+   - Test name, user workflow, inputs, expected outputs
+
+4. **Edge Cases**: Boundary conditions and error scenarios
+   - Test name, edge case description, expected behavior
+
+5. **Test Data**: Sample inputs and expected outputs for each test category
+
+Format as a structured test plan that can be split among parallel builders.
+Group tests by component/feature for parallel execution.
+Be specific about assertions and success criteria.
+EOF
+)
+
+    if [ $? -ne 0 ] || [ -z "$TEST_SUITE" ]; then
+        warning "AI test generation failed, creating basic test plan..."
+        TEST_SUITE="# Test Suite
+
+## Basic Tests
+1. Program runs without errors
+2. Help text displays correctly
+3. Invalid input handled gracefully
+4. Core functionality works as specified
+
+Note: Test suite generation failed - expand manually."
+    fi
+
+    # Save test suite
+    echo "$TEST_SUITE" > "$DESIGN_DIR/test_suite.md"
+
+    # Display to user
+    box_header "Generated Test Suite" "${CHECK}"
+    cat "$DESIGN_DIR/test_suite.md" | colorize_markdown
+    box_footer
+
+    success "Test suite generated"
+
+    # Save to session if available
+    if [[ -n "$SESSION_ID" ]] && session_exists "$SESSION_ID"; then
+        # Copy test suite to session directory
+        local session_dir=$(get_session_dir "$SESSION_ID")
+        cp "$DESIGN_DIR/test_suite.md" "$session_dir/test_suite.md"
+
+        # Update session context
+        save_context_field "$SESSION_ID" "test_suite_generated" "true"
+        save_context_field "$SESSION_ID" "test_suite_location" "$DESIGN_DIR/test_suite.md"
+
+        info "Test suite saved to session"
+    fi
+}
+
 # Finalize design
 finalize_design() {
     info "Finalizing design..."
+
+    # Determine if test suite was generated
+    local has_test_suite="false"
+    local test_suite_location=""
+    if [[ -f "$DESIGN_DIR/test_suite.md" ]]; then
+        has_test_suite="true"
+        test_suite_location="$DESIGN_DIR/test_suite.md"
+    fi
+
+    # Determine build location based on project type
+    local build_location="~/.argo/tools/$PROGRAM_NAME"
+    if [[ -n "$PROJECT_DIR" ]]; then
+        build_location="$PROJECT_DIR"
+    fi
 
     # Create design.json (structured for build_program)
     cat > "$DESIGN_DIR/design.json" <<EOF
@@ -410,10 +566,21 @@ finalize_design() {
   "success_criteria": $(printf '%s' "$SUCCESS_CRITERIA" | jq -Rs .),
   "constraints": $(printf '%s' "$CONSTRAINTS" | jq -Rs .),
   "design_complete": true,
+  "test_suite_generated": $has_test_suite,
+  "test_suite_location": $(printf '%s' "$test_suite_location" | jq -Rs .),
+  "project_type": $(printf '%s' "$PROJECT_TYPE" | jq -Rs .),
+  "session_id": $(printf '%s' "$SESSION_ID" | jq -Rs .),
   "created": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "build_location": "~/.argo/tools/$PROGRAM_NAME"
+  "build_location": $(printf '%s' "$build_location" | jq -Rs .)
 }
 EOF
+
+    # Update session context if available
+    if [[ -n "$SESSION_ID" ]] && session_exists "$SESSION_ID"; then
+        save_context_field "$SESSION_ID" "design_complete" "true"
+        save_context_field "$SESSION_ID" "design_location" "$DESIGN_DIR"
+        update_phase "$SESSION_ID" "design_complete"
+    fi
 
     banner_summary "Design Complete!"
 
@@ -421,10 +588,18 @@ EOF
     echo -e "${BOLD}${WHITE}Language:${NC} $(arg $LANGUAGE)"
     echo -e "${BOLD}${WHITE}Location:${NC} $(path $DESIGN_DIR)"
 
+    if [[ -n "$PROJECT_TYPE" ]]; then
+        echo -e "${BOLD}${WHITE}Type:${NC} $(label $PROJECT_TYPE)"
+    fi
+
     list_header "Files created:"
     list_item "requirements.md" "what you want"
     list_item "architecture.md" "how to build it"
     list_item "design.json" "structured design"
+
+    if [[ "$has_test_suite" == "true" ]]; then
+        list_item "test_suite.md" "comprehensive tests"
+    fi
 
     next_steps "Next steps" \
         "Review design: $(cmd cat) $(path $DESIGN_DIR/architecture.md)" \
@@ -433,12 +608,25 @@ EOF
 
 # Main execution
 main() {
+    # Setup colors
+    setup_colors
+
     banner_welcome "Welcome to Program Designer!" \
                    "AI-assisted program design through interactive dialog"
+
+    # Try to load session context
+    if load_session_context; then
+        info "Continuing from project intake session"
+        echo ""
+    else
+        info "Running in standalone mode (no session)"
+        echo ""
+    fi
 
     info "This workflow will:"
     list_pending "Gather your requirements"
     list_pending "AI proposes architecture"
+    list_pending "Generate test suite"
     list_pending "Create design documents"
 
     echo ""
@@ -448,8 +636,11 @@ main() {
     # Ensure designs directory exists
     mkdir -p "$DESIGNS_DIR"
 
-    # Run phases
-    gather_program_identity
+    # Run phases (skip gather_program_identity if session loaded with name)
+    if [[ -z "$PROGRAM_NAME" ]]; then
+        gather_program_identity
+    fi
+
     gather_requirements
     design_dialog
 

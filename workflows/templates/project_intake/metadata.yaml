@@ -1,0 +1,21 @@
+# © 2025 Casey Koons All rights reserved
+name: project_intake
+description: Classify project type and initialize workspace
+version: 1.0.0
+author: Casey Koons
+created: 2025-10-22
+category: foundation
+
+# Workflow configuration
+interactive: true
+requires_design: false
+
+# Classification types supported
+project_types:
+  - tool       # Single-file utility
+  - program    # Multi-file application
+  - project    # GitHub-integrated project
+
+# Session state integration
+creates_session: true
+hands_off_to: design_program
