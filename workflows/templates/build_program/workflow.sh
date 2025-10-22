@@ -157,6 +157,281 @@ load_design() {
     echo -e "${BOLD}${WHITE}Purpose:${NC} $PURPOSE"
 }
 
+# Determine if parallelization is needed
+determine_parallelization() {
+    log_phase "Parallelization Analysis"
+
+    # Check project type
+    if [[ "$PROJECT_TYPE" == "tool" ]]; then
+        info "Project type: $(label tool) - Single builder only"
+        PARALLEL_BUILD=false
+        return 0
+    fi
+
+    # Count features
+    local feature_count=$(jq -r '.features | length' "$DESIGN_DIR/design.json" 2>/dev/null || echo "0")
+
+    if [[ "$PROJECT_TYPE" == "program" ]]; then
+        if [[ $feature_count -lt $ARGO_MIN_FEATURES_FOR_PARALLEL ]]; then
+            info "Program has $feature_count features (min: $ARGO_MIN_FEATURES_FOR_PARALLEL) - Single builder"
+            PARALLEL_BUILD=false
+        else
+            prompt "Enable parallel builders? (yes/no)"
+            read -r enable_parallel
+            if [[ "$enable_parallel" == "yes" ]]; then
+                PARALLEL_BUILD=true
+            else
+                PARALLEL_BUILD=false
+            fi
+        fi
+    elif [[ "$PROJECT_TYPE" == "project" ]]; then
+        info "Project type: $(label project) - Parallel builders enabled"
+        PARALLEL_BUILD=true
+    else
+        # Standalone mode (no session)
+        PARALLEL_BUILD=false
+    fi
+
+    if [[ "$PARALLEL_BUILD" == "true" ]]; then
+        # Determine builder count (min 2, max ARGO_MAX_BUILDERS)
+        BUILDER_COUNT=$((feature_count < ARGO_MAX_BUILDERS ? feature_count : ARGO_MAX_BUILDERS))
+        BUILDER_COUNT=$((BUILDER_COUNT < 2 ? 2 : BUILDER_COUNT))
+        success "Parallel build enabled: $BUILDER_COUNT builders"
+    else
+        BUILDER_COUNT=1
+        success "Single builder mode"
+    fi
+}
+
+# Decompose tasks for parallel builders
+decompose_tasks() {
+    log_phase "Task Decomposition"
+    info "Analyzing requirements and architecture for independent tasks..."
+
+    local requirements=$(cat "$DESIGN_DIR/requirements.md")
+    local architecture=$(cat "$DESIGN_DIR/architecture.md")
+    local test_suite=$(cat "$DESIGN_DIR/test_suite.md" 2>/dev/null || echo "No test suite available")
+
+    TASK_DECOMPOSITION=$(ci <<EOF
+You are a technical architect decomposing a project into $BUILDER_COUNT independent parallel tasks.
+
+**Critical requirement**: Each task MUST be completely independent - no dependencies between tasks.
+If tasks depend on each other, group them into the same task.
+
+Requirements:
+$requirements
+
+Architecture:
+$architecture
+
+Test Suite:
+$test_suite
+
+Decompose this into exactly $BUILDER_COUNT independent tasks that can be built in parallel.
+
+For each task, provide:
+1. **Task ID**: argo-A, argo-B, etc. (up to argo-E)
+2. **Task Description**: Brief summary (one line)
+3. **Components**: What files/modules this task implements
+4. **Tests**: Which tests from the test suite apply to this task
+5. **Independence Check**: Confirm this task has NO dependencies on other tasks
+
+Format as JSON array:
+[
+  {
+    "task_id": "argo-A",
+    "description": "Implement user authentication",
+    "components": ["auth.py", "login.py"],
+    "tests": ["test_login", "test_logout", "test_token_validation"],
+    "independent": true
+  }
+]
+
+Output ONLY the JSON array, nothing else.
+EOF
+)
+
+    if [ $? -ne 0 ] || [ -z "$TASK_DECOMPOSITION" ]; then
+        error "Task decomposition failed"
+        return 1
+    fi
+
+    # Save task decomposition
+    echo "$TASK_DECOMPOSITION" > "$DESIGN_DIR/tasks.json"
+
+    # Display tasks
+    box_header "Task Decomposition" "$ROBOT"
+    echo "$TASK_DECOMPOSITION" | jq -r '.[] | "[\(.task_id)] \(.description)"'
+    box_footer
+
+    success "Tasks decomposed"
+}
+
+# Signal handler for child process exits
+handle_child_exit() {
+    # Check which builders have exited
+    for builder_id in "${!BUILDER_PIDS[@]}"; do
+        local pid="${BUILDER_PIDS[$builder_id]}"
+        if ! kill -0 "$pid" 2>/dev/null; then
+            # Builder has exited
+            wait "$pid"
+            local exit_code=$?
+
+            # Read final state
+            local status=$(get_builder_status "$SESSION_ID" "$builder_id")
+
+            if [[ $exit_code -eq 0 ]]; then
+                success "Builder $builder_id completed: $status"
+            else
+                warning "Builder $builder_id failed: $status (exit $exit_code)"
+            fi
+
+            # Remove from active list
+            unset BUILDER_PIDS[$builder_id]
+        fi
+    done
+}
+
+# Spawn parallel builders
+spawn_builders() {
+    log_phase "Spawning Builders"
+
+    # Set up signal handler
+    trap 'handle_child_exit' SIGCHLD
+
+    # Create feature branch if git repo
+    if [[ "$IS_GIT_REPO" == "yes" ]]; then
+        FEATURE_BRANCH="$PROGRAM_NAME/feature"
+        if ! git_branch_exists "$FEATURE_BRANCH"; then
+            git_create_branch "$FEATURE_BRANCH" "$MAIN_BRANCH"
+            success "Created feature branch: $(path $FEATURE_BRANCH)"
+        fi
+    fi
+
+    # Spawn each builder
+    local task_count=$(echo "$TASK_DECOMPOSITION" | jq '. | length')
+    for i in $(seq 0 $((task_count - 1))); do
+        local task=$(echo "$TASK_DECOMPOSITION" | jq -r ".[$i]")
+        local builder_id=$(echo "$task" | jq -r '.task_id')
+        local description=$(echo "$task" | jq -r '.description')
+        local builder_branch="$FEATURE_BRANCH/$builder_id"
+
+        # Create builder branch if git repo
+        if [[ "$IS_GIT_REPO" == "yes" ]]; then
+            git_create_branch "$builder_branch" "$FEATURE_BRANCH"
+        fi
+
+        # Initialize builder state
+        init_builder_state "$SESSION_ID" "$builder_id" "$builder_branch" "$description"
+
+        # Spawn builder process (background)
+        "$LIB_DIR/builder_ci_loop.sh" "$SESSION_ID" "$builder_id" "$DESIGN_DIR" "$BUILD_DIR" &
+        BUILDER_PIDS[$builder_id]=$!
+
+        info "Spawned builder $(label $builder_id): $description (PID: ${BUILDER_PIDS[$builder_id]})"
+        BUILDER_IDS+=("$builder_id")
+    done
+
+    success "All builders spawned"
+}
+
+# Monitor builder progress
+monitor_builders() {
+    log_phase "Building in Parallel"
+
+    info "Monitoring ${#BUILDER_IDS[@]} builders..."
+    echo ""
+
+    while [[ ${#BUILDER_PIDS[@]} -gt 0 ]]; do
+        # Display current status
+        for builder_id in "${BUILDER_IDS[@]}"; do
+            if [[ -n "${BUILDER_PIDS[$builder_id]}" ]]; then
+                local status=$(get_builder_status "$SESSION_ID" "$builder_id" 2>/dev/null || echo "unknown")
+                local state_file=$(get_session_dir "$SESSION_ID")/builders/$builder_id.json
+
+                if [[ -f "$state_file" ]]; then
+                    local passed=$(jq -r '.tests_passed_count' "$state_file")
+                    local failed=$(jq -r '.tests_failed_count' "$state_file")
+                    echo -e "  $(label $builder_id): $status (${GREEN}$passed passed${NC}, ${RED}$failed failed${NC})"
+                fi
+            fi
+        done
+
+        sleep 5
+        echo -e "\033[${#BUILDER_IDS[@]}A"  # Move cursor up
+    done
+
+    echo ""
+    success "All builders finished"
+}
+
+# Sequential merge of builder branches
+merge_builder_branches() {
+    log_phase "Merging Results"
+
+    if [[ "$IS_GIT_REPO" != "yes" ]]; then
+        info "Not a git repo - skipping merge"
+        return 0
+    fi
+
+    # Get successful builders
+    local -a successful_builders=()
+    for builder_id in "${BUILDER_IDS[@]}"; do
+        local status=$(get_builder_status "$SESSION_ID" "$builder_id")
+        if [[ "$status" == "completed" ]]; then
+            successful_builders+=("$builder_id")
+        fi
+    done
+
+    if [[ ${#successful_builders[@]} -eq 0 ]]; then
+        error "No builders completed successfully"
+        return 1
+    fi
+
+    info "Merging ${#successful_builders[@]} successful builders..."
+
+    # Checkout feature branch
+    git_checkout_branch "$FEATURE_BRANCH"
+
+    # Sort builders by lines changed (smallest first)
+    local -a sorted_builders=()
+    for builder_id in "${successful_builders[@]}"; do
+        local branch="$FEATURE_BRANCH/$builder_id"
+        local lines=$(git_get_lines_changed "$FEATURE_BRANCH" "$branch")
+        sorted_builders+=("$lines:$builder_id")
+    done
+
+    # Sort numerically
+    IFS=$'\n' sorted_builders=($(sort -n <<<"${sorted_builders[*]}"))
+    unset IFS
+
+    # Sequential merge
+    for entry in "${sorted_builders[@]}"; do
+        local builder_id="${entry#*:}"
+        local branch="$FEATURE_BRANCH/$builder_id"
+
+        step "Merging $(label $builder_id)..."
+
+        if git_merge_branch "$branch" "Merge $builder_id"; then
+            success "Merged $builder_id cleanly"
+            git_delete_branch "$branch"
+        else
+            if git_has_conflicts; then
+                warning "Conflicts detected in $builder_id"
+                info "Conflicted files:"
+                git_list_conflicts
+
+                # For now, abort and report
+                git_abort_merge
+                error "Manual conflict resolution required for $builder_id"
+                return 1
+            fi
+        fi
+    done
+
+    success "All builders merged successfully"
+}
+
 # Phase 2: Determine Build Location
 determine_build_location() {
     log_phase "Phase 2: Build Location"
@@ -500,17 +775,20 @@ offer_installation() {
 
 # Main execution
 main() {
+    # Setup colors
+    setup_colors
+
     banner_welcome "Welcome to Program Builder!" \
                    "AI-powered code generation from design documents"
 
-    info "This workflow will:"
-    list_pending "Load your design"
-    list_pending "Ask clarifying questions"
-    list_pending "Generate complete source code"
-    list_pending "Create comprehensive tests"
-    list_pending "Build documentation"
-
-    echo ""
+    # Try to load session context
+    if load_session_context; then
+        info "Continuing from design session"
+        echo ""
+    else
+        info "Running in standalone mode (no session)"
+        echo ""
+    fi
 
     # Load design (pass workflow arguments)
     load_design "$@"
@@ -518,17 +796,67 @@ main() {
     # Determine where to build
     determine_build_location "$@"
 
-    # Ask any clarifying questions
-    ask_clarifying_questions
+    # Determine if parallel build needed
+    determine_parallelization
 
-    # Build the program
-    build_program
+    if [[ "$PARALLEL_BUILD" == "true" ]]; then
+        # Parallel build path
+        info "This workflow will:"
+        list_pending "Decompose tasks into independent components"
+        list_pending "Spawn parallel builders"
+        list_pending "Monitor builder progress"
+        list_pending "Merge results sequentially"
+        list_pending "Test and install"
+        echo ""
 
-    # Test it
-    test_program || warning "Continue with manual testing"
+        # Decompose tasks
+        decompose_tasks || exit 1
 
-    # Offer installation
-    offer_installation
+        # Spawn builders
+        spawn_builders
+
+        # Monitor progress (async - updates while builders run)
+        monitor_builders
+
+        # Merge branches
+        merge_builder_branches || {
+            error "Merge failed - manual intervention required"
+            exit 1
+        }
+
+        # Final test of merged result
+        test_program || warning "Continue with manual testing"
+
+        # Offer installation
+        offer_installation
+
+    else
+        # Single builder path (original flow)
+        info "This workflow will:"
+        list_pending "Load your design"
+        list_pending "Ask clarifying questions"
+        list_pending "Generate complete source code"
+        list_pending "Create comprehensive tests"
+        list_pending "Build documentation"
+        echo ""
+
+        # Ask any clarifying questions
+        ask_clarifying_questions
+
+        # Build the program
+        build_program
+
+        # Test it
+        test_program || warning "Continue with manual testing"
+
+        # Offer installation
+        offer_installation
+    fi
+
+    # Update session if available
+    if [[ -n "$SESSION_ID" ]] && session_exists "$SESSION_ID"; then
+        update_phase "$SESSION_ID" "build_complete"
+    fi
 
     success "Build workflow complete!"
 }
