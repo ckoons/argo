@@ -20,6 +20,8 @@ LIB_DIR="$ARGO_ROOT/lib"
 source "$LIB_DIR/arc-colors.sh"
 source "$LIB_DIR/state-manager.sh"
 source "$LIB_DIR/git-helpers.sh"
+source "$LIB_DIR/failure-handler.sh"  # Phase 5.1
+source "$LIB_DIR/conflict-resolver.sh"  # Phase 5.2
 
 # Load configuration
 if [[ -f "${HOME}/.argo/config" ]]; then
@@ -267,7 +269,7 @@ EOF
     success "Tasks decomposed"
 }
 
-# Signal handler for child process exits
+# Signal handler for child process exits (enhanced with Phase 5.1)
 handle_child_exit() {
     # Check which builders have exited
     for builder_id in "${!BUILDER_PIDS[@]}"; do
@@ -284,6 +286,17 @@ handle_child_exit() {
                 success "Builder $builder_id completed: $status"
             else
                 warning "Builder $builder_id failed: $status (exit $exit_code)"
+
+                # Phase 5.1: Try to handle failure automatically
+                if handle_builder_failure "$SESSION_ID" "$builder_id" "$DESIGN_DIR" "$BUILD_DIR"; then
+                    # Failure handled, respawned with new PID
+                    info "Builder $builder_id recovery in progress..."
+                    # Don't remove from active list yet - will be updated by respawn
+                    continue
+                else
+                    # Could not handle automatically - marked for user escalation
+                    error "Builder $builder_id needs manual intervention"
+                fi
             fi
 
             # Remove from active list
@@ -405,7 +418,7 @@ merge_builder_branches() {
     IFS=$'\n' sorted_builders=($(sort -n <<<"${sorted_builders[*]}"))
     unset IFS
 
-    # Sequential merge
+    # Sequential merge (enhanced with Phase 5.2)
     for entry in "${sorted_builders[@]}"; do
         local builder_id="${entry#*:}"
         local branch="$FEATURE_BRANCH/$builder_id"
@@ -418,12 +431,22 @@ merge_builder_branches() {
         else
             if git_has_conflicts; then
                 warning "Conflicts detected in $builder_id"
-                info "Conflicted files:"
-                git_list_conflicts
 
-                # For now, abort and report
-                git_abort_merge
-                error "Manual conflict resolution required for $builder_id"
+                # Phase 5.2: Try to handle conflicts automatically
+                if handle_merge_conflict "$SESSION_ID" "$builder_id" "$FEATURE_BRANCH" "$branch" "$DESIGN_DIR" "$BUILD_DIR"; then
+                    success "Conflicts resolved for $builder_id"
+
+                    # Complete the merge
+                    git commit -m "Merge $builder_id (conflicts resolved)"
+                    git_delete_branch "$branch"
+                else
+                    # Could not handle automatically - marked for user escalation
+                    error "Manual conflict resolution required for $builder_id"
+                    return 1
+                fi
+            else
+                # Merge failed for other reason
+                error "Merge failed for $builder_id (non-conflict error)"
                 return 1
             fi
         fi
