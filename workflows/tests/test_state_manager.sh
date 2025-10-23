@@ -52,7 +52,7 @@ test_create_session() {
     local session_id=$(create_session "test_project")
 
     assert_not_empty "$session_id" "Session ID should not be empty" || return 1
-    assert_matches "$session_id" "^proj-[0-9]{8}-[0-9]{6}$" "Session ID format" || return 1
+    assert_matches "$session_id" "^proj-[A-Z]+$" "Session ID format (proj-A, proj-B, etc.)" || return 1
 
     local session_dir=$(get_session_dir "$session_id")
     assert_dir_exists "$session_dir" "Session directory should exist" || return 1
@@ -333,11 +333,9 @@ test_delete_session() {
 }
 
 test_list_sessions() {
-    # Create multiple sessions (with small delay to ensure unique timestamps)
+    # Create multiple sessions (sequential IDs, no timing issues)
     local session1=$(create_session "project1")
-    sleep 1
     local session2=$(create_session "project2")
-    sleep 1
     local session3=$(create_session "project3")
 
     # Verify all sessions exist first
@@ -367,7 +365,6 @@ test_list_sessions() {
 
 test_get_latest_session() {
     local session1=$(create_session "old_project")
-    sleep 1
     local session2=$(create_session "new_project")
 
     local latest=$(get_latest_session)

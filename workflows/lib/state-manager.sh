@@ -18,13 +18,67 @@ mkdir -p "$ARCHIVES_DIR"
 # Session Management
 # ============================================================================
 
+# Generate next session ID (sequential: proj-A, proj-B, ..., proj-Z, proj-AA, ...)
+# Returns: next session_id
+generate_session_id() {
+    # Get all existing session IDs
+    local existing_ids=$(list_sessions 2>/dev/null | sed 's/^proj-//' | sort)
+
+    if [[ -z "$existing_ids" ]]; then
+        echo "proj-A"
+        return 0
+    fi
+
+    # Get the last ID
+    local last_id=$(echo "$existing_ids" | tail -1)
+
+    # Increment the ID (A->B, Z->AA, etc.)
+    local next_id=$(increment_alpha_id "$last_id")
+    echo "proj-$next_id"
+}
+
+# Increment alphanumeric ID (A->B, Z->AA, AZ->BA, etc.)
+increment_alpha_id() {
+    local id="$1"
+    local len=${#id}
+    local result=""
+    local carry=1
+
+    # Process from right to left
+    for ((i=len-1; i>=0; i--)); do
+        local char="${id:$i:1}"
+
+        if [[ $carry -eq 1 ]]; then
+            if [[ "$char" == "Z" ]]; then
+                result="A${result}"
+                carry=1
+            else
+                # Increment the character
+                local ascii=$(printf '%d' "'$char")
+                local next_ascii=$((ascii + 1))
+                result="$(printf \\$(printf '%03o' $next_ascii))${result}"
+                carry=0
+            fi
+        else
+            result="${char}${result}"
+        fi
+    done
+
+    # If we still have carry, prepend 'A'
+    if [[ $carry -eq 1 ]]; then
+        result="A${result}"
+    fi
+
+    echo "$result"
+}
+
 # Create a new session with unique ID
 # Returns: session_id
 create_session() {
     local project_name="${1:-unnamed}"
 
-    # Generate session ID: proj-YYYYMMDD-HHMMSS
-    local session_id="proj-$(date +%Y%m%d-%H%M%S)"
+    # Generate sequential session ID
+    local session_id=$(generate_session_id)
     local session_dir="$SESSIONS_DIR/$session_id"
 
     # Create session directory structure
