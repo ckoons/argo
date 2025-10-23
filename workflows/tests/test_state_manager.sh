@@ -333,9 +333,11 @@ test_delete_session() {
 }
 
 test_list_sessions() {
-    # Create multiple sessions
+    # Create multiple sessions (with small delay to ensure unique timestamps)
     local session1=$(create_session "project1")
+    sleep 1
     local session2=$(create_session "project2")
+    sleep 1
     local session3=$(create_session "project3")
 
     # Verify all sessions exist first

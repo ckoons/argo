@@ -382,7 +382,7 @@ delete_session() {
 # List all active sessions
 list_sessions() {
     shopt -s nullglob
-    for session_dir in "$SESSIONS_DIR"/proj-*/; do
+    for session_dir in "$SESSIONS_DIR"/proj-*; do
         if [[ -d "$session_dir" ]]; then
             basename "$session_dir"
         fi
