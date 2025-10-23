@@ -1,0 +1,23 @@
+[
+  {
+    "task_id": "argo-A",
+    "description": "Implement input module",
+    "components": ["input.sh"],
+    "tests": ["test_read_input", "test_validate_input", "test_parse_input"],
+    "independent": true
+  },
+  {
+    "task_id": "argo-B",
+    "description": "Implement processing module",
+    "components": ["process.sh"],
+    "tests": ["test_transform_data", "test_aggregate_results", "test_filter_data"],
+    "independent": true
+  },
+  {
+    "task_id": "argo-C",
+    "description": "Implement output module",
+    "components": ["output.sh"],
+    "tests": ["test_format_output", "test_write_output", "test_generate_summary"],
+    "independent": true
+  }
+]

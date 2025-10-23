@@ -1,0 +1,15 @@
+{
+  "session_id": "proj-20251023-120000",
+  "project_name": "test_project",
+  "project_type": "project",
+  "project_dir": "/tmp/test_project",
+  "is_new_project": "yes",
+  "is_git_repo": "yes",
+  "is_github_project": "yes",
+  "main_branch": "main",
+  "feature_branch": "feature/test",
+  "parallel_builds": true,
+  "builder_count": 3,
+  "current_phase": "build",
+  "created": "2025-10-23T12:00:00Z"
+}
