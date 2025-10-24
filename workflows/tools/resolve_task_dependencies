@@ -1,0 +1,96 @@
+#!/bin/bash
+# © 2025 Casey Koons All rights reserved
+#
+# resolve_task_dependencies - DC tool to resolve task execution order
+#
+# Performs topological sort on tasks based on dependencies
+#
+# Usage: resolve_task_dependencies <tasks.json>
+# Output: Task IDs in execution order (one per line)
+
+tasks_file="$1"
+
+if [[ ! -f "$tasks_file" ]]; then
+    echo "Error: Tasks file not found: $tasks_file" >&2
+    exit 1
+fi
+
+# Topological sort using Kahn's algorithm
+# 1. Find all tasks with no dependencies
+# 2. Add them to result
+# 3. Remove them from graph
+# 4. Repeat until all tasks processed
+
+# Extract tasks as JSON
+tasks_json=$(cat "$tasks_file")
+task_count=$(echo "$tasks_json" | jq '.tasks | length')
+
+if [[ $task_count -eq 0 ]]; then
+    echo "Error: No tasks found" >&2
+    exit 1
+fi
+
+# Create temporary files for tracking
+remaining_tasks=$(mktemp)
+completed_tasks=$(mktemp)
+result=$(mktemp)
+
+# Initialize remaining tasks (all task IDs)
+echo "$tasks_json" | jq -r '.tasks[].id' > "$remaining_tasks"
+
+# Main loop: process tasks in dependency order
+while [[ -s "$remaining_tasks" ]]; do
+    processed_count=0
+
+    # Find tasks with satisfied dependencies
+    while IFS= read -r task_id; do
+        if [[ -z "$task_id" ]]; then
+            continue
+        fi
+
+        # Get dependencies for this task
+        dependencies=$(echo "$tasks_json" | jq -r ".tasks[] | select(.id == \"$task_id\") | .depends_on[]? // empty")
+
+        # Check if all dependencies are completed
+        all_deps_met=true
+        while IFS= read -r dep; do
+            if [[ -z "$dep" ]]; then
+                continue
+            fi
+
+            # Check if dependency is in completed list
+            if ! grep -q "^${dep}$" "$completed_tasks"; then
+                all_deps_met=false
+                break
+            fi
+        done <<< "$dependencies"
+
+        # If all dependencies met, add to result
+        if [[ "$all_deps_met" == "true" ]]; then
+            echo "$task_id" >> "$result"
+            echo "$task_id" >> "$completed_tasks"
+            processed_count=$((processed_count + 1))
+
+            # Remove from remaining
+            grep -v "^${task_id}$" "$remaining_tasks" > "${remaining_tasks}.tmp"
+            mv "${remaining_tasks}.tmp" "$remaining_tasks"
+        fi
+    done < "$remaining_tasks"
+
+    # Check for circular dependencies
+    if [[ $processed_count -eq 0 ]] && [[ -s "$remaining_tasks" ]]; then
+        echo "Error: Circular dependency detected or unmet dependencies" >&2
+        echo "Remaining tasks:" >&2
+        cat "$remaining_tasks" >&2
+        rm -f "$remaining_tasks" "$completed_tasks" "$result"
+        exit 1
+    fi
+done
+
+# Output result
+cat "$result"
+
+# Cleanup
+rm -f "$remaining_tasks" "$completed_tasks" "$result"
+
+exit 0

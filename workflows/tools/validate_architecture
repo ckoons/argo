@@ -1,0 +1,66 @@
+#!/bin/bash
+# © 2025 Casey Koons All rights reserved
+#
+# validate_architecture - DC tool to validate architecture completeness
+#
+# Deterministic validation of architecture in context.json
+#
+# Usage: validate_architecture <context.json>
+# Updates: architecture.validated, architecture.validation_errors in context.json
+
+context_file="$1"
+
+if [[ ! -f "$context_file" ]]; then
+    echo "Error: Context file not found: $context_file" >&2
+    exit 1
+fi
+
+# Extract architecture fields
+components=$(jq -r '.architecture.components | length' "$context_file")
+interfaces=$(jq -r '.architecture.interfaces | length' "$context_file")
+requirements_converged=$(jq -r '.requirements.converged' "$context_file")
+
+# Validation logic (deterministic checks)
+errors=()
+
+# Check that requirements are converged first
+if [[ "$requirements_converged" != "true" ]]; then
+    errors+=("Requirements not converged - complete requirements first")
+fi
+
+# Check components
+if [[ "$components" == "0" ]]; then
+    errors+=("No components specified")
+fi
+
+# Check interfaces (can be 0 for single-component systems)
+# So this is just informational, not an error
+
+# Update context.json with validation results
+temp_file=$(mktemp)
+
+if [[ ${#errors[@]} -eq 0 ]]; then
+    # Validation passed
+    jq '.architecture.validated = true |
+        .architecture.validation_errors = [] |
+        .metadata.last_updated = now | .metadata.last_updated |= todate' \
+       "$context_file" > "$temp_file"
+else
+    # Validation failed - format errors as JSON array
+    errors_json=$(printf '%s\n' "${errors[@]}" | jq -R . | jq -s .)
+
+    jq --argjson errors "$errors_json" \
+       '.architecture.validated = false |
+        .architecture.validation_errors = $errors |
+        .metadata.last_updated = now | .metadata.last_updated |= todate' \
+       "$context_file" > "$temp_file"
+fi
+
+mv "$temp_file" "$context_file"
+
+# Exit with status (0 = valid, 1 = invalid)
+if [[ ${#errors[@]} -eq 0 ]]; then
+    exit 0
+else
+    exit 1
+fi

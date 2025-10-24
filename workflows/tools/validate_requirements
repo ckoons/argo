@@ -1,0 +1,63 @@
+#!/bin/bash
+# © 2025 Casey Koons All rights reserved
+#
+# validate_requirements - DC tool to validate requirements completeness
+#
+# Deterministic validation of requirements in context.json
+#
+# Usage: validate_requirements <context.json>
+# Updates: requirements.validated, requirements.validation_errors in context.json
+
+context_file="$1"
+
+if [[ ! -f "$context_file" ]]; then
+    echo "Error: Context file not found: $context_file" >&2
+    exit 1
+fi
+
+# Extract requirements fields
+platform=$(jq -r '.requirements.platform' "$context_file")
+features=$(jq -r '.requirements.features | length' "$context_file")
+converged=$(jq -r '.requirements.converged' "$context_file")
+
+# Validation logic (deterministic checks)
+errors=()
+
+# Check platform
+if [[ "$platform" == "null" ]] || [[ -z "$platform" ]]; then
+    errors+=("Platform not specified")
+fi
+
+# Check features
+if [[ "$features" == "0" ]]; then
+    errors+=("No features specified")
+fi
+
+# Update context.json with validation results
+temp_file=$(mktemp)
+
+if [[ ${#errors[@]} -eq 0 ]]; then
+    # Validation passed
+    jq '.requirements.validated = true |
+        .requirements.validation_errors = [] |
+        .metadata.last_updated = now | .metadata.last_updated |= todate' \
+       "$context_file" > "$temp_file"
+else
+    # Validation failed - format errors as JSON array
+    errors_json=$(printf '%s\n' "${errors[@]}" | jq -R . | jq -s .)
+
+    jq --argjson errors "$errors_json" \
+       '.requirements.validated = false |
+        .requirements.validation_errors = $errors |
+        .metadata.last_updated = now | .metadata.last_updated |= todate' \
+       "$context_file" > "$temp_file"
+fi
+
+mv "$temp_file" "$context_file"
+
+# Exit with status (0 = valid, 1 = invalid)
+if [[ ${#errors[@]} -eq 0 ]]; then
+    exit 0
+else
+    exit 1
+fi

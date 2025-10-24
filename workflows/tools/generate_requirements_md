@@ -1,0 +1,76 @@
+#!/bin/bash
+# © 2025 Casey Koons All rights reserved
+#
+# generate_requirements_md - DC tool to generate requirements.md from context
+#
+# Deterministic generation of human-readable requirements documentation
+#
+# Usage: generate_requirements_md <context.json>
+# Updates: requirements.file in context.json
+
+context_file="$1"
+
+if [[ ! -f "$context_file" ]]; then
+    echo "Error: Context file not found: $context_file" >&2
+    exit 1
+fi
+
+# Get session directory (context.json is in session directory)
+session_dir=$(dirname "$context_file")
+output_file="$session_dir/requirements.md"
+
+# Extract requirements data
+project_name=$(jq -r '.project_name' "$context_file")
+platform=$(jq -r '.requirements.platform' "$context_file")
+features=$(jq -r '.requirements.features[]' "$context_file" 2>/dev/null)
+constraints=$(jq -r '.requirements.constraints | to_entries[] | "- \(.key): \(.value)"' "$context_file" 2>/dev/null)
+
+# Generate requirements.md (deterministic output)
+cat > "$output_file" <<EOF
+# Requirements: $project_name
+
+## Platform
+
+$platform
+
+## Features
+
+EOF
+
+# Add features
+if [[ -n "$features" ]]; then
+    while IFS= read -r feature; do
+        echo "- $feature" >> "$output_file"
+    done <<< "$features"
+else
+    echo "No features specified yet." >> "$output_file"
+fi
+
+# Add constraints if any
+if [[ -n "$constraints" ]]; then
+    cat >> "$output_file" <<EOF
+
+## Constraints
+
+EOF
+    echo "$constraints" >> "$output_file"
+fi
+
+# Add generation timestamp
+cat >> "$output_file" <<EOF
+
+---
+
+*Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
+EOF
+
+# Update context.json with file path
+temp_file=$(mktemp)
+jq --arg file "$output_file" \
+   '.requirements.file = $file |
+    .metadata.last_updated = now | .metadata.last_updated |= todate' \
+   "$context_file" > "$temp_file"
+mv "$temp_file" "$context_file"
+
+echo "Generated: $output_file"
+exit 0
