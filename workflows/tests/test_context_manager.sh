@@ -118,7 +118,7 @@ test_add_conversation_message_user() {
     echo "$messages" | grep -q "Hello, I want to build a calculator"
     assert_success $? "Should add user message" || return 1
 
-    echo "$messages" | grep -q "\"role\":\"user\""
+    echo "$messages" | grep -q '"role": "user"'
     assert_success $? "Should have correct role" || return 1
 }
 
@@ -133,7 +133,7 @@ test_add_conversation_message_assistant() {
     echo "$messages" | grep -q "I can help with that"
     assert_success $? "Should add assistant message" || return 1
 
-    echo "$messages" | grep -q "\"role\":\"assistant\""
+    echo "$messages" | grep -q '"role": "assistant"'
     assert_success $? "Should have correct role" || return 1
 }
 

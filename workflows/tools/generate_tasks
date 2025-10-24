@@ -92,30 +92,30 @@ fi
 
 # Add integration task (if multiple components)
 if [[ "$component_count" -gt 1 ]]; then
-    # Collect all test task IDs for dependencies
-    test_task_ids=$(echo "$tasks_json" | jq -r '[.tasks[] | select(.type == "test") | .id] | join(",")' | sed 's/,/","/g')
+    # Collect all test task IDs for dependencies (let jq build the array)
+    test_task_ids=$(echo "$tasks_json" | jq -c '[.tasks[] | select(.type == "test") | .id]')
 
-    tasks_json=$(echo "$tasks_json" | jq --arg deps "[$test_task_ids]" \
+    tasks_json=$(echo "$tasks_json" | jq --argjson deps "$test_task_ids" \
                                           '.tasks += [{
       "id": "integration",
       "name": "Integration testing",
       "type": "integration",
       "description": "Test component interactions",
       "status": "pending",
-      "depends_on": ($deps | fromjson)
+      "depends_on": $deps
     }]')
 fi
 
 # Add documentation task
-all_impl_ids=$(echo "$tasks_json" | jq -r '[.tasks[] | select(.type == "implementation") | .id] | join(",")' | sed 's/,/","/g')
-tasks_json=$(echo "$tasks_json" | jq --arg deps "[$all_impl_ids]" \
+all_impl_ids=$(echo "$tasks_json" | jq -c '[.tasks[] | select(.type == "implementation") | .id]')
+tasks_json=$(echo "$tasks_json" | jq --argjson deps "$all_impl_ids" \
                                       '.tasks += [{
   "id": "documentation",
   "name": "Generate documentation",
   "type": "documentation",
   "description": "Create user and developer documentation",
   "status": "pending",
-  "depends_on": ($deps | fromjson)
+  "depends_on": $deps
 }]')
 
 # Write tasks.json
