@@ -44,18 +44,18 @@ test_orchestrator_dispatches_phase() {
     export ARGO_PROJECTS_REGISTRY="$TEST_TMP_DIR/.argo/projects.json"
     "$SETUP_TEMPLATE" "test_project" "$project_dir" >/dev/null
 
-    # Set state for code to act
-    update_state "phase" "design_program"
+    # Set state for code to act (use test-specific phase name)
+    update_state "phase" "test_phase"
     update_state "action_owner" "code"
 
-    # Create mock phase handler
+    # Create mock phase handler (using test-specific name)
     mkdir -p "$SCRIPT_DIR/../phases"
-    cat > "$SCRIPT_DIR/../phases/design_program.sh" <<'EOF'
+    cat > "$SCRIPT_DIR/../phases/test_phase.sh" <<'EOF'
 #!/bin/bash
 touch /tmp/argo_phase_was_called
 exit 0
 EOF
-    chmod +x "$SCRIPT_DIR/../phases/design_program.sh"
+    chmod +x "$SCRIPT_DIR/../phases/test_phase.sh"
 
     rm -f /tmp/argo_phase_was_called
 
@@ -74,7 +74,7 @@ EOF
     assert_file_exists "/tmp/argo_phase_was_called" "Phase handler should be called"
 
     # Cleanup
-    rm -f "$SCRIPT_DIR/../phases/design_program.sh"
+    rm -f "$SCRIPT_DIR/../phases/test_phase.sh"
     rm -f /tmp/argo_phase_was_called
 }
 
@@ -229,20 +229,20 @@ test_orchestrator_polling() {
     export ARGO_PROJECTS_REGISTRY="$TEST_TMP_DIR/.argo/projects.json"
     "$SETUP_TEMPLATE" "test_project" "$project_dir" >/dev/null
 
-    # Start with CI owning action
-    update_state "phase" "design"
+    # Start with CI owning action (use test-specific phase)
+    update_state "phase" "test_poll"
     update_state "action_owner" "ci"
 
-    # Create phase handler that updates state
+    # Create phase handler that updates state (using test-specific name)
     mkdir -p "$SCRIPT_DIR/../phases"
-    cat > "$SCRIPT_DIR/../phases/design.sh" <<'EOF'
+    cat > "$SCRIPT_DIR/../phases/test_poll.sh" <<'EOF'
 #!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/state_file.sh"
 update_state "phase" "storage"
 exit 0
 EOF
-    chmod +x "$SCRIPT_DIR/../phases/design.sh"
+    chmod +x "$SCRIPT_DIR/../phases/test_poll.sh"
 
     # Start orchestrator
     "$ORCHESTRATOR" "$project_dir" >/dev/null 2>&1 &
@@ -261,7 +261,7 @@ EOF
 
     # Cleanup first
     kill $orch_pid 2>/dev/null || true
-    rm -f "$SCRIPT_DIR/../phases/design.sh"
+    rm -f "$SCRIPT_DIR/../phases/test_poll.sh"
 
     # Now assert
     assert_equals "storage" "$phase" "Orchestrator should poll and execute when state changes"
