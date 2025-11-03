@@ -47,6 +47,7 @@ test_orchestrator_dispatches_phase() {
     # Set state for code to act (use test-specific phase name)
     update_state "phase" "test_phase"
     update_state "action_owner" "code"
+    update_state "action_needed" "test_phase"  # Override default action_needed
 
     # Create mock phase handler (using test-specific name)
     mkdir -p "$SCRIPT_DIR/../phases"
@@ -64,7 +65,7 @@ EOF
     local orch_pid=$!
 
     # Give it time to run one iteration (need to wait for first poll)
-    sleep 2
+    sleep 7  # Increased from 2 to ensure full poll cycle
 
     # Kill orchestrator
     kill $orch_pid 2>/dev/null || true
@@ -232,6 +233,7 @@ test_orchestrator_polling() {
     # Start with CI owning action (use test-specific phase)
     update_state "phase" "test_poll"
     update_state "action_owner" "ci"
+    update_state "action_needed" "test_poll"  # Override default action_needed
 
     # Create phase handler that updates state (using test-specific name)
     mkdir -p "$SCRIPT_DIR/../phases"
