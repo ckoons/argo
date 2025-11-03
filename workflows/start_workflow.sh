@@ -6,9 +6,11 @@
 # Usage: ./start_workflow.sh <user_query> [project_path]
 #
 # Initializes workflow state and launches orchestrator daemon
+# Sets initial phase to "init" and action_owner to "code"
+# Orchestrator runs as background daemon process
 
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get script directory (needed for orchestrator path)
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source library modules
 source "$SCRIPT_DIR/lib/state_file.sh"
@@ -31,18 +33,21 @@ main() {
         return 1
     fi
 
-    # Convert to absolute path and verify
+    # Convert to absolute path and verify (absolute paths required for daemon)
     if [[ "$project_path" != "." ]]; then
-        project_path=$(cd "$project_path" 2>/dev/null && pwd)
-        if [[ $? -ne 0 ]]; then
-            echo "ERROR: Invalid project path" >&2
+        if ! project_path=$(cd "$project_path" 2>/dev/null && pwd); then
+            echo "ERROR: Invalid project path: $2" >&2
             return 1
         fi
     else
         project_path=$(pwd)
     fi
 
-    cd "$project_path"
+    # Change to project directory (needed for state operations)
+    cd "$project_path" || {
+        echo "ERROR: Failed to change to project directory" >&2
+        return 1
+    }
 
     # Verify .argo-project exists
     if [[ ! -d .argo-project ]]; then

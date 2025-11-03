@@ -8,7 +8,7 @@
 # Transitions from design -> execution
 
 # Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source library modules
 source "$SCRIPT_DIR/../lib/state_file.sh"
@@ -32,7 +32,10 @@ main() {
         return 1
     fi
 
-    cd "$project_path"
+    cd "$project_path" || {
+        echo "ERROR: Failed to change to project directory" >&2
+        return 1
+    }
 
     echo "=== design_build phase ==="
 

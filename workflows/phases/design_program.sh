@@ -8,14 +8,14 @@
 # Hands off to CI for design approval
 
 # Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source library modules
 source "$SCRIPT_DIR/../lib/state_file.sh"
 source "$SCRIPT_DIR/../lib/logging_enhanced.sh"
 
 # CI tool command (allow override for testing)
-CI_TOOL="${CI_COMMAND:-ci}"
+readonly CI_TOOL="${CI_COMMAND:-ci}"
 
 #
 # Main function
@@ -35,7 +35,10 @@ main() {
         return 1
     fi
 
-    cd "$project_path"
+    cd "$project_path" || {
+        echo "ERROR: Failed to change to project directory" >&2
+        return 1
+    }
 
     echo "=== design_program phase ==="
 
