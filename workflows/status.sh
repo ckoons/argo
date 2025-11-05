@@ -8,7 +8,7 @@
 # Displays current phase, action owner, and progress
 
 # Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source library modules
 source "$SCRIPT_DIR/lib/state_file.sh"
@@ -30,7 +30,10 @@ main() {
         project_path=$(pwd)
     fi
 
-    cd "$project_path"
+    cd "$project_path" || {
+        echo "ERROR: Failed to change to project directory" >&2
+        return 1
+    }
 
     # Verify .argo-project exists
     if [[ ! -d .argo-project ]]; then

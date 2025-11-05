@@ -13,7 +13,7 @@
 #   - Exits gracefully on SIGTERM/SIGINT or when phase="storage"
 
 # Get script directory (must be absolute for correct handler paths)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source library modules (state management and logging)
 source "$SCRIPT_DIR/lib/state_file.sh"

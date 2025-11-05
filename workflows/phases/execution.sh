@@ -18,7 +18,7 @@ source "$SCRIPT_DIR/../lib/logging_enhanced.sh"
 readonly CI_TOOL="${CI_COMMAND:-ci}"
 
 # Poll interval for monitoring builders
-MONITOR_INTERVAL=5
+readonly MONITOR_INTERVAL=5
 
 #
 # spawn_builder - Launch CI session for a builder
