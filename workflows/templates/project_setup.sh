@@ -63,6 +63,10 @@ main() {
     echo "Creating config.json..."
     cat > .argo-project/config.json <<'EOF'
 {
+  "ci": {
+    "tool": "ci",
+    "model": null
+  },
   "providers": {
     "default": "claude_code",
     "fallback": "claude_api"

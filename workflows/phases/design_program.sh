@@ -13,9 +13,10 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source library modules
 source "$SCRIPT_DIR/../lib/state_file.sh"
 source "$SCRIPT_DIR/../lib/logging_enhanced.sh"
+source "$SCRIPT_DIR/../lib/config.sh"
 
-# CI tool command (allow override for testing)
-readonly CI_TOOL="${CI_COMMAND:-ci}"
+# CI tool command (reads from config with fallback to environment variable)
+readonly CI_TOOL="$(get_ci_tool)"
 
 #
 # Main function
